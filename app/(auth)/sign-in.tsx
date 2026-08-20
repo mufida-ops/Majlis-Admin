@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
+import { FloralFlourish } from '@/components/FloralFlourish';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +44,7 @@ export default function SignInScreen() {
   return (
     <Screen>
       <View style={{ gap: 6 }}>
+        <FloralFlourish width={110} height={72} style={styles.flourish} />
         <Text style={styles.eyebrow}>Majlis</Text>
         <Text style={styles.title}>{mode === 'sign-in' ? 'Welcome back' : 'Create your account'}</Text>
         <Text style={styles.sub}>A shared, quiet workspace for Mufida and Victoria.</Text>
@@ -105,6 +107,7 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
+  flourish: { position: 'absolute', top: -18, right: -10, transform: [{ scaleX: -1 }] },
   eyebrow: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   title: { color: theme.colors.text, fontSize: 26, fontWeight: '600' },
   sub: { color: theme.colors.muted, fontSize: 15, lineHeight: 21 },
