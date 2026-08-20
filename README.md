@@ -35,6 +35,10 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   (`supabase/functions/parse-drop`) into reviewable `ai_actions` (create_task, assign_task, create_decision,
   resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for), shown for
   Accept/Dismiss on the Drop screen.
+- Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
+  drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
+  couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
+  keyboard's built-in microphone button, focused on the Drop text field.
 
 ## Run locally
 

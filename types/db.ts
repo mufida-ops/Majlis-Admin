@@ -62,6 +62,7 @@ export type DropRow = {
   raw_text: string;
   urgent: boolean;
   processed: boolean;
+  summary: string | null;
   created_at: string;
 };
 

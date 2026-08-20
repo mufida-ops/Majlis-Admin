@@ -3,7 +3,9 @@
 // Turns one freeform Drop into zero or more structured, reviewable
 // ai_actions rows (create_task, assign_task, create_decision, ...), using
 // Claude with forced tool use so the output is always valid structured
-// data instead of freeform text to parse.
+// data instead of freeform text to parse. In the same call, it also asks
+// for a short third-person summary of the drop, which replaces the raw
+// (possibly long, rambling) text in the co-founder's Catch-up feed.
 //
 // Deploy: supabase functions deploy parse-drop
 // Secrets required: ANTHROPIC_API_KEY (SUPABASE_URL and
@@ -37,6 +39,11 @@ const PROPOSE_ACTIONS_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
+      summary: {
+        type: 'string',
+        description:
+          "One or two plain sentences, third person, summarising what this note says for the founder's co-founder to read in their catch-up feed — e.g. \"Mufida decided to move the cultural box before teacher CPD in Phase 2 and flagged the venue deposit as due Friday.\" Written even for short notes; for a already-short note this may just lightly rephrase it."
+      },
       actions: {
         type: 'array',
         items: {
@@ -54,7 +61,7 @@ const PROPOSE_ACTIONS_TOOL = {
         }
       }
     },
-    required: ['actions']
+    required: ['summary', 'actions']
   }
 };
 
@@ -99,7 +106,10 @@ Deno.serve(async req => {
         supabase.from('organisations').select('id, name, stage').eq('workspace_id', drop.workspace_id)
       ]);
 
+    const author = (members ?? []).find(m => m.user_id === drop.created_by);
+
     const context = {
+      author_name: author?.display_name ?? 'A founder',
       members: (members ?? []).map(m => ({ user_id: m.user_id, name: m.display_name })),
       open_projects: (projects ?? []).map(p => ({ id: p.id, title: p.title })),
       open_tasks: (tasks ?? []).map(t => ({ id: t.id, title: t.title, status: t.status, project_id: t.project_id })),
@@ -123,9 +133,9 @@ Deno.serve(async req => {
           {
             role: 'user',
             content:
-              `A founder wrote this note ("drop"):\n\n"""${drop.raw_text}"""\n\n` +
+              `${context.author_name} wrote this note ("drop"), which may be a rough voice-dictated rant:\n\n"""${drop.raw_text}"""\n\n` +
               `Workspace context (only use these ids, never invent new ones):\n${JSON.stringify(context, null, 2)}\n\n` +
-              'Propose any structured follow-up actions this note clearly implies.'
+              'First, write the summary for their co-founder\'s catch-up feed. Then propose any structured follow-up actions this note clearly implies.'
           }
         ]
       })
@@ -138,6 +148,7 @@ Deno.serve(async req => {
 
     const completion = await anthropicResponse.json();
     const toolUse = completion.content?.find((block: { type: string }) => block.type === 'tool_use');
+    const summary: string | undefined = toolUse?.input?.summary;
     const actions: Array<{ action_type: string; confidence?: number; payload: Record<string, unknown> }> =
       toolUse?.input?.actions ?? [];
 
@@ -156,9 +167,21 @@ Deno.serve(async req => {
       if (insertError) throw new Error(insertError.message);
     }
 
-    await supabase.from('drops').update({ processed: true }).eq('id', drop.id);
+    await supabase.from('drops').update({ processed: true, summary: summary ?? null }).eq('id', drop.id);
 
-    return new Response(JSON.stringify({ proposed: rows.length }), {
+    // The insert trigger already logged this drop to activity_events using
+    // a raw-text snippet (before this summary existed); replace it now so
+    // the co-founder's catch-up feed shows the clean version, not the rant.
+    if (summary) {
+      await supabase
+        .from('activity_events')
+        .update({ summary })
+        .eq('workspace_id', drop.workspace_id)
+        .eq('entity_type', 'drop')
+        .eq('entity_id', drop.id);
+    }
+
+    return new Response(JSON.stringify({ proposed: rows.length, summary: summary ?? null }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (err) {

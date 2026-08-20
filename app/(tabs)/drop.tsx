@@ -119,8 +119,10 @@ export default function DropScreen() {
         {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
       </Card>
       <Text style={styles.note}>
-        Normal drops wait for {partner?.display_name ?? 'your co-founder'}'s catch-up. Urgent drops bypass their quiet
-        hours. A structured suggestion (task, decision, follow-up) may show up for review below once it's processed.
+        Talk or type freely — tap the microphone on your keyboard to dictate. {partner?.display_name ?? 'Your co-founder'}{' '}
+        won't see the raw text: it's condensed into a short summary for their catch-up feed. Normal drops wait for their
+        next catch-up; urgent drops bypass quiet hours. A structured suggestion (task, decision, follow-up) may also show
+        up for review below once it's processed.
       </Text>
 
       {actionsLoading ? (

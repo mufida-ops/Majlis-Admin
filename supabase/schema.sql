@@ -82,8 +82,10 @@ create table if not exists drops (
   raw_text text not null,
   urgent boolean not null default false,
   processed boolean not null default false,
+  summary text,
   created_at timestamptz not null default now()
 );
+alter table drops add column if not exists summary text;
 
 create table if not exists decisions (
   id uuid primary key default gen_random_uuid(),
