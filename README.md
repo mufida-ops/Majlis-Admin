@@ -42,7 +42,9 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
 
 ## Run locally
 
-1. Install Node.js (this project was built against Node 22 / Expo SDK 57).
+1. Install Node.js (this project was built against Node 22 / Expo SDK 54 — deliberately pinned one SDK below
+   latest, since the published Expo Go client on the app stores lags a freshly-released SDK by some weeks; bump
+   once Expo Go itself supports a newer SDK).
 2. Install dependencies:
 
    ```
