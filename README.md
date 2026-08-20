@@ -1,18 +1,7 @@
 # Majlis Founder OS
 
-A mobile-first shared founder workspace for Mufida and Victoria: quick capture, shared projects, simple Gantt views, decisions, CRM, and asynchronous catch-up.
-
-## What is working in this starter
-
-- Expo Router tab structure
-- Home / Drop / Projects / Decisions / CRM
-- hidden Catch-up route linked from Home
-- local interactive capture state
-- local decision state
-- seeded Majlis project and CRM data
-- simple project-level Gantt visualisation
-- shared-workspace Supabase schema with RLS scaffolding
-- Supabase client abstraction
+A mobile-first shared founder workspace for Mufida and Victoria: quick capture, shared projects, simple Gantt views,
+decisions, CRM, and asynchronous catch-up.
 
 ## Core product rule
 
@@ -24,49 +13,108 @@ A promise can become an assignment.
 A CRM note can become a follow-up.
 A late-night drop can wait for the other founder's catch-up.
 
+Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Catch Up**
+
+## What's implemented
+
+- Supabase email/password auth, gated routing (`app/index.tsx`, `app/(auth)`, `app/(tabs)/_layout.tsx`).
+- Automatic two-member shared workspace: the first two people who sign in join the same workspace via the
+  `bootstrap_workspace()` RPC (`supabase/schema.sql`) — no invite codes, no hardcoded emails.
+- All screens (Home, Drop, Projects, Decisions, CRM, Catch-up) read and write Supabase directly through the typed
+  repository layer in `lib/repositories/`. No mock data remains.
+- Project/task detail (`app/(tabs)/projects`), CRM organisation detail with activity history
+  (`app/(tabs)/crm`), and a generic discussion thread (`app/thread.tsx`) reusable across projects, tasks,
+  decisions and CRM organisations.
+- Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Drop reflect the partner's
+  real quiet-hours state (`lib/quietHours.ts`).
+- Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs
+  you" and "FYI", and advances `last_seen_at` once it's shown.
+- CRM activity history and overdue next-action highlighting on the organisation detail screen, backed by the
+  `activity_events` log that database triggers populate automatically (`supabase/schema.sql`).
+- Structured AI actions: a Drop can be parsed by the `parse-drop` Supabase Edge Function
+  (`supabase/functions/parse-drop`) into reviewable `ai_actions` (create_task, assign_task, create_decision,
+  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for), shown for
+  Accept/Dismiss on the Drop screen.
+
 ## Run locally
 
-1. Install Node.js and Expo tooling.
-2. In this folder run:
+1. Install Node.js (this project was built against Node 22 / Expo SDK 57).
+2. Install dependencies:
 
+   ```
    npm install
+   ```
 
-3. Then:
+   Dependency versions are pinned to what `expo/bundledNativeModules.json` reports for the installed Expo SDK, so
+   `npm install` resolves cleanly with no `--legacy-peer-deps` flag. If you ever bump the Expo SDK, re-align
+   versions with Expo's own compatibility tooling:
 
-   npx expo start
+   ```
+   npx expo install --check
+   npx expo install --fix
+   ```
 
-Expo's current documentation recommends Expo Router for file-based routing, and the package versions should be aligned with your installed Expo SDK using `npx expo install` if npm reports compatibility warnings.
+3. Typecheck: `npm run typecheck`
+4. Start the app: `npx expo start` (or `npm run web` for a quick browser check, `npm run ios` / `npm run android`
+   for native).
+
+Without a configured Supabase project the app still boots and shows a "Supabase is not configured" screen instead
+of crashing — see below to connect one.
 
 ## Connect Supabase
 
 1. Create a Supabase project.
-2. Copy `.env.example` to `.env`.
-3. Add:
+2. Copy `.env.example` to `.env` and fill in:
 
+   ```
    EXPO_PUBLIC_SUPABASE_URL=...
    EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+   ```
 
-4. Run `supabase/schema.sql` in the Supabase SQL editor.
-5. Replace seeded data in `data/mock.ts` with repository/service calls.
+   The publishable key is safe for the client; the service-role key must never go in the Expo app — it's only used
+   server-side inside the Edge Function.
 
-The publishable key is intended for the client; service-role keys must never be placed in the Expo app.
+3. Run `supabase/schema.sql` in the Supabase SQL editor. It's idempotent (uses `if not exists` / `drop policy if
+   exists` throughout), so it's safe to re-run after pulling schema changes.
+4. Restart Expo so the new env vars are picked up (`npx expo start -c` if you've already started once).
+5. Sign up as Mufida, then sign up again as Victoria (or vice versa) — the second signup automatically joins the
+   first one's workspace via `bootstrap_workspace()`. A third signup gets its own separate workspace.
+6. (Optional) Deploy the AI action parser:
 
-## Next build steps for Claude Code
+   ```
+   supabase functions deploy parse-drop
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
 
-1. Add authentication and a two-member workspace onboarding flow.
-2. Create repositories for projects, tasks, decisions, drops, organisations and messages.
-3. Connect Drop to `drops`.
-4. Add thread screens attached to tasks/projects/CRM records.
-5. Add AI action parsing via a server-side Supabase Edge Function.
-6. Build a morning Catch-up query summarising changes since `last_seen_at`.
-7. Implement quiet-hours delivery rules.
-8. Add real push notifications only for explicit urgent items / chosen reminders.
-9. Add CRM activity history and next-action resurfacing.
-10. Add production-ready tests and regenerate dependency versions with Expo's compatibility tooling.
+   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically. `ANTHROPIC_MODEL` is optional and
+   defaults to a fast/cheap model, since parsing a Drop is a background job, not the primary product surface. Without
+   this deployed, Drop still saves normally — the "Suggested from your drops" section on the Drop screen just stays
+   empty.
+
+## Project structure
+
+```
+app/
+  (auth)/sign-in.tsx        sign in / sign up
+  (tabs)/home.tsx           focus list, quiet-hours pill, catch-up entry
+  (tabs)/drop.tsx           capture + AI action review
+  (tabs)/projects/          project list, detail (tasks, Gantt, next action)
+  (tabs)/decisions.tsx      decision log
+  (tabs)/crm/               CRM list, detail (stage, notes, activity history)
+  (tabs)/catch-up.tsx       changes since last_seen_at
+  thread.tsx                generic discussion thread (project/task/decision/organisation)
+  settings.tsx              quiet hours, sign out
+lib/
+  auth.tsx, workspace.tsx   session + shared-workspace context
+  repositories/             typed Supabase CRUD per entity
+  quietHours.ts, ownerLabel.ts, format.ts, useAsync.ts   shared helpers
+supabase/
+  schema.sql                 tables, RLS, bootstrap_workspace(), activity triggers
+  functions/parse-drop/       Drop → structured ai_actions
+```
 
 ## Suggested AI actions
 
-- create_drop
 - create_task
 - assign_task
 - update_task
@@ -77,7 +125,3 @@ The publishable key is intended for the client; service-role keys must never be 
 - create_follow_up
 - mark_waiting_for
 - summarize_changes_since_last_seen
-
-## Product loop
-
-Drop → Discuss → Decide → Assign → Track → CRM → Catch Up
