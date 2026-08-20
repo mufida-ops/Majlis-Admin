@@ -1,15 +1,15 @@
 export const theme = {
   colors: {
-    background: '#FBF3F2', // blush ivory
-    surface: '#FFFCFB',
-    surfaceMuted: '#F3E3E2', // dusty rose tint
-    text: '#3B2A34', // deep plum-charcoal
-    muted: '#8C7680', // mauve grey
-    navy: '#6E3B52', // deep mulberry — primary / CTA (key kept as `navy` since it's used as the app's primary accent throughout)
-    gold: '#C68FA0', // dusty rose-gold — secondary accent
-    border: '#EAD9D9',
-    success: '#7C8C6E', // muted sage
-    danger: '#B5555E' // soft wine
+    background: '#F5F0E4', // warm beige
+    surface: '#FCFAF3',
+    surfaceMuted: '#EBE2CC', // deeper sand
+    text: '#1E2B3C', // deep navy-charcoal
+    muted: '#7A7566', // warm taupe grey
+    navy: '#1B3A5C', // navy — primary / CTA
+    gold: '#BC9A3D', // muted gold — secondary accent
+    border: '#E2D9C2',
+    success: '#5F7A5A', // muted sage
+    danger: '#9C4A3B' // warm brick red
   },
   radius: {
     sm: 10,
