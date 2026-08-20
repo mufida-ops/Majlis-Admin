@@ -13,6 +13,12 @@ export async function listProjects(workspaceId: string): Promise<ProjectWithTask
   return unwrap(result) as unknown as ProjectWithTasks[];
 }
 
+export async function getProject(id: string): Promise<ProjectWithTasks> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('projects').select('*, project_tasks(*)').eq('id', id).single();
+  return unwrap(result) as unknown as ProjectWithTasks;
+}
+
 export async function createProject(input: { workspace_id: string; title: string; next_action?: string; created_by: string }) {
   const supabase = requireSupabase();
   const result = await supabase.from('projects').insert(input).select('*').single();

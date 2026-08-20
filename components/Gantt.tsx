@@ -1,22 +1,39 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { ProjectTask } from '@/types';
 import { theme } from '@/constants/theme';
 
-const WINDOW_START = new Date('2026-08-20T00:00:00');
-const WINDOW_END = new Date('2026-09-05T00:00:00');
-const total = WINDOW_END.getTime() - WINDOW_START.getTime();
+export type GanttTask = {
+  id: string;
+  title: string;
+  owner: string;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  status: string;
+};
 
-function pct(date: string) {
-  const n = new Date(date + 'T00:00:00').getTime() - WINDOW_START.getTime();
-  return Math.max(0, Math.min(100, (n / total) * 100));
+const DAY_MS = 86400000;
+
+function pct(date: string, windowStart: number, windowTotal: number) {
+  const n = new Date(date + 'T00:00:00').getTime() - windowStart;
+  return Math.max(0, Math.min(100, (n / windowTotal) * 100));
 }
 
-export function Gantt({ tasks }: { tasks: ProjectTask[] }) {
+export function Gantt({ tasks }: { tasks: GanttTask[] }) {
+  if (tasks.length === 0) return null;
+
+  // Window is derived from the tasks themselves (with a little padding) so
+  // the chart stays correct for whatever dates real projects happen to use,
+  // instead of a fixed range tuned to one set of seed data.
+  const starts = tasks.map(t => new Date(t.start + 'T00:00:00').getTime());
+  const ends = tasks.map(t => new Date(t.end + 'T00:00:00').getTime());
+  const windowStart = Math.min(...starts) - DAY_MS;
+  const windowEnd = Math.max(...ends) + DAY_MS;
+  const windowTotal = Math.max(windowEnd - windowStart, DAY_MS);
+
   return (
     <View style={{ gap: 12 }}>
       {tasks.map(task => {
-        const left = pct(task.start);
-        const right = pct(task.end);
+        const left = pct(task.start, windowStart, windowTotal);
+        const right = pct(task.end, windowStart, windowTotal);
         const width = Math.max(7, right - left);
         return (
           <View key={task.id} style={{ gap: 7 }}>

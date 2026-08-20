@@ -1,51 +1,156 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
 import { SectionTitle } from '@/components/SectionTitle';
+import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
+import { useAuth } from '@/lib/auth';
+import { useWorkspace } from '@/lib/workspace';
+import { useAsync } from '@/lib/useAsync';
+import { listProjects, type ProjectWithTasks } from '@/lib/repositories/projects';
+import { listDecisions } from '@/lib/repositories/decisions';
+import { listOrganisations } from '@/lib/repositories/organisations';
+import { isInQuietHours } from '@/lib/quietHours';
+import { formatShortDate } from '@/lib/format';
+import type { DecisionRow, OrganisationRow } from '@/types/db';
 
-const focus = [
-  ['CRM · Magrudy’s', 'Clarify partner terms', 'Mufida · due tomorrow'],
-  ['Decision', 'Phase 2 pricing structure', 'Victoria needs your input'],
-  ['Project · Website', 'Resource architecture', 'Blocked by content grouping']
-];
+type FocusItem = {
+  key: string;
+  eyebrow: string;
+  title: string;
+  meta: string;
+  href: string;
+};
 
 export default function HomeScreen() {
+  const { session } = useAuth();
+  const { me, partner, loading: workspaceLoading, workspaceId } = useWorkspace();
+
+  const { data, loading, error, refresh } = useAsync(async () => {
+    if (!workspaceId) return { projects: [] as ProjectWithTasks[], decisions: [] as DecisionRow[], organisations: [] as OrganisationRow[] };
+    const [projects, decisions, organisations] = await Promise.all([
+      listProjects(workspaceId),
+      listDecisions(workspaceId),
+      listOrganisations(workspaceId)
+    ]);
+    return { projects, decisions, organisations };
+  }, [workspaceId]);
+
+  const focus = useMemo<FocusItem[]>(() => {
+    if (!data || !me) return [];
+    const items: FocusItem[] = [];
+
+    const nextOrg = data.organisations
+      .filter(o => o.next_action_at)
+      .sort((a, b) => new Date(a.next_action_at!).getTime() - new Date(b.next_action_at!).getTime())[0];
+    if (nextOrg) {
+      items.push({
+        key: `org-${nextOrg.id}`,
+        eyebrow: `CRM · ${nextOrg.name}`,
+        title: nextOrg.next_action ?? 'Follow up',
+        meta: `Due ${formatShortDate(nextOrg.next_action_at!)}`,
+        href: `/(tabs)/crm/${nextOrg.id}`
+      });
+    }
+
+    const waitingDecision = data.decisions
+      .filter(d => d.status === 'Waiting')
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
+    if (waitingDecision) {
+      items.push({
+        key: `decision-${waitingDecision.id}`,
+        eyebrow: 'Decision',
+        title: waitingDecision.title,
+        meta: waitingDecision.owner === 'Both' ? 'Needs both of you' : `${waitingDecision.owner ?? 'Someone'} needs to weigh in`,
+        href: `/(tabs)/decisions`
+      });
+    }
+
+    const myTask = data.projects
+      .flatMap(p => p.project_tasks.map(t => ({ task: t, project: p })))
+      .filter(({ task }) => task.status !== 'Done' && task.owner_user_id === me.user_id)
+      .sort((a, b) => (a.task.due_at ?? '').localeCompare(b.task.due_at ?? ''))[0];
+    if (myTask) {
+      items.push({
+        key: `task-${myTask.task.id}`,
+        eyebrow: `Project · ${myTask.project.title}`,
+        title: myTask.task.title,
+        meta: myTask.task.due_at ? `Due ${formatShortDate(myTask.task.due_at)}` : 'No due date yet',
+        href: `/(tabs)/projects/${myTask.project.id}`
+      });
+    }
+
+    return items;
+  }, [data, me]);
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const dateLabel = useMemo(
+    () => new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }),
+    []
+  );
+
+  if (workspaceLoading) return <LoadingState label="Loading your workspace…" />;
+
   return (
     <Screen>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.date}>Thursday, 20 August</Text>
-          <Text style={styles.greeting}>Good evening, Mufida</Text>
-          <Text style={styles.sub}>Here’s what needs your attention — nothing more.</Text>
+          <Text style={styles.date}>{dateLabel}</Text>
+          <Text style={styles.greeting}>
+            {greeting}, {me?.display_name ?? session?.user.email}
+          </Text>
+          <Text style={styles.sub}>Here's what needs your attention — nothing more.</Text>
         </View>
-        <Pill label="Victoria · quiet hours" />
+        <Pressable onPress={() => router.push('/settings')}>
+          <Pill label={partner && isInQuietHours(partner) ? `${partner.display_name} · quiet hours` : 'You · settings'} />
+        </Pressable>
       </View>
 
       <Pressable onPress={() => router.push('/(tabs)/drop')}>
         <Card style={styles.capture}>
           <Text style={styles.captureTitle}>Drop something in</Text>
           <Text style={styles.captureText}>Thought, task, decision, follow-up — organise it later.</Text>
-          <Text style={styles.capturePrompt}>What’s on your mind?</Text>
+          <Text style={styles.capturePrompt}>What's on your mind?</Text>
         </Card>
       </Pressable>
 
       <View style={{ gap: 10 }}>
         <SectionTitle title="Right now" subtitle="Only the things that genuinely need movement." />
-        {focus.map(([eyebrow, title, meta]) => (
-          <Card key={title}>
-            <Text style={styles.eyebrow}>{eyebrow}</Text>
-            <Text style={styles.itemTitle}>{title}</Text>
-            <Text style={styles.meta}>{meta}</Text>
+        {loading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState message={error} onRetry={refresh} />
+        ) : focus.length === 0 ? (
+          <Card>
+            <Text style={styles.meta}>Nothing urgent right now. Drop a thought in, or check Catch-up.</Text>
           </Card>
-        ))}
+        ) : (
+          focus.map(item => (
+            <Pressable key={item.key} onPress={() => router.push(item.href as never)}>
+              <Card>
+                <Text style={styles.eyebrow}>{item.eyebrow}</Text>
+                <Text style={styles.itemTitle}>{item.title}</Text>
+                <Text style={styles.meta}>{item.meta}</Text>
+              </Card>
+            </Pressable>
+          ))
+        )}
       </View>
 
       <Pressable style={styles.catchUp} onPress={() => router.push('/(tabs)/catch-up')}>
         <Text style={styles.catchUpTitle}>Catch me up</Text>
-        <Text style={styles.catchUpText}>See what Victoria changed while you were away →</Text>
+        <Text style={styles.catchUpText}>
+          See what {partner?.display_name ?? 'your partner'} changed while you were away →
+        </Text>
       </Pressable>
     </Screen>
   );
