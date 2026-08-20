@@ -1,0 +1,170 @@
+// Supabase Edge Function: parse-drop
+//
+// Turns one freeform Drop into zero or more structured, reviewable
+// ai_actions rows (create_task, assign_task, create_decision, ...), using
+// Claude with forced tool use so the output is always valid structured
+// data instead of freeform text to parse.
+//
+// Deploy: supabase functions deploy parse-drop
+// Secrets required: ANTHROPIC_API_KEY (SUPABASE_URL and
+// SUPABASE_SERVICE_ROLE_KEY are injected automatically by the platform).
+// Optional: ANTHROPIC_MODEL (defaults to a fast/cheap model — this is a
+// background parsing job, not the primary product surface).
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+
+const ACTION_TYPES = [
+  'create_task',
+  'assign_task',
+  'update_task',
+  'create_decision',
+  'resolve_decision',
+  'add_crm_note',
+  'update_pipeline_stage',
+  'create_follow_up',
+  'mark_waiting_for'
+] as const;
+
+const PROPOSE_ACTIONS_TOOL = {
+  name: 'propose_actions',
+  description:
+    "Propose structured follow-up actions extracted from a founder's freeform note. Only propose actions clearly supported by the text — an empty list is correct when nothing actionable was said.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      actions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            action_type: { type: 'string', enum: ACTION_TYPES },
+            confidence: { type: 'number', description: '0 to 1, how clearly the text supports this action' },
+            payload: {
+              type: 'object',
+              description:
+                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one.'
+            }
+          },
+          required: ['action_type', 'payload']
+        }
+      }
+    },
+    required: ['actions']
+  }
+};
+
+Deno.serve(async req => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const { drop_id } = await req.json();
+    if (!drop_id) {
+      return new Response(JSON.stringify({ error: 'drop_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!anthropicKey) {
+      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY is not configured for this project.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Service-role client: this function runs trusted server-side logic and
+    // needs to read across the workspace for context and write ai_actions
+    // regardless of which member's drop triggered it.
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    const { data: drop, error: dropError } = await supabase.from('drops').select('*').eq('id', drop_id).single();
+    if (dropError || !drop) throw new Error(dropError?.message ?? 'Drop not found.');
+
+    const [{ data: members }, { data: projects }, { data: tasks }, { data: decisions }, { data: organisations }] =
+      await Promise.all([
+        supabase.from('workspace_members').select('user_id, display_name').eq('workspace_id', drop.workspace_id),
+        supabase.from('projects').select('id, title').eq('workspace_id', drop.workspace_id),
+        supabase
+          .from('project_tasks')
+          .select('id, title, status, project_id')
+          .eq('workspace_id', drop.workspace_id)
+          .neq('status', 'Done'),
+        supabase.from('decisions').select('id, title, status').eq('workspace_id', drop.workspace_id).eq('status', 'Waiting'),
+        supabase.from('organisations').select('id, name, stage').eq('workspace_id', drop.workspace_id)
+      ]);
+
+    const context = {
+      members: (members ?? []).map(m => ({ user_id: m.user_id, name: m.display_name })),
+      open_projects: (projects ?? []).map(p => ({ id: p.id, title: p.title })),
+      open_tasks: (tasks ?? []).map(t => ({ id: t.id, title: t.title, status: t.status, project_id: t.project_id })),
+      waiting_decisions: (decisions ?? []).map(d => ({ id: d.id, title: d.title })),
+      organisations: (organisations ?? []).map(o => ({ id: o.id, name: o.name, stage: o.stage }))
+    };
+
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        tools: [PROPOSE_ACTIONS_TOOL],
+        tool_choice: { type: 'tool', name: 'propose_actions' },
+        messages: [
+          {
+            role: 'user',
+            content:
+              `A founder wrote this note ("drop"):\n\n"""${drop.raw_text}"""\n\n` +
+              `Workspace context (only use these ids, never invent new ones):\n${JSON.stringify(context, null, 2)}\n\n` +
+              'Propose any structured follow-up actions this note clearly implies.'
+          }
+        ]
+      })
+    });
+
+    if (!anthropicResponse.ok) {
+      const errText = await anthropicResponse.text();
+      throw new Error(`Anthropic API error: ${anthropicResponse.status} ${errText}`);
+    }
+
+    const completion = await anthropicResponse.json();
+    const toolUse = completion.content?.find((block: { type: string }) => block.type === 'tool_use');
+    const actions: Array<{ action_type: string; confidence?: number; payload: Record<string, unknown> }> =
+      toolUse?.input?.actions ?? [];
+
+    const rows = actions
+      .filter(a => (ACTION_TYPES as readonly string[]).includes(a.action_type))
+      .map(a => ({
+        workspace_id: drop.workspace_id,
+        drop_id: drop.id,
+        action_type: a.action_type,
+        payload: a.payload ?? {},
+        confidence: typeof a.confidence === 'number' ? a.confidence : null
+      }));
+
+    if (rows.length > 0) {
+      const { error: insertError } = await supabase.from('ai_actions').insert(rows);
+      if (insertError) throw new Error(insertError.message);
+    }
+
+    await supabase.from('drops').update({ processed: true }).eq('id', drop.id);
+
+    return new Response(JSON.stringify({ proposed: rows.length }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});

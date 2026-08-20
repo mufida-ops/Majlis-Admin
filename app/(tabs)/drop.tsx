@@ -3,11 +3,14 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
+import { LoadingState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
+import { useAsync } from '@/lib/useAsync';
 import { createDrop } from '@/lib/repositories/drops';
-import { requestDropParse } from '@/lib/repositories/aiActions';
+import { requestDropParse, listProposedActions, applyAiAction, dismissAiAction } from '@/lib/repositories/aiActions';
+import { describeAiAction } from '@/lib/aiActionLabel';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
 
 export default function DropScreen() {
@@ -16,6 +19,39 @@ export default function DropScreen() {
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState('');
   const [saving, setSaving] = useState(false);
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
+
+  const {
+    data: proposedActions,
+    loading: actionsLoading,
+    refresh: refreshActions,
+    setData: setProposedActions
+  } = useAsync(() => (workspaceId ? listProposedActions(workspaceId) : Promise.resolve([])), [workspaceId]);
+
+  const accept = async (actionId: string) => {
+    if (!session || !proposedActions) return;
+    const action = proposedActions.find(a => a.id === actionId);
+    if (!action) return;
+    setBusyActionId(actionId);
+    try {
+      await applyAiAction(action, session.user.id);
+      setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Could not apply that suggestion.');
+    } finally {
+      setBusyActionId(null);
+    }
+  };
+
+  const dismiss = async (actionId: string) => {
+    setBusyActionId(actionId);
+    try {
+      await dismissAiAction(actionId);
+      setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
+    } finally {
+      setBusyActionId(null);
+    }
+  };
 
   const save = async (urgent = false) => {
     if (!text.trim()) {
@@ -49,7 +85,9 @@ export default function DropScreen() {
 
       // Structured-action parsing is best-effort: a Drop is fully saved
       // either way, this just tries to pre-fill suggested follow-ups.
-      requestDropParse(drop.id).catch(() => {});
+      requestDropParse(drop.id)
+        .then(() => refreshActions())
+        .catch(() => {});
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : 'Could not save that drop.');
     } finally {
@@ -82,8 +120,41 @@ export default function DropScreen() {
       </Card>
       <Text style={styles.note}>
         Normal drops wait for {partner?.display_name ?? 'your co-founder'}'s catch-up. Urgent drops bypass their quiet
-        hours. A structured suggestion (task, decision, follow-up) may show up for review once it's processed.
+        hours. A structured suggestion (task, decision, follow-up) may show up for review below once it's processed.
       </Text>
+
+      {actionsLoading ? (
+        <LoadingState label="Checking for suggestions…" />
+      ) : proposedActions && proposedActions.length > 0 ? (
+        <View style={{ gap: 10 }}>
+          <SectionTitle title="Suggested from your drops" subtitle="Review before anything is created or changed." />
+          {proposedActions.map(action => (
+            <Card key={action.id}>
+              <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
+              <View style={styles.buttons}>
+                <Pressable
+                  style={styles.primary}
+                  onPress={() => accept(action.id)}
+                  disabled={busyActionId === action.id}
+                >
+                  <Text style={styles.primaryText}>{busyActionId === action.id ? '…' : 'Accept'}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondary}
+                  onPress={() => dismiss(action.id)}
+                  disabled={busyActionId === action.id}
+                >
+                  <Text style={styles.secondaryText}>Dismiss</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ))}
+        </View>
+      ) : (
+        <Pressable onPress={refreshActions}>
+          <Text style={styles.refresh}>Check for suggestions</Text>
+        </Pressable>
+      )}
     </Screen>
   );
 }
@@ -107,5 +178,7 @@ const styles = StyleSheet.create({
   secondary: { borderWidth: 1, borderColor: theme.colors.border, padding: 14, borderRadius: theme.radius.md, alignItems: 'center' },
   secondaryText: { color: theme.colors.text, fontWeight: '600' },
   feedback: { color: theme.colors.success, marginTop: 14 },
-  note: { color: theme.colors.muted, lineHeight: 21 }
+  note: { color: theme.colors.muted, lineHeight: 21 },
+  suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
+  refresh: { color: theme.colors.navy, fontWeight: '600', textAlign: 'center' }
 });
