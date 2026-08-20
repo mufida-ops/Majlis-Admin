@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
+import { theme } from '@/constants/theme';
 
 export default function TabsLayout() {
   const { session, loading } = useAuth();
@@ -13,11 +14,11 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#1F3558',
-        tabBarInactiveTintColor: '#8B8A84',
+        tabBarActiveTintColor: theme.colors.navy,
+        tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
-          backgroundColor: '#FFFDF7',
-          borderTopColor: '#E9E2D7',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           height: 68,
           paddingTop: 8,
           paddingBottom: 8
