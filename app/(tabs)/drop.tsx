@@ -8,10 +8,11 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { createDrop } from '@/lib/repositories/drops';
+import { createDrop, listDrops } from '@/lib/repositories/drops';
 import { requestDropParse, listProposedActions, applyAiAction, dismissAiAction } from '@/lib/repositories/aiActions';
 import { describeAiAction } from '@/lib/aiActionLabel';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
+import { formatRelative } from '@/lib/format';
 
 export default function DropScreen() {
   const { session } = useAuth();
@@ -27,6 +28,12 @@ export default function DropScreen() {
     refresh: refreshActions,
     setData: setProposedActions
   } = useAsync(() => (workspaceId ? listProposedActions(workspaceId) : Promise.resolve([])), [workspaceId]);
+
+  const {
+    data: myDrops,
+    loading: dropsLoading,
+    refresh: refreshDrops
+  } = useAsync(() => (workspaceId ? listDrops(workspaceId) : Promise.resolve([])), [workspaceId]);
 
   const accept = async (actionId: string) => {
     if (!session || !proposedActions) return;
@@ -82,11 +89,15 @@ export default function DropScreen() {
         setFeedback(`Saved for ${partnerName}'s next catch-up.`);
       }
       setText('');
+      refreshDrops();
 
       // Structured-action parsing is best-effort: a Drop is fully saved
       // either way, this just tries to pre-fill suggested follow-ups.
       requestDropParse(drop.id)
-        .then(() => refreshActions())
+        .then(() => {
+          refreshActions();
+          refreshDrops();
+        })
         .catch(() => {});
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : 'Could not save that drop.');
@@ -157,6 +168,32 @@ export default function DropScreen() {
           <Text style={styles.refresh}>Check for suggestions</Text>
         </Pressable>
       )}
+
+      <SectionTitle title="What you've sent" subtitle={`Your recent drops, in your own words.`} />
+      {dropsLoading ? (
+        <LoadingState label="Loading your drops…" />
+      ) : (
+        (() => {
+          const mine = (myDrops ?? []).filter(d => d.created_by === session?.user.id);
+          if (mine.length === 0) {
+            return <Text style={styles.note}>Nothing sent yet — whatever you drop above will show up here.</Text>;
+          }
+          return (
+            <View style={{ gap: 10 }}>
+              {mine.map(drop => (
+                <Card key={drop.id}>
+                  <Text style={styles.sentText}>{drop.raw_text}</Text>
+                  <Text style={styles.meta}>
+                    {formatRelative(drop.created_at)}
+                    {drop.urgent ? ' · Urgent' : ''}
+                    {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
+                  </Text>
+                </Card>
+              ))}
+            </View>
+          );
+        })()
+      )}
     </Screen>
   );
 }
@@ -182,5 +219,7 @@ const styles = StyleSheet.create({
   feedback: { color: theme.colors.success, marginTop: 14 },
   note: { color: theme.colors.muted, lineHeight: 21 },
   suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
-  refresh: { color: theme.colors.navy, fontWeight: '600', textAlign: 'center' }
+  refresh: { color: theme.colors.navy, fontWeight: '600', textAlign: 'center' },
+  sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
+  meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 }
 });
