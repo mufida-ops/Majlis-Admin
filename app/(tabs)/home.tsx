@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -130,8 +130,9 @@ export default function HomeScreen() {
         ) : error ? (
           <ErrorState message={error} onRetry={refresh} />
         ) : focus.length === 0 ? (
-          <Card>
-            <Text style={styles.meta}>Nothing urgent right now. Drop a thought in, or check Catch-up.</Text>
+          <Card style={styles.emptyCard}>
+            <Image source={require('@/assets/images/reading-together.jpg')} style={styles.emptyImage} resizeMode="cover" />
+            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Drop a thought in, or check Catch-up.</Text>
           </Card>
         ) : (
           focus.map(item => (
@@ -163,11 +164,14 @@ const styles = StyleSheet.create({
   sub: { color: theme.colors.muted, fontSize: 15, marginTop: 6, lineHeight: 21 },
   capture: { backgroundColor: theme.colors.navy },
   captureTitle: { color: theme.colors.surface, fontSize: 20, fontWeight: '600' },
-  captureText: { color: '#EBD3D9', marginTop: 5, lineHeight: 20 },
+  captureText: { color: theme.colors.background, marginTop: 5, lineHeight: 20 },
   capturePrompt: { color: theme.colors.surface, marginTop: 20, fontSize: 16 },
   eyebrow: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   itemTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '600', marginTop: 5 },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },
+  emptyCard: { padding: 0, overflow: 'hidden' },
+  emptyImage: { width: '100%', height: 140 },
+  emptyText: { padding: 16, marginTop: 0 },
   catchUp: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md },
   catchUpTitle: { color: theme.colors.navy, fontSize: 18, fontWeight: '600' },
   catchUpText: { color: theme.colors.muted, marginTop: 4 }

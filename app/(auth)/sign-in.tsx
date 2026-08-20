@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -43,6 +43,8 @@ export default function SignInScreen() {
 
   return (
     <Screen>
+      <Image source={require('@/assets/images/sign-in-hero.jpg')} style={styles.hero} resizeMode="cover" />
+
       <View style={{ gap: 6 }}>
         <FloralFlourish width={110} height={72} style={styles.flourish} />
         <Text style={styles.eyebrow}>Majlis</Text>
@@ -107,6 +109,7 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
+  hero: { width: '100%', height: 130, borderRadius: theme.radius.lg, marginBottom: 4 },
   flourish: { position: 'absolute', top: -18, right: -10, transform: [{ scaleX: -1 }] },
   eyebrow: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   title: { color: theme.colors.text, fontSize: 26, fontWeight: '600' },
