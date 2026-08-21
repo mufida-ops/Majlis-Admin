@@ -39,3 +39,9 @@ export async function postMessage(input: { workspace_id: string; thread_id: stri
   const result = await supabase.from('messages').insert(input).select('*').single();
   return unwrap(result) as MessageRow;
 }
+
+export async function deleteMessage(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('messages').delete().eq('id', id);
+  unwrap(result);
+}

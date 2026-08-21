@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -10,7 +11,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listOrganisations, createOrganisation } from '@/lib/repositories/organisations';
+import { listOrganisations, createOrganisation, deleteOrganisation } from '@/lib/repositories/organisations';
 import { memberLabel } from '@/lib/ownerLabel';
 import { formatRelative } from '@/lib/format';
 
@@ -39,6 +40,20 @@ export default function CrmScreen() {
     }
   };
 
+  const confirmDelete = (id: string, orgName: string) => {
+    Alert.alert('Delete organisation?', `This removes "${orgName}" and its notes, contacts, and activity history. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteOrganisation(id);
+          refresh();
+        }
+      }
+    ]);
+  };
+
   return (
     <Screen>
       <SectionTitle title="CRM" subtitle="Who are we talking to, what happened last, and what needs to happen next?" />
@@ -62,6 +77,9 @@ export default function CrmScreen() {
                   </Text>
                 </View>
                 <Pill label={memberLabel(account.owner_user_id, me, partner)} />
+                <Pressable hitSlop={10} onPress={() => confirmDelete(account.id, account.name)}>
+                  <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                </Pressable>
               </View>
               {account.next_action ? <Text style={styles.next}>Next: {account.next_action}</Text> : null}
               <Text style={styles.last}>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -7,7 +7,13 @@ import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { getOrganisation, updatePipelineStage, addCrmNote, createFollowUp } from '@/lib/repositories/organisations';
+import {
+  getOrganisation,
+  updatePipelineStage,
+  addCrmNote,
+  createFollowUp,
+  deleteOrganisation
+} from '@/lib/repositories/organisations';
 import { listActivityForOrganisation } from '@/lib/repositories/activity';
 import { memberLabel } from '@/lib/ownerLabel';
 import { formatRelative, formatShortDate } from '@/lib/format';
@@ -62,6 +68,20 @@ export default function OrganisationDetailScreen() {
     } finally {
       setSavingFollowUp(false);
     }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert('Delete organisation?', `This removes "${org.name}" and its notes, contacts, and activity history. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteOrganisation(org.id);
+          router.replace('/(tabs)/crm');
+        }
+      }
+    ]);
   };
 
   return (
@@ -146,6 +166,10 @@ export default function OrganisationDetailScreen() {
       >
         <Text style={styles.discussText}>Discuss {org.name} →</Text>
       </Pressable>
+
+      <Pressable style={styles.deleteButton} onPress={confirmDelete}>
+        <Text style={styles.deleteText}>Delete organisation</Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -185,5 +209,7 @@ const styles = StyleSheet.create({
   primaryText: { color: '#fff', fontWeight: '600' },
   activityRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: theme.colors.border, marginTop: 10 },
   discuss: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
-  discussText: { color: theme.colors.navy, fontWeight: '600' }
+  discussText: { color: theme.colors.navy, fontWeight: '600' },
+  deleteButton: { padding: 16, alignItems: 'center' },
+  deleteText: { color: theme.colors.danger, fontWeight: '600' }
 });

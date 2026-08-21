@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -7,7 +7,7 @@ import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
-import { getOrCreateThread, listMessages, postMessage } from '@/lib/repositories/threads';
+import { getOrCreateThread, listMessages, postMessage, deleteMessage } from '@/lib/repositories/threads';
 import { memberLabel } from '@/lib/ownerLabel';
 import { formatTime, formatShortDate } from '@/lib/format';
 import type { MessageRow, ThreadRow } from '@/types/db';
@@ -73,6 +73,25 @@ export default function ThreadScreen() {
     }
   };
 
+  const confirmDeleteMessage = (id: string) => {
+    Alert.alert('Delete message?', "This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setMessages(prev => prev.filter(m => m.id !== id));
+          try {
+            await deleteMessage(id);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Could not delete that message.');
+            load();
+          }
+        }
+      }
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ headerShown: true, title: params.title ?? 'Thread', headerStyle: { backgroundColor: theme.colors.background }, headerTintColor: theme.colors.navy }} />
@@ -90,9 +109,16 @@ export default function ThreadScreen() {
             ) : (
               messages.map(msg => (
                 <Card key={msg.id} style={msg.author_user_id === session?.user.id ? styles.mine : undefined}>
-                  <Text style={styles.author}>
-                    {memberLabel(msg.author_user_id, me, partner)} · {formatShortDate(msg.created_at)} {formatTime(msg.created_at)}
-                  </Text>
+                  <View style={styles.messageHeader}>
+                    <Text style={styles.author}>
+                      {memberLabel(msg.author_user_id, me, partner)} · {formatShortDate(msg.created_at)} {formatTime(msg.created_at)}
+                    </Text>
+                    {msg.author_user_id === session?.user.id ? (
+                      <Pressable hitSlop={10} onPress={() => confirmDeleteMessage(msg.id)}>
+                        <Text style={styles.deleteMessage}>Delete</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                   <Text style={styles.body}>{msg.body}</Text>
                 </Card>
               ))
@@ -119,7 +145,9 @@ export default function ThreadScreen() {
 
 const styles = StyleSheet.create({
   empty: { color: theme.colors.muted },
+  messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   author: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
+  deleteMessage: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },
   body: { color: theme.colors.text, marginTop: 6, lineHeight: 21, fontSize: 15 },
   mine: { backgroundColor: theme.colors.surfaceMuted },
   composer: {

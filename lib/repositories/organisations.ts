@@ -60,6 +60,12 @@ export async function createFollowUp(id: string, nextAction: string, nextActionA
   return updateOrganisation(id, { next_action: nextAction, next_action_at: nextActionAt ?? null });
 }
 
+export async function deleteOrganisation(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('organisations').delete().eq('id', id);
+  unwrap(result);
+}
+
 export async function addContact(input: {
   workspace_id: string;
   organisation_id: string;
