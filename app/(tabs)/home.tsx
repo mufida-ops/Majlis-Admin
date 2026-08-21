@@ -15,6 +15,7 @@ import { listDecisions } from '@/lib/repositories/decisions';
 import { listOrganisations } from '@/lib/repositories/organisations';
 import { isInQuietHours } from '@/lib/quietHours';
 import { formatShortDate } from '@/lib/format';
+import { quoteOfTheDay } from '@/lib/quotes';
 import type { DecisionRow, OrganisationRow } from '@/types/db';
 
 type FocusItem = {
@@ -98,6 +99,8 @@ export default function HomeScreen() {
     []
   );
 
+  const todaysQuote = useMemo(() => quoteOfTheDay(), []);
+
   if (workspaceLoading) return <LoadingState label="Loading your workspace…" />;
 
   return (
@@ -115,6 +118,11 @@ export default function HomeScreen() {
           <Pill label={partner && isInQuietHours(partner) ? `${partner.display_name} · quiet hours` : 'You · settings'} />
         </Pressable>
       </View>
+
+      <Card style={styles.quoteCard}>
+        <Text style={styles.quoteEyebrow}>Today, for both of you</Text>
+        <Text style={styles.quoteText}>"{todaysQuote}"</Text>
+      </Card>
 
       <Pressable onPress={() => router.push('/(tabs)/drop')}>
         <Card style={styles.capture}>
@@ -163,6 +171,9 @@ const styles = StyleSheet.create({
   date: { color: theme.colors.muted, fontSize: 13 },
   greeting: { color: theme.colors.text, fontSize: 26, fontWeight: '600', marginTop: 4 },
   sub: { color: theme.colors.muted, fontSize: 15, marginTop: 6, lineHeight: 21 },
+  quoteCard: { backgroundColor: theme.colors.surfaceMuted, borderWidth: 0 },
+  quoteEyebrow: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  quoteText: { color: theme.colors.text, fontSize: 16, lineHeight: 23, marginTop: 8, fontStyle: 'italic' },
   capture: { backgroundColor: theme.colors.navy },
   captureTitle: { color: theme.colors.surface, fontSize: 20, fontWeight: '600' },
   captureText: { color: theme.colors.background, marginTop: 5, lineHeight: 20 },
