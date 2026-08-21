@@ -43,10 +43,15 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
 - Quote of the day on Home (`lib/quotes.ts`): the same line for both founders on the same calendar day, picked by
   indexing a curated list with the local date — no table, no sync, both phones just compute the same index.
 - Drop screen: edit or delete anything in "What you've sent" — editing re-triggers AI parsing against the corrected
-  text. Accepting a suggestion now shows an explicit "Done — …" confirmation instead of just removing the card, and
-  the `parse-drop` Edge Function re-validates every id a suggestion references (project/task/decision/organisation)
+  text. Each drop has its own "Action it" button and shows its own suggestions directly underneath it (rather than a
+  single pooled list at the top disconnected from which note produced them), with Accept/Dismiss right there.
+  Accepting a suggestion shows an explicit "Done — …" confirmation instead of just removing the card, and the
+  `parse-drop` Edge Function re-validates every id a suggestion references (project/task/decision/organisation)
   against the real workspace data before proposing it, so a suggestion can no longer look valid on screen and then
   silently fail (or do nothing) when accepted.
+- Illustrated empty states: the two illustrations Mufida shared (`assets/images/sign-in-hero.jpg`,
+  `assets/images/reading-together.jpg`) appear across Home, Sign-in, Projects, Decisions, CRM, Calendar, Catch-up,
+  and Drop wherever a list is empty, via `EmptyState`'s optional `image` prop (`components/AsyncState.tsx`).
 
 ## Testing without a local dev server
 

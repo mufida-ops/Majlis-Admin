@@ -63,7 +63,7 @@ export default function CrmScreen() {
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !organisations || organisations.length === 0 ? (
-        <EmptyState label="No organisations yet. Add one below." />
+        <EmptyState label="No organisations yet. Add one below." image={require('@/assets/images/sign-in-hero.jpg')} />
       ) : (
         organisations.map(account => (
           <Pressable key={account.id} onPress={() => router.push(`/(tabs)/crm/${account.id}`)}>

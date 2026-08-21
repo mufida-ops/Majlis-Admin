@@ -55,7 +55,7 @@ export default function DecisionsScreen() {
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !decisions || decisions.length === 0 ? (
-        <EmptyState label="No decisions logged yet." />
+        <EmptyState label="No decisions logged yet." image={require('@/assets/images/reading-together.jpg')} />
       ) : (
         decisions.map(item => (
           <Card key={item.id}>

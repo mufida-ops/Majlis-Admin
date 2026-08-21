@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -98,13 +98,18 @@ export default function CatchUpScreen() {
   return (
     <Screen>
       <SectionTitle title="Catch-up" subtitle="What changed since you last checked — without reading a wall of chat." />
-      <Card>
-        <Text style={styles.lead}>Since you last checked</Text>
-        <Text style={styles.body}>
-          {total === 0
-            ? "You're fully caught up. Nothing changed since your last visit."
-            : `${total} update${total === 1 ? '' : 's'} while you were away.`}
-        </Text>
+      <Card style={total === 0 ? styles.caughtUpCard : undefined}>
+        {total === 0 ? (
+          <Image source={require('@/assets/images/reading-together.jpg')} style={styles.caughtUpImage} resizeMode="cover" />
+        ) : null}
+        <View style={total === 0 ? styles.caughtUpBody : undefined}>
+          <Text style={styles.lead}>Since you last checked</Text>
+          <Text style={styles.body}>
+            {total === 0
+              ? "You're fully caught up. Nothing changed since your last visit."
+              : `${total} update${total === 1 ? '' : 's'} while you were away.`}
+          </Text>
+        </View>
       </Card>
 
       {needsYou.length > 0 ? (
@@ -140,6 +145,9 @@ function ActivityRow({ event, href }: { event: ActivityEventRow; href?: Href }) 
 }
 
 const styles = StyleSheet.create({
+  caughtUpCard: { padding: 0, overflow: 'hidden' },
+  caughtUpImage: { width: '100%', height: 130 },
+  caughtUpBody: { padding: 16 },
   lead: { color: theme.colors.navy, fontSize: 18, fontWeight: '600' },
   body: { color: theme.colors.text, marginTop: 10, lineHeight: 23, fontSize: 16 },
   label: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },

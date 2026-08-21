@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
-import { LoadingState } from '@/components/AsyncState';
+import { LoadingState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -29,7 +29,6 @@ export default function DropScreen() {
 
   const {
     data: proposedActions,
-    loading: actionsLoading,
     refresh: refreshActions,
     setData: setProposedActions
   } = useAsync(() => (workspaceId ? listProposedActions(workspaceId) : Promise.resolve([])), [workspaceId]);
@@ -200,42 +199,9 @@ export default function DropScreen() {
       <Text style={styles.note}>
         Talk or type freely — tap the microphone on your keyboard to dictate. {partner?.display_name ?? 'Your co-founder'}{' '}
         won't see the raw text: it's condensed into a short summary for their catch-up feed. Normal drops wait for their
-        next catch-up; urgent drops bypass quiet hours. A structured suggestion (task, decision, follow-up) may also show
-        up for review below once it's processed.
+        next catch-up; urgent drops bypass quiet hours. Each drop below has its own "Action it" button — tap it to have
+        AI turn that specific note into a task, decision, CRM update, or calendar event for you to review.
       </Text>
-
-      {actionsLoading ? (
-        <LoadingState label="Checking for suggestions…" />
-      ) : proposedActions && proposedActions.length > 0 ? (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title="Suggested from your drops" subtitle="Review before anything is created or changed." />
-          {proposedActions.map(action => (
-            <Card key={action.id}>
-              <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
-              <View style={styles.buttons}>
-                <Pressable
-                  style={styles.primary}
-                  onPress={() => accept(action.id)}
-                  disabled={busyActionId === action.id}
-                >
-                  <Text style={styles.primaryText}>{busyActionId === action.id ? '…' : 'Accept'}</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.secondary}
-                  onPress={() => dismiss(action.id)}
-                  disabled={busyActionId === action.id}
-                >
-                  <Text style={styles.secondaryText}>Dismiss</Text>
-                </Pressable>
-              </View>
-            </Card>
-          ))}
-        </View>
-      ) : (
-        <Pressable style={styles.secondary} onPress={refreshActions}>
-          <Text style={styles.secondaryText}>Check for suggestions</Text>
-        </Pressable>
-      )}
 
       <SectionTitle title="What you've sent" subtitle={`Your recent drops, in your own words.`} />
       {dropsLoading ? (
@@ -244,7 +210,12 @@ export default function DropScreen() {
         (() => {
           const mine = (myDrops ?? []).filter(d => d.created_by === session?.user.id);
           if (mine.length === 0) {
-            return <Text style={styles.note}>Nothing sent yet — whatever you drop above will show up here.</Text>;
+            return (
+              <EmptyState
+                label="Nothing sent yet — whatever you drop above will show up here."
+                image={require('@/assets/images/sign-in-hero.jpg')}
+              />
+            );
           }
           return (
             <View style={{ gap: 10 }}>
@@ -286,14 +257,37 @@ export default function DropScreen() {
                       {drop.urgent ? ' · Urgent' : ''}
                       {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
                     </Text>
+
+                    {(proposedActions ?? [])
+                      .filter(action => action.drop_id === drop.id)
+                      .map(action => (
+                        <View key={action.id} style={styles.suggestionBlock}>
+                          <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
+                          <View style={styles.buttons}>
+                            <Pressable
+                              style={styles.primary}
+                              onPress={() => accept(action.id)}
+                              disabled={busyActionId === action.id}
+                            >
+                              <Text style={styles.primaryText}>{busyActionId === action.id ? '…' : 'Accept'}</Text>
+                            </Pressable>
+                            <Pressable
+                              style={styles.secondary}
+                              onPress={() => dismiss(action.id)}
+                              disabled={busyActionId === action.id}
+                            >
+                              <Text style={styles.secondaryText}>Dismiss</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      ))}
+
                     <Pressable
                       style={styles.retry}
                       onPress={() => retryParse(drop.id)}
                       disabled={retryingDropId === drop.id}
                     >
-                      <Text style={styles.retryText}>
-                        {retryingDropId === drop.id ? 'Rechecking…' : 'Recheck for suggestions'}
-                      </Text>
+                      <Text style={styles.retryText}>{retryingDropId === drop.id ? 'Actioning…' : 'Action it'}</Text>
                     </Pressable>
                   </Card>
                 )
@@ -327,6 +321,12 @@ const styles = StyleSheet.create({
   feedback: { color: theme.colors.success, marginTop: 14 },
   note: { color: theme.colors.muted, lineHeight: 21 },
   suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
+  suggestionBlock: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border
+  },
   sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
   sentHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   sentIcons: { flexDirection: 'row', gap: 14, paddingTop: 2 },

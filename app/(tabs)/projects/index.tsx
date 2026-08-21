@@ -49,7 +49,7 @@ export default function ProjectsScreen() {
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !projects || projects.length === 0 ? (
-        <EmptyState label="No projects yet. Start one below." />
+        <EmptyState label="No projects yet. Start one below." image={require('@/assets/images/reading-together.jpg')} />
       ) : (
         projects.map(project => {
           const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({

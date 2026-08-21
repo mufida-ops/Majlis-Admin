@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import { theme } from '@/constants/theme';
 import { Card } from '@/components/Card';
 
@@ -25,7 +25,15 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-export function EmptyState({ label }: { label: string }) {
+export function EmptyState({ label, image }: { label: string; image?: ImageSourcePropType }) {
+  if (image) {
+    return (
+      <Card style={styles.imageCard}>
+        <Image source={image} style={styles.image} resizeMode="cover" />
+        <Text style={[styles.muted, styles.imageLabel]}>{label}</Text>
+      </Card>
+    );
+  }
   return (
     <Card>
       <Text style={styles.muted}>{label}</Text>
@@ -37,5 +45,8 @@ const styles = StyleSheet.create({
   center: { paddingVertical: 40, alignItems: 'center', gap: 10 },
   muted: { color: theme.colors.muted, lineHeight: 20 },
   errorTitle: { color: theme.colors.danger, fontWeight: '700' },
-  retry: { color: theme.colors.navy, fontWeight: '600', marginTop: 10 }
+  retry: { color: theme.colors.navy, fontWeight: '600', marginTop: 10 },
+  imageCard: { padding: 0, overflow: 'hidden' },
+  image: { width: '100%', height: 130 },
+  imageLabel: { padding: 16 }
 });

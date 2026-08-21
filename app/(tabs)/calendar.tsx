@@ -169,7 +169,7 @@ export default function CalendarScreen() {
         <ErrorState message={error} onRetry={refresh} />
       ) : view === 'agenda' ? (
         agendaGroups.length === 0 ? (
-          <EmptyState label="Nothing coming up. Add an event below." />
+          <EmptyState label="Nothing coming up. Add an event below." image={require('@/assets/images/sign-in-hero.jpg')} />
         ) : (
           agendaGroups.map(([day, dayEvents]) => (
             <View key={day} style={{ gap: 8 }}>
