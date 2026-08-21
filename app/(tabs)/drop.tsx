@@ -21,6 +21,7 @@ export default function DropScreen() {
   const [feedback, setFeedback] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
+  const [retryingDropId, setRetryingDropId] = useState<string | null>(null);
 
   const {
     data: proposedActions,
@@ -47,6 +48,19 @@ export default function DropScreen() {
       setFeedback(err instanceof Error ? err.message : 'Could not apply that suggestion.');
     } finally {
       setBusyActionId(null);
+    }
+  };
+
+  const retryParse = async (dropId: string) => {
+    setRetryingDropId(dropId);
+    setFeedback('');
+    try {
+      await requestDropParse(dropId);
+      await Promise.all([refreshActions(), refreshDrops()]);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Could not recheck that drop.');
+    } finally {
+      setRetryingDropId(null);
     }
   };
 
@@ -188,6 +202,15 @@ export default function DropScreen() {
                     {drop.urgent ? ' · Urgent' : ''}
                     {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
                   </Text>
+                  <Pressable
+                    style={styles.retry}
+                    onPress={() => retryParse(drop.id)}
+                    disabled={retryingDropId === drop.id}
+                  >
+                    <Text style={styles.retryText}>
+                      {retryingDropId === drop.id ? 'Rechecking…' : 'Recheck for suggestions'}
+                    </Text>
+                  </Pressable>
                 </Card>
               ))}
             </View>
@@ -220,5 +243,14 @@ const styles = StyleSheet.create({
   note: { color: theme.colors.muted, lineHeight: 21 },
   suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
   sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
-  meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 }
+  meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 },
+  retry: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  retryText: { color: theme.colors.text, fontWeight: '600', fontSize: 13 }
 });
