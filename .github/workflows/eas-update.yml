@@ -26,7 +26,12 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - run: eas update --branch preview --message "${{ github.event.head_commit.message || format('Manual publish {0}', github.sha) }}" --non-interactive
+      - run: |
+          eas update --branch preview --message "${COMMIT_MESSAGE%%$'\n'*}" --non-interactive
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          # Passed as an env var (not interpolated into the script text) so
+          # quote/newline characters inside the commit message can't break
+          # the shell command that reads it.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || format('Manual publish {0}', github.sha) }}
