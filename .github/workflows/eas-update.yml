@@ -26,3 +26,6 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
