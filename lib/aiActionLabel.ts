@@ -23,6 +23,8 @@ export function describeAiAction(action: AiActionRow): string {
       return `CRM follow-up: "${str(p.next_action)}"`;
     case 'mark_waiting_for':
       return 'Mark a task as waiting';
+    case 'create_organisation':
+      return `New CRM entry: "${str(p.name)}"${p.stage ? ` · ${str(p.stage)}` : ''}`;
     case 'create_event': {
       const when = str(p.start_date) + (p.all_day || !p.start_time ? '' : ` ${str(p.start_time)}`);
       return `New calendar event: "${str(p.title)}"${when ? ` · ${when}` : ''}`;

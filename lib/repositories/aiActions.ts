@@ -61,6 +61,17 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
       return organisations.createFollowUp(p.organisation_id, p.next_action, p.next_action_at ?? null);
     case 'mark_waiting_for':
       return projects.updateTask(p.task_id, { status: 'Waiting' });
+    case 'create_organisation': {
+      const org = await organisations.createOrganisation({
+        workspace_id: workspaceId,
+        name: p.name,
+        stage: p.stage || 'Lead',
+        next_action: p.next_action ?? undefined,
+        created_by: actorUserId
+      });
+      if (p.note) await organisations.addCrmNote(org.id, p.note);
+      return org;
+    }
     case 'create_event': {
       // Combined client-side (in the founder's own timezone) rather than by
       // the Edge Function or Claude, exactly like the Calendar screen's own

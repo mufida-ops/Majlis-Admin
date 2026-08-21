@@ -30,7 +30,8 @@ const ACTION_TYPES = [
   'update_pipeline_stage',
   'create_follow_up',
   'mark_waiting_for',
-  'create_event'
+  'create_event',
+  'create_organisation'
 ] as const;
 
 const PROPOSE_ACTIONS_TOOL = {
@@ -55,7 +56,7 @@ const PROPOSE_ACTIONS_TOOL = {
             payload: {
               type: 'object',
               description:
-                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if the note actually mentions a specific time), all_day? (true when no specific time was mentioned), description?}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one.'
+                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if the note actually mentions a specific time), all_day? (true when no specific time was mentioned), description?}; create_organisation {name, stage? (one of Lead|Contacted|Meeting Booked|Proposal Sent|Negotiating|Won|Onboarding|Active Partner|Follow-up — default Lead unless the text clearly implies further along), note? (what the drop said about them, for CRM history), next_action?}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one; that includes organisations — if a company/school/contact the note describes is NOT already listed in organisations, propose create_organisation for it instead of add_crm_note/update_pipeline_stage/create_follow_up (which require an existing organisation_id).'
             }
           },
           required: ['action_type', 'payload']

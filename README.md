@@ -142,4 +142,5 @@ supabase/
 - create_follow_up
 - mark_waiting_for
 - create_event
+- create_organisation
 - summarize_changes_since_last_seen
