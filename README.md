@@ -35,7 +35,10 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   (`supabase/functions/parse-drop`) into reviewable `ai_actions` (create_task, assign_task, create_decision,
   resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event), shown
   for Accept/Dismiss on the Drop screen. create_event resolves relative dates ("tomorrow", "Friday") using the
-  author's own timezone, computed server-side and given to Claude as today_date/tomorrow_date context.
+  author's own timezone, computed server-side and given to Claude as today_date/tomorrow_date context. Saving a
+  drop (or editing one) only ever writes its catch-up summary — a drop is plain conversation between the two
+  founders by default. AI suggestions only get proposed when a founder explicitly taps "Action it" on that drop,
+  via a `propose_actions` flag on the same Edge Function call (`lib/repositories/aiActions.ts`'s `requestDropParse`).
 - Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
   drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone

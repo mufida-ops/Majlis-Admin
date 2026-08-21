@@ -109,12 +109,11 @@ export default function DropScreen() {
       setEditingDropId(null);
       setEditText('');
       await refreshDrops();
-      // Re-run AI parsing against the corrected text, same as a fresh drop.
-      requestDropParse(dropId)
-        .then(() => {
-          refreshActions();
-          refreshDrops();
-        })
+      // Refresh the catch-up summary against the corrected text, same as a
+      // fresh drop — but don't auto-propose actions; that's still only
+      // "Action it", tapped explicitly.
+      requestDropParse(dropId, false)
+        .then(() => refreshDrops())
         .catch(() => {});
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : 'Could not save that edit.');
@@ -252,13 +251,12 @@ export default function DropScreen() {
       setText('');
       refreshDrops();
 
-      // Structured-action parsing is best-effort: a Drop is fully saved
-      // either way, this just tries to pre-fill suggested follow-ups.
-      requestDropParse(drop.id)
-        .then(() => {
-          refreshActions();
-          refreshDrops();
-        })
+      // A plain save is only ever conversation with your co-founder: this
+      // gets a clean summary written for their catch-up feed (best-effort —
+      // a drop is fully saved either way), but deliberately proposes no AI
+      // actions. That only happens if "Action it" is tapped on this drop.
+      requestDropParse(drop.id, false)
+        .then(() => refreshDrops())
         .catch(() => {});
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : 'Could not save that drop.');

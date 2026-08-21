@@ -71,7 +71,7 @@ Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { drop_id } = await req.json();
+    const { drop_id, propose_actions = true } = await req.json();
     if (!drop_id) {
       return new Response(JSON.stringify({ error: 'drop_id is required' }), {
         status: 400,
@@ -196,7 +196,11 @@ Deno.serve(async req => {
         confidence: typeof a.confidence === 'number' ? a.confidence : null
       }));
 
-    if (rows.length > 0) {
+    // propose_actions=false means: just write the catch-up summary, don't
+    // surface any structured suggestions — a plain drop is only ever a note
+    // to the co-founder unless the founder explicitly taps "Action it" on
+    // it, which re-calls this same function with propose_actions=true.
+    if (propose_actions && rows.length > 0) {
       const { error: insertError } = await supabase.from('ai_actions').insert(rows);
       if (insertError) throw new Error(insertError.message);
     }

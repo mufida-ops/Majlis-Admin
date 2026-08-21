@@ -113,8 +113,14 @@ export async function dismissAiAction(id: string): Promise<AiActionRow> {
   return unwrap(result) as AiActionRow;
 }
 
-export async function requestDropParse(dropId: string) {
+// proposeActions=false is used right after saving a drop: it still gets a
+// clean summary written for the co-founder's catch-up feed, but no AI
+// suggestions are surfaced — a drop is only ever plain conversation until
+// the founder explicitly taps "Action it" on it (proposeActions=true).
+export async function requestDropParse(dropId: string, proposeActions: boolean = true) {
   const supabase = requireSupabase();
-  const { error } = await supabase.functions.invoke('parse-drop', { body: { drop_id: dropId } });
+  const { error } = await supabase.functions.invoke('parse-drop', {
+    body: { drop_id: dropId, propose_actions: proposeActions }
+  });
   if (error) throw new Error(error.message);
 }
