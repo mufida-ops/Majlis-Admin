@@ -5,6 +5,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Gantt, type GanttTask } from '@/components/Gantt';
+import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -43,13 +44,14 @@ export default function ProjectsScreen() {
   return (
     <Screen>
       <SectionTitle title="Projects" subtitle="Shared work, owners, next actions and dependencies." />
+      <PageBanner image={require('@/assets/images/reading-together.jpg')} />
 
       {loading ? (
         <LoadingState />
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !projects || projects.length === 0 ? (
-        <EmptyState label="No projects yet. Start one below." image={require('@/assets/images/reading-together.jpg')} />
+        <EmptyState label="No projects yet. Start one below." />
       ) : (
         projects.map(project => {
           const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({

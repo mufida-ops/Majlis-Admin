@@ -62,9 +62,10 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   CRM follow-up for what's really a calendar reschedule), tapping one opens a small inline form (title, plus
   whatever that target needs — a project picker for Task, an organisation picker for CRM, a date for Calendar) and
   creates the right thing directly, dismissing the original mis-categorised suggestion.
-- Illustrated empty states: the two illustrations Mufida shared (`assets/images/sign-in-hero.jpg`,
-  `assets/images/reading-together.jpg`) appear across Home, Sign-in, Projects, Decisions, CRM, Calendar, Catch-up,
-  and Drop wherever a list is empty, via `EmptyState`'s optional `image` prop (`components/AsyncState.tsx`).
+- Illustrations throughout: the two illustrations Mufida shared (`assets/images/sign-in-hero.jpg`,
+  `assets/images/reading-together.jpg`) appear on Sign-in and Home's empty-focus-list card, and as a persistent
+  header banner (`components/PageBanner.tsx`) on Projects, Decisions, CRM, Calendar, and Drop — shown always,
+  whether that list is empty or full, rather than only in the empty state.
 
 ## Testing without a local dev server
 

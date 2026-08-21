@@ -4,6 +4,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { MonthGrid } from '@/components/MonthGrid';
+import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -153,6 +154,7 @@ export default function CalendarScreen() {
   return (
     <Screen>
       <SectionTitle title="Calendar" subtitle="Shared events for both of you." />
+      <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
 
       <View style={styles.viewToggle}>
         <Pressable style={[styles.toggleButton, view === 'agenda' && styles.toggleButtonActive]} onPress={() => setView('agenda')}>
@@ -169,7 +171,7 @@ export default function CalendarScreen() {
         <ErrorState message={error} onRetry={refresh} />
       ) : view === 'agenda' ? (
         agendaGroups.length === 0 ? (
-          <EmptyState label="Nothing coming up. Add an event below." image={require('@/assets/images/sign-in-hero.jpg')} />
+          <EmptyState label="Nothing coming up. Add an event below." />
         ) : (
           agendaGroups.map(([day, dayEvents]) => (
             <View key={day} style={{ gap: 8 }}>

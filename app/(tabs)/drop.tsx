@@ -6,6 +6,7 @@ import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
 import { LoadingState, EmptyState } from '@/components/AsyncState';
+import { PageBanner } from '@/components/PageBanner';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -155,6 +156,7 @@ export default function DropScreen() {
       </Pressable>
 
       <SectionTitle title="What you've sent" subtitle={`Your recent drops, in your own words.`} />
+      <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
       {dropsLoading ? (
         <LoadingState label="Loading your drops…" />
       ) : (
@@ -164,7 +166,6 @@ export default function DropScreen() {
             return (
               <EmptyState
                 label="Nothing sent yet — whatever you drop above will show up here."
-                image={require('@/assets/images/sign-in-hero.jpg')}
               />
             );
           }

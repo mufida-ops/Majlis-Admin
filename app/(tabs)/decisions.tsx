@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
+import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -49,13 +50,14 @@ export default function DecisionsScreen() {
   return (
     <Screen>
       <SectionTitle title="Decisions" subtitle="A durable record of what you actually agreed." />
+      <PageBanner image={require('@/assets/images/reading-together.jpg')} />
 
       {loading ? (
         <LoadingState />
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !decisions || decisions.length === 0 ? (
-        <EmptyState label="No decisions logged yet." image={require('@/assets/images/reading-together.jpg')} />
+        <EmptyState label="No decisions logged yet." />
       ) : (
         decisions.map(item => (
           <Card key={item.id}>

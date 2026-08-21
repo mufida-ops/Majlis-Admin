@@ -6,6 +6,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Pill } from '@/components/Pill';
+import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -57,13 +58,14 @@ export default function CrmScreen() {
   return (
     <Screen>
       <SectionTitle title="CRM" subtitle="Who are we talking to, what happened last, and what needs to happen next?" />
+      <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
 
       {loading ? (
         <LoadingState />
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !organisations || organisations.length === 0 ? (
-        <EmptyState label="No organisations yet. Add one below." image={require('@/assets/images/sign-in-hero.jpg')} />
+        <EmptyState label="No organisations yet. Add one below." />
       ) : (
         organisations.map(account => (
           <Pressable key={account.id} onPress={() => router.push(`/(tabs)/crm/${account.id}`)}>
