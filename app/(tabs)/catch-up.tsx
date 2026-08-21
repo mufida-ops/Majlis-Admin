@@ -70,6 +70,8 @@ export default function CatchUpScreen() {
             linkMap[event.id] = `/(tabs)/crm/${event.entity_id}`;
           } else if (event.entity_type === 'drop') {
             needsMe = event.action === 'urgent_drop';
+          } else if (event.entity_type === 'event') {
+            linkMap[event.id] = '/(tabs)/calendar';
           }
 
           (needsMe ? mine : others).push(event);

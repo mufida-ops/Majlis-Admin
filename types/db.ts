@@ -99,6 +99,19 @@ export type OrganisationRow = {
   updated_at: string;
 };
 
+export type EventRow = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  start_at: string;
+  end_at: string | null;
+  all_day: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ContactRow = {
   id: string;
   workspace_id: string;

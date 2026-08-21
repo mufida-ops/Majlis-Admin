@@ -126,6 +126,19 @@ create table if not exists organisations (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  title text not null,
+  description text,
+  start_at timestamptz not null,
+  end_at timestamptz,
+  all_day boolean not null default false,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists contacts (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid references workspaces(id) on delete cascade not null,
@@ -194,6 +207,7 @@ alter table project_tasks add column if not exists created_by uuid references au
 alter table decisions add column if not exists owner owner_type;
 alter table organisations add column if not exists created_by uuid references auth.users(id);
 
+create index if not exists idx_events_workspace_start on events(workspace_id, start_at);
 create index if not exists idx_project_tasks_project on project_tasks(project_id);
 create index if not exists idx_activity_events_workspace_created on activity_events(workspace_id, created_at desc);
 create index if not exists idx_activity_events_organisation on activity_events(organisation_id, created_at desc);
@@ -214,6 +228,7 @@ alter table drops enable row level security;
 alter table decisions enable row level security;
 alter table organisations enable row level security;
 alter table contacts enable row level security;
+alter table events enable row level security;
 alter table threads enable row level security;
 alter table messages enable row level security;
 alter table activity_events enable row level security;
@@ -279,6 +294,11 @@ with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "members manage organisations" on organisations;
 create policy "members manage organisations" on organisations
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "members manage events" on events;
+create policy "members manage events" on events
 for all using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
@@ -434,6 +454,29 @@ drop trigger if exists trg_log_task_activity on project_tasks;
 create trigger trg_log_task_activity
 after insert or update on project_tasks
 for each row execute function public.log_task_activity();
+
+create or replace function public.log_event_activity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into activity_events (workspace_id, actor_user_id, entity_type, entity_id, action, summary)
+    values (new.workspace_id, coalesce(auth.uid(), new.created_by), 'event', new.id, 'created', 'Added event "' || new.title || '"');
+  elsif tg_op = 'UPDATE' and (new.start_at is distinct from old.start_at or new.title is distinct from old.title) then
+    insert into activity_events (workspace_id, actor_user_id, entity_type, entity_id, action, summary)
+    values (new.workspace_id, auth.uid(), 'event', new.id, 'updated', 'Updated event "' || new.title || '"');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_event_activity on events;
+create trigger trg_log_event_activity
+after insert or update on events
+for each row execute function public.log_event_activity();
 
 -- A project's progress is derived, not hand-set: each task carries a
 -- weight (percentage points), and progress is the sum of weights of that
