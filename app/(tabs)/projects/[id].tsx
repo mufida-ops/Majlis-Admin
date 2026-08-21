@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
+import { PriorityBadge } from '@/components/PriorityBadge';
 import { Gantt, type GanttTask } from '@/components/Gantt';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
@@ -13,7 +14,7 @@ import { useAsync } from '@/lib/useAsync';
 import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
-import type { ProjectStatus } from '@/types/db';
+import type { ProjectStatus, PriorityLevel } from '@/types/db';
 
 const STATUSES: ProjectStatus[] = ['Active', 'Blocked', 'Complete'];
 
@@ -45,6 +46,16 @@ export default function ProjectDetailScreen() {
   const changeStatus = async (status: ProjectStatus) => {
     const updated = await setProjectStatus(project.id, status);
     setData({ ...project, ...updated });
+  };
+
+  const changePriority = async (priority: PriorityLevel) => {
+    const updated = await updateProject(project.id, { priority });
+    setData({ ...project, ...updated });
+  };
+
+  const changeTaskPriority = async (taskId: string, priority: PriorityLevel) => {
+    await updateTask(taskId, { priority });
+    refresh();
   };
 
   const saveNextAction = async () => {
@@ -99,6 +110,7 @@ export default function ProjectDetailScreen() {
             <Pill label={status === project.status ? `● ${status}` : status} />
           </Pressable>
         ))}
+        <PriorityBadge value={project.priority} onChange={changePriority} />
       </View>
 
       <Card>
@@ -166,6 +178,7 @@ export default function ProjectDetailScreen() {
                 />
                 <Text style={styles.weightPercent}>%</Text>
               </View>
+              <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
             </View>
           ))
         )}

@@ -19,6 +19,9 @@ begin
   if not exists (select 1 from pg_type where typname = 'ai_action_status') then
     create type ai_action_status as enum ('Proposed', 'Applied', 'Dismissed');
   end if;
+  if not exists (select 1 from pg_type where typname = 'priority_level') then
+    create type priority_level as enum ('Low', 'Medium', 'High');
+  end if;
 end
 $$;
 
@@ -49,11 +52,13 @@ create table if not exists projects (
   title text not null,
   status project_status not null default 'Active',
   progress int not null default 0 check (progress between 0 and 100),
+  priority priority_level not null default 'Medium',
   next_action text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table projects add column if not exists priority priority_level not null default 'Medium';
 
 create table if not exists project_tasks (
   id uuid primary key default gen_random_uuid(),
@@ -63,6 +68,7 @@ create table if not exists project_tasks (
   owner_user_id uuid references auth.users(id),
   status task_status not null default 'Todo',
   weight integer not null default 0,
+  priority priority_level not null default 'Medium',
   start_at timestamptz,
   due_at timestamptz,
   created_by uuid references auth.users(id),
@@ -70,6 +76,7 @@ create table if not exists project_tasks (
   updated_at timestamptz not null default now()
 );
 alter table project_tasks add column if not exists weight integer not null default 0;
+alter table project_tasks add column if not exists priority priority_level not null default 'Medium';
 
 create table if not exists task_dependencies (
   task_id uuid references project_tasks(id) on delete cascade,

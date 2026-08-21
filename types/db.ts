@@ -5,6 +5,7 @@
 export type OwnerType = 'Mufida' | 'Victoria' | 'Both';
 export type ProjectStatus = 'Active' | 'Blocked' | 'Complete';
 export type TaskStatus = 'Todo' | 'Doing' | 'Waiting' | 'Done';
+export type PriorityLevel = 'Low' | 'Medium' | 'High';
 export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
 export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
 
@@ -30,6 +31,7 @@ export type ProjectRow = {
   title: string;
   status: ProjectStatus;
   progress: number;
+  priority: PriorityLevel;
   next_action: string | null;
   created_by: string | null;
   created_at: string;
@@ -44,6 +46,7 @@ export type ProjectTaskRow = {
   owner_user_id: string | null;
   status: TaskStatus;
   weight: number;
+  priority: PriorityLevel;
   start_at: string | null;
   due_at: string | null;
   created_by: string | null;

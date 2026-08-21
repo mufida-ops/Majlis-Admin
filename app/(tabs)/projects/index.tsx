@@ -13,6 +13,7 @@ import { useAsync } from '@/lib/useAsync';
 import { listProjects, createProject } from '@/lib/repositories/projects';
 import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
+import { PRIORITY_COLOR } from '@/lib/priority';
 
 export default function ProjectsScreen() {
   const { session } = useAuth();
@@ -63,7 +64,7 @@ export default function ProjectsScreen() {
 
           return (
             <Pressable key={project.id} onPress={() => router.push(`/(tabs)/projects/${project.id}`)}>
-              <Card>
+              <Card style={{ borderLeftWidth: 4, borderLeftColor: PRIORITY_COLOR[project.priority] }}>
                 <View style={styles.row}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.title}>{project.title}</Text>

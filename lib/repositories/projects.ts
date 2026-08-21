@@ -1,5 +1,5 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
-import type { ProjectRow, ProjectStatus, TaskDependencyRow, ProjectTaskRow, TaskStatus } from '@/types/db';
+import type { ProjectRow, ProjectStatus, TaskDependencyRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
 
 export type ProjectWithTasks = ProjectRow & { project_tasks: ProjectTaskRow[] };
 
@@ -19,13 +19,22 @@ export async function getProject(id: string): Promise<ProjectWithTasks> {
   return unwrap(result) as unknown as ProjectWithTasks;
 }
 
-export async function createProject(input: { workspace_id: string; title: string; next_action?: string; created_by: string }) {
+export async function createProject(input: {
+  workspace_id: string;
+  title: string;
+  priority?: PriorityLevel;
+  next_action?: string;
+  created_by: string;
+}) {
   const supabase = requireSupabase();
   const result = await supabase.from('projects').insert(input).select('*').single();
   return unwrap(result) as ProjectRow;
 }
 
-export async function updateProject(id: string, patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'next_action'>>) {
+export async function updateProject(
+  id: string,
+  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action'>>
+) {
   // progress is intentionally not editable here: it's derived server-side
   // (see recalc_project_progress in supabase/schema.sql) from the sum of
   // Done tasks' weight, so it can never drift from the actual task list.
@@ -45,6 +54,7 @@ export async function createTask(input: {
   title: string;
   owner_user_id?: string | null;
   weight?: number;
+  priority?: PriorityLevel;
   start_at?: string | null;
   due_at?: string | null;
   created_by: string;
@@ -56,7 +66,7 @@ export async function createTask(input: {
 
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<ProjectTaskRow, 'title' | 'status' | 'owner_user_id' | 'weight' | 'start_at' | 'due_at'>>
+  patch: Partial<Pick<ProjectTaskRow, 'title' | 'status' | 'owner_user_id' | 'weight' | 'priority' | 'start_at' | 'due_at'>>
 ) {
   const supabase = requireSupabase();
   const result = await supabase
