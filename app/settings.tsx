@@ -24,6 +24,20 @@ export default function SettingsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [icon, setIcon] = useState(me?.avatar_emoji ?? '');
+  const [savingIcon, setSavingIcon] = useState(false);
+  const [iconSaved, setIconSaved] = useState(false);
+
+  const saveIcon = async () => {
+    setSavingIcon(true);
+    setIconSaved(false);
+    try {
+      await updateMyMembership({ avatar_emoji: icon.trim() || null });
+      setIconSaved(true);
+    } finally {
+      setSavingIcon(false);
+    }
+  };
 
   const save = async () => {
     setError('');
@@ -58,6 +72,24 @@ export default function SettingsScreen() {
           headerTintColor: theme.colors.navy
         }}
       />
+
+      <Card>
+        <Text style={styles.label}>Your icon</Text>
+        <Text style={styles.sub}>A small emoji shown next to your name — tap the text box and use your keyboard's emoji key.</Text>
+        <View style={styles.row}>
+          <TextInput
+            value={icon}
+            onChangeText={setIcon}
+            placeholder="🦋"
+            placeholderTextColor={theme.colors.muted}
+            style={[styles.input, styles.iconInput]}
+          />
+          <Pressable style={[styles.primary, { marginTop: 0, flex: 1 }]} onPress={saveIcon} disabled={savingIcon}>
+            <Text style={styles.primaryText}>{savingIcon ? 'Saving…' : 'Save icon'}</Text>
+          </Pressable>
+        </View>
+        {iconSaved ? <Text style={styles.success}>Saved.</Text> : null}
+      </Card>
 
       <Card>
         <Text style={styles.label}>Your quiet hours</Text>
@@ -124,6 +156,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     backgroundColor: theme.colors.background
   },
+  iconInput: { width: 64, textAlign: 'center', fontSize: 20 },
   error: { color: theme.colors.danger, marginTop: 12 },
   success: { color: theme.colors.success, marginTop: 12 },
   primary: { backgroundColor: theme.colors.navy, padding: 14, borderRadius: theme.radius.md, alignItems: 'center', marginTop: 16 },

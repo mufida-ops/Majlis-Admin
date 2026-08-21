@@ -19,6 +19,7 @@ export type WorkspaceMember = {
   workspace_id: string;
   user_id: string;
   display_name: string;
+  avatar_emoji: string | null;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   timezone: string;

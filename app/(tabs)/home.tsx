@@ -106,7 +106,8 @@ export default function HomeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.date}>{dateLabel}</Text>
           <Text style={styles.greeting}>
-            {greeting}, {me?.display_name ?? session?.user.email}
+            {greeting}, {me?.avatar_emoji ? `${me.avatar_emoji} ` : ''}
+            {me?.display_name ?? session?.user.email}
           </Text>
           <Text style={styles.sub}>Here's what needs your attention — nothing more.</Text>
         </View>

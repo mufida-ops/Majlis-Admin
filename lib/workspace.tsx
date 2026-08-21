@@ -10,7 +10,9 @@ type WorkspaceContextValue = {
   me: WorkspaceMember | null;
   partner: WorkspaceMember | null;
   refresh: () => Promise<void>;
-  updateMyMembership: (patch: Partial<Pick<WorkspaceMember, 'display_name' | 'quiet_hours_start' | 'quiet_hours_end' | 'timezone' | 'last_seen_at'>>) => Promise<void>;
+  updateMyMembership: (
+    patch: Partial<Pick<WorkspaceMember, 'display_name' | 'avatar_emoji' | 'quiet_hours_start' | 'quiet_hours_end' | 'timezone' | 'last_seen_at'>>
+  ) => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);

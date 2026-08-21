@@ -35,6 +35,7 @@ create table if not exists workspace_members (
   workspace_id uuid references workspaces(id) on delete cascade,
   user_id uuid references auth.users(id) on delete cascade,
   display_name text not null,
+  avatar_emoji text,
   quiet_hours_start time,
   quiet_hours_end time,
   timezone text not null default 'Asia/Dubai',
@@ -42,9 +43,10 @@ create table if not exists workspace_members (
   primary key (workspace_id, user_id)
 );
 
--- Fresh installs get the column from the table definition above; existing
--- databases created from an earlier version of this script pick it up here.
+-- Fresh installs get the columns from the table definition above; existing
+-- databases created from an earlier version of this script pick them up here.
 alter table workspace_members add column if not exists last_seen_at timestamptz;
+alter table workspace_members add column if not exists avatar_emoji text;
 
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),

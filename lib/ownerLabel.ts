@@ -1,13 +1,17 @@
 import type { WorkspaceMember } from '@/types/db';
 
+function withIcon(member: WorkspaceMember): string {
+  return member.avatar_emoji ? `${member.avatar_emoji} ${member.display_name}` : member.display_name;
+}
+
 export function memberLabel(
   userId: string | null | undefined,
   me: WorkspaceMember | null,
   partner: WorkspaceMember | null
 ): string {
   if (!userId) return 'Unassigned';
-  if (me && userId === me.user_id) return me.display_name;
-  if (partner && userId === partner.user_id) return partner.display_name;
+  if (me && userId === me.user_id) return withIcon(me);
+  if (partner && userId === partner.user_id) return withIcon(partner);
   return 'Team member';
 }
 
