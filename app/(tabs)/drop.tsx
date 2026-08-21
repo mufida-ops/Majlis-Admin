@@ -164,8 +164,8 @@ export default function DropScreen() {
           ))}
         </View>
       ) : (
-        <Pressable onPress={refreshActions}>
-          <Text style={styles.refresh}>Check for suggestions</Text>
+        <Pressable style={styles.secondary} onPress={refreshActions}>
+          <Text style={styles.secondaryText}>Check for suggestions</Text>
         </Pressable>
       )}
 
@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
   feedback: { color: theme.colors.success, marginTop: 14 },
   note: { color: theme.colors.muted, lineHeight: 21 },
   suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
-  refresh: { color: theme.colors.navy, fontWeight: '600', textAlign: 'center' },
   sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
   meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 }
 });
