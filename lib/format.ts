@@ -22,3 +22,14 @@ export function toDateInputValue(iso: string | null): string {
   if (!iso) return '';
   return iso.slice(0, 10);
 }
+
+// Local calendar-day key for a Date (or "now" if omitted) — never slice an
+// ISO string or call toISOString() for this: both operate in UTC, which
+// shifts the date for any positive UTC offset (e.g. Asia/Dubai, this app's
+// default timezone — local midnight is still "yesterday" in UTC).
+export function localDateKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
