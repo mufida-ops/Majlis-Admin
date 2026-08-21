@@ -42,7 +42,8 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   today_date/tomorrow_date context. Saving or editing a drop only ever writes its catch-up summary — via a
   `propose_actions` flag on the same Edge Function call (`lib/repositories/aiActions.ts`'s `requestDropParse`) that
   Drop always sends as `false` and AI Actions always sends as `true` — so nothing AI-related ever happens without
-  an explicit tap on the AI Actions screen. Both Home and Drop link to it.
+  an explicit tap on the AI Actions screen. Reached only from a link on Drop — deliberately absent from Home, which
+  stays focused on today's actual priorities.
 - Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
   drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
@@ -137,7 +138,7 @@ of crashing — see below to connect one.
 ```
 app/
   (auth)/sign-in.tsx        sign in / sign up
-  (tabs)/home.tsx           focus list, quiet-hours pill, catch-up + AI Actions entry
+  (tabs)/home.tsx           focus list, quiet-hours pill, catch-up entry
   (tabs)/drop.tsx           capture — plain conversation with your co-founder, no AI
   (tabs)/ai.tsx             AI Actions — action a drop, review/reclassify suggestions
   (tabs)/projects/          project list, detail (tasks, Gantt, next action)
