@@ -1,0 +1,32 @@
+name: Deploy Supabase Edge Functions
+
+# Deploys supabase/functions/* to the live project and pushes the
+# ANTHROPIC_API_KEY secret it needs, whenever a function changes or this
+# is triggered manually. Without this, the Drop-suggestions feature is
+# built but never actually runs anywhere.
+on:
+  push:
+    branches:
+      - claude/mvp-production-build-j5x1sd
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: okouuospxsdhtmgossce
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - run: supabase functions deploy parse-drop --project-ref "$SUPABASE_PROJECT_REF"
+
+      - run: supabase secrets set "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

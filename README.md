@@ -93,7 +93,9 @@ of crashing — see below to connect one.
 4. Restart Expo so the new env vars are picked up (`npx expo start -c` if you've already started once).
 5. Sign up as Mufida, then sign up again as Victoria (or vice versa) — the second signup automatically joins the
    first one's workspace via `bootstrap_workspace()`. A third signup gets its own separate workspace.
-6. (Optional) Deploy the AI action parser:
+6. (Optional) Deploy the AI action parser. `.github/workflows/deploy-supabase-functions.yml` does this automatically
+   on every push that touches `supabase/functions/**`, given two repo secrets: `SUPABASE_ACCESS_TOKEN` (a personal
+   access token from supabase.com/dashboard/account/tokens) and `ANTHROPIC_API_KEY`. To do it by hand instead:
 
    ```
    supabase functions deploy parse-drop
