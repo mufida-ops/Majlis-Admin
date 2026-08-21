@@ -11,9 +11,29 @@ import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { createDrop, listDrops, updateDropText, deleteDrop } from '@/lib/repositories/drops';
 import { requestDropParse, listProposedActions, applyAiAction, dismissAiAction } from '@/lib/repositories/aiActions';
+import { listProjects, createTask } from '@/lib/repositories/projects';
+import { createDecision } from '@/lib/repositories/decisions';
+import { listOrganisations, createFollowUp } from '@/lib/repositories/organisations';
+import { createEvent } from '@/lib/repositories/events';
 import { describeAiAction } from '@/lib/aiActionLabel';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
-import { formatRelative } from '@/lib/format';
+import { formatRelative, localDateKey } from '@/lib/format';
+import type { AiActionRow, OwnerType } from '@/types/db';
+
+type RecatTarget = 'task' | 'decision' | 'crm' | 'calendar';
+
+const RECAT_TARGETS: { key: RecatTarget; label: string }[] = [
+  { key: 'task', label: 'Task' },
+  { key: 'decision', label: 'Decision' },
+  { key: 'crm', label: 'CRM follow-up' },
+  { key: 'calendar', label: 'Calendar' }
+];
+
+function seedTitleFromAction(action: AiActionRow): string {
+  const p = action.payload as Record<string, unknown>;
+  const value = p.title ?? p.next_action ?? p.note ?? '';
+  return typeof value === 'string' ? value : '';
+}
 
 export default function DropScreen() {
   const { session } = useAuth();
@@ -26,6 +46,14 @@ export default function DropScreen() {
   const [editingDropId, setEditingDropId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [recategorizing, setRecategorizing] = useState<{ actionId: string; target: RecatTarget } | null>(null);
+  const [recatTitle, setRecatTitle] = useState('');
+  const [recatDate, setRecatDate] = useState('');
+  const [recatTime, setRecatTime] = useState('');
+  const [recatProjectId, setRecatProjectId] = useState('');
+  const [recatOrgId, setRecatOrgId] = useState('');
+  const [recatOwner, setRecatOwner] = useState<OwnerType>('Both');
+  const [recatSaving, setRecatSaving] = useState(false);
 
   const {
     data: proposedActions,
@@ -38,6 +66,11 @@ export default function DropScreen() {
     loading: dropsLoading,
     refresh: refreshDrops
   } = useAsync(() => (workspaceId ? listDrops(workspaceId) : Promise.resolve([])), [workspaceId]);
+
+  // Loaded only to power the project/organisation pickers when reclassifying
+  // a suggestion — not shown anywhere else on this screen.
+  const { data: projectsList } = useAsync(() => (workspaceId ? listProjects(workspaceId) : Promise.resolve([])), [workspaceId]);
+  const { data: orgsList } = useAsync(() => (workspaceId ? listOrganisations(workspaceId) : Promise.resolve([])), [workspaceId]);
 
   const accept = async (actionId: string) => {
     if (!session || !proposedActions) return;
@@ -124,6 +157,67 @@ export default function DropScreen() {
       setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
     } finally {
       setBusyActionId(null);
+    }
+  };
+
+  const startRecategorize = (action: AiActionRow, target: RecatTarget) => {
+    setRecategorizing({ actionId: action.id, target });
+    setRecatTitle(seedTitleFromAction(action));
+    setRecatDate(localDateKey());
+    setRecatTime('');
+    setRecatProjectId('');
+    setRecatOrgId('');
+    setRecatOwner('Both');
+    setFeedback('');
+  };
+
+  const cancelRecategorize = () => setRecategorizing(null);
+
+  const targetLabel = (target: RecatTarget) =>
+    target === 'calendar' ? 'Calendar' : target === 'decision' ? 'Decisions' : target === 'task' ? 'Projects' : 'CRM';
+
+  const saveRecategorize = async () => {
+    if (!recategorizing || !session || !workspaceId) return;
+    const { actionId, target } = recategorizing;
+    if (!recatTitle.trim()) {
+      setFeedback('Add a title first.');
+      return;
+    }
+    if (target === 'task' && !recatProjectId) {
+      setFeedback('Pick a project first.');
+      return;
+    }
+    if (target === 'crm' && !recatOrgId) {
+      setFeedback('Pick an organisation first.');
+      return;
+    }
+    setRecatSaving(true);
+    try {
+      if (target === 'calendar') {
+        const allDay = !recatTime.trim();
+        const startAt = new Date(`${recatDate}T${allDay ? '00:00' : recatTime}:00`);
+        await createEvent({
+          workspace_id: workspaceId,
+          title: recatTitle.trim(),
+          start_at: startAt.toISOString(),
+          all_day: allDay,
+          created_by: session.user.id
+        });
+      } else if (target === 'decision') {
+        await createDecision({ workspace_id: workspaceId, title: recatTitle.trim(), owner: recatOwner, created_by: session.user.id });
+      } else if (target === 'task') {
+        await createTask({ workspace_id: workspaceId, project_id: recatProjectId, title: recatTitle.trim(), created_by: session.user.id });
+      } else {
+        await createFollowUp(recatOrgId, recatTitle.trim());
+      }
+      await dismissAiAction(actionId);
+      setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
+      setFeedback(`Done — added to ${targetLabel(target)}.`);
+      setRecategorizing(null);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Could not save that.');
+    } finally {
+      setRecatSaving(false);
     }
   };
 
@@ -260,27 +354,115 @@ export default function DropScreen() {
 
                     {(proposedActions ?? [])
                       .filter(action => action.drop_id === drop.id)
-                      .map(action => (
-                        <View key={action.id} style={styles.suggestionBlock}>
-                          <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
-                          <View style={styles.buttons}>
-                            <Pressable
-                              style={styles.primary}
-                              onPress={() => accept(action.id)}
-                              disabled={busyActionId === action.id}
-                            >
-                              <Text style={styles.primaryText}>{busyActionId === action.id ? '…' : 'Accept'}</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.secondary}
-                              onPress={() => dismiss(action.id)}
-                              disabled={busyActionId === action.id}
-                            >
-                              <Text style={styles.secondaryText}>Dismiss</Text>
-                            </Pressable>
+                      .map(action =>
+                        recategorizing?.actionId === action.id ? (
+                          <View key={action.id} style={styles.suggestionBlock}>
+                            <Text style={styles.recatLabel}>Add to {targetLabel(recategorizing.target)} instead</Text>
+                            <TextInput
+                              value={recatTitle}
+                              onChangeText={setRecatTitle}
+                              placeholder="Title"
+                              placeholderTextColor={theme.colors.muted}
+                              style={styles.recatInput}
+                            />
+                            {recategorizing.target === 'calendar' ? (
+                              <View style={styles.recatRow}>
+                                <TextInput
+                                  value={recatDate}
+                                  onChangeText={setRecatDate}
+                                  placeholder="YYYY-MM-DD"
+                                  placeholderTextColor={theme.colors.muted}
+                                  style={[styles.recatInput, { flex: 1 }]}
+                                />
+                                <TextInput
+                                  value={recatTime}
+                                  onChangeText={setRecatTime}
+                                  placeholder="HH:MM (optional)"
+                                  placeholderTextColor={theme.colors.muted}
+                                  style={[styles.recatInput, { flex: 1 }]}
+                                />
+                              </View>
+                            ) : null}
+                            {recategorizing.target === 'task' ? (
+                              <View style={styles.chipRow}>
+                                {(projectsList ?? []).map(p => (
+                                  <Pressable
+                                    key={p.id}
+                                    style={[styles.chip, recatProjectId === p.id && styles.chipActive]}
+                                    onPress={() => setRecatProjectId(p.id)}
+                                  >
+                                    <Text style={[styles.chipText, recatProjectId === p.id && styles.chipTextActive]}>
+                                      {p.title}
+                                    </Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            ) : null}
+                            {recategorizing.target === 'crm' ? (
+                              <View style={styles.chipRow}>
+                                {(orgsList ?? []).map(o => (
+                                  <Pressable
+                                    key={o.id}
+                                    style={[styles.chip, recatOrgId === o.id && styles.chipActive]}
+                                    onPress={() => setRecatOrgId(o.id)}
+                                  >
+                                    <Text style={[styles.chipText, recatOrgId === o.id && styles.chipTextActive]}>{o.name}</Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            ) : null}
+                            {recategorizing.target === 'decision' ? (
+                              <View style={styles.chipRow}>
+                                {(['Both', 'Mufida', 'Victoria'] as OwnerType[]).map(owner => (
+                                  <Pressable
+                                    key={owner}
+                                    style={[styles.chip, recatOwner === owner && styles.chipActive]}
+                                    onPress={() => setRecatOwner(owner)}
+                                  >
+                                    <Text style={[styles.chipText, recatOwner === owner && styles.chipTextActive]}>{owner}</Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            ) : null}
+                            <View style={styles.buttons}>
+                              <Pressable style={styles.primary} onPress={saveRecategorize} disabled={recatSaving}>
+                                <Text style={styles.primaryText}>{recatSaving ? 'Saving…' : 'Save'}</Text>
+                              </Pressable>
+                              <Pressable style={styles.secondary} onPress={cancelRecategorize} disabled={recatSaving}>
+                                <Text style={styles.secondaryText}>Cancel</Text>
+                              </Pressable>
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        ) : (
+                          <View key={action.id} style={styles.suggestionBlock}>
+                            <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
+                            <View style={styles.buttons}>
+                              <Pressable
+                                style={styles.primary}
+                                onPress={() => accept(action.id)}
+                                disabled={busyActionId === action.id}
+                              >
+                                <Text style={styles.primaryText}>{busyActionId === action.id ? '…' : 'Accept'}</Text>
+                              </Pressable>
+                              <Pressable
+                                style={styles.secondary}
+                                onPress={() => dismiss(action.id)}
+                                disabled={busyActionId === action.id}
+                              >
+                                <Text style={styles.secondaryText}>Dismiss</Text>
+                              </Pressable>
+                            </View>
+                            <Text style={styles.recatPrompt}>Wrong category? Move it to:</Text>
+                            <View style={styles.chipRow}>
+                              {RECAT_TARGETS.map(t => (
+                                <Pressable key={t.key} style={styles.chipSmall} onPress={() => startRecategorize(action, t.key)}>
+                                  <Text style={styles.chipSmallText}>{t.label}</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          </View>
+                        )
+                      )}
 
                     <Pressable
                       style={styles.retry}
@@ -327,6 +509,37 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border
   },
+  recatPrompt: { color: theme.colors.muted, fontSize: 12, marginTop: 12 },
+  recatLabel: { color: theme.colors.navy, fontWeight: '600', fontSize: 14 },
+  recatInput: {
+    marginTop: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background
+  },
+  recatRow: { flexDirection: 'row', gap: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  chip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14
+  },
+  chipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  chipText: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  chipSmall: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12
+  },
+  chipSmallText: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
   sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
   sentHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   sentIcons: { flexDirection: 'row', gap: 14, paddingTop: 2 },

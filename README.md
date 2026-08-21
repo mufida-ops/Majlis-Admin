@@ -49,6 +49,11 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   `parse-drop` Edge Function re-validates every id a suggestion references (project/task/decision/organisation)
   against the real workspace data before proposing it, so a suggestion can no longer look valid on screen and then
   silently fail (or do nothing) when accepted.
+- Reclassify a suggestion: every suggestion on the Drop screen has a "Wrong category? Move it to:" row (Task /
+  Decision / CRM follow-up / Calendar) — since the AI's own guess at a category is sometimes wrong (e.g. proposing a
+  CRM follow-up for what's really a calendar reschedule), tapping one opens a small inline form (title, plus
+  whatever that target needs — a project picker for Task, an organisation picker for CRM, a date for Calendar) and
+  creates the right thing directly, dismissing the original mis-categorised suggestion.
 - Illustrated empty states: the two illustrations Mufida shared (`assets/images/sign-in-hero.jpg`,
   `assets/images/reading-together.jpg`) appear across Home, Sign-in, Projects, Decisions, CRM, Calendar, Catch-up,
   and Drop wherever a list is empty, via `EmptyState`'s optional `image` prop (`components/AsyncState.tsx`).
