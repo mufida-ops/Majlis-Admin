@@ -43,6 +43,7 @@ export type ProjectTaskRow = {
   title: string;
   owner_user_id: string | null;
   status: TaskStatus;
+  weight: number;
   start_at: string | null;
   due_at: string | null;
   created_by: string | null;

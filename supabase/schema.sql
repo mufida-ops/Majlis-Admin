@@ -62,12 +62,14 @@ create table if not exists project_tasks (
   title text not null,
   owner_user_id uuid references auth.users(id),
   status task_status not null default 'Todo',
+  weight integer not null default 0,
   start_at timestamptz,
   due_at timestamptz,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table project_tasks add column if not exists weight integer not null default 0;
 
 create table if not exists task_dependencies (
   task_id uuid references project_tasks(id) on delete cascade,
@@ -423,6 +425,36 @@ drop trigger if exists trg_log_task_activity on project_tasks;
 create trigger trg_log_task_activity
 after insert or update on project_tasks
 for each row execute function public.log_task_activity();
+
+-- A project's progress is derived, not hand-set: each task carries a
+-- weight (percentage points), and progress is the sum of weights of that
+-- project's Done tasks. Recalculated whenever any task in the project is
+-- added, changed, or removed, so it can never drift from the task list.
+create or replace function public.recalc_project_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_project_id uuid;
+  v_total integer;
+begin
+  v_project_id := coalesce(new.project_id, old.project_id);
+
+  select coalesce(sum(weight), 0) into v_total
+  from project_tasks
+  where project_id = v_project_id and status = 'Done';
+
+  update projects set progress = least(100, greatest(0, v_total)) where id = v_project_id;
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists trg_recalc_project_progress on project_tasks;
+create trigger trg_recalc_project_progress
+after insert or update or delete on project_tasks
+for each row execute function public.recalc_project_progress();
 
 create or replace function public.log_decision_activity()
 returns trigger

@@ -10,7 +10,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { getProject, createTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
+import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import type { ProjectStatus } from '@/types/db';
@@ -26,9 +26,9 @@ export default function ProjectDetailScreen() {
   const [nextAction, setNextAction] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
+  const [taskWeight, setTaskWeight] = useState('');
   const [addingTask, setAddingTask] = useState(false);
-  const [progressInput, setProgressInput] = useState('');
-  const [savingProgress, setSavingProgress] = useState(false);
+  const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -54,35 +54,39 @@ export default function ProjectDetailScreen() {
     setNextAction('');
   };
 
-  const saveProgress = async (value: number) => {
-    const clamped = Math.max(0, Math.min(100, Math.round(value)));
-    setSavingProgress(true);
-    try {
-      const updated = await updateProject(project.id, { progress: clamped });
-      setData({ ...project, ...updated });
-      setProgressInput('');
-    } finally {
-      setSavingProgress(false);
-    }
-  };
-
   const addTask = async () => {
     if (!taskTitle.trim() || !workspaceId || !session) return;
     setAddingTask(true);
     try {
+      const weight = Math.max(0, Math.min(100, Math.round(Number(taskWeight)) || 0));
       await createTask({
         workspace_id: workspaceId,
         project_id: project.id,
         title: taskTitle.trim(),
         owner_user_id: taskOwner,
+        weight,
         created_by: session.user.id
       });
       setTaskTitle('');
       setTaskOwner(null);
+      setTaskWeight('');
       refresh();
     } finally {
       setAddingTask(false);
     }
+  };
+
+  const saveWeight = async (taskId: string) => {
+    const draft = weightDrafts[taskId];
+    if (draft === undefined) return;
+    const weight = Math.max(0, Math.min(100, Math.round(Number(draft)) || 0));
+    setWeightDrafts(prev => {
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
+    });
+    await updateTask(taskId, { weight });
+    refresh();
   };
 
   return (
@@ -105,37 +109,9 @@ export default function ProjectDetailScreen() {
           </View>
           <Text style={styles.progressValue}>{project.progress}%</Text>
         </View>
-        <View style={styles.progressButtons}>
-          <Pressable
-            style={styles.secondarySmall}
-            onPress={() => saveProgress(project.progress - 10)}
-            disabled={savingProgress || project.progress <= 0}
-          >
-            <Text style={styles.secondaryText}>-10%</Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondarySmall}
-            onPress={() => saveProgress(project.progress + 10)}
-            disabled={savingProgress || project.progress >= 100}
-          >
-            <Text style={styles.secondaryText}>+10%</Text>
-          </Pressable>
-          <TextInput
-            value={progressInput}
-            onChangeText={setProgressInput}
-            placeholder="Set exact %"
-            placeholderTextColor={theme.colors.muted}
-            keyboardType="number-pad"
-            style={styles.progressInput}
-          />
-          <Pressable
-            style={styles.primarySmall}
-            onPress={() => saveProgress(Number(progressInput))}
-            disabled={savingProgress || progressInput.trim() === '' || Number.isNaN(Number(progressInput))}
-          >
-            <Text style={styles.primaryText}>Set</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.meta}>
+          Calculated automatically — give each task a weight below, and progress adds up as tasks are checked off Done.
+        </Text>
       </Card>
 
       <Card>
@@ -168,20 +144,29 @@ export default function ProjectDetailScreen() {
           <Text style={styles.meta}>No tasks yet.</Text>
         ) : (
           project.project_tasks.map(task => (
-            <Pressable
-              key={task.id}
-              style={styles.taskRow}
-              onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
-            >
-              <View style={{ flex: 1 }}>
+            <View key={task.id} style={styles.taskRow}>
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
+              >
                 <Text style={styles.taskTitle}>{task.title}</Text>
                 <Text style={styles.meta}>
                   {memberLabel(task.owner_user_id, me, partner)} · {task.status}
                   {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
                 </Text>
+                <Text style={styles.discuss}>Discuss →</Text>
+              </Pressable>
+              <View style={styles.weightEditor}>
+                <TextInput
+                  value={weightDrafts[task.id] ?? String(task.weight)}
+                  onChangeText={text => setWeightDrafts(prev => ({ ...prev, [task.id]: text }))}
+                  onEndEditing={() => saveWeight(task.id)}
+                  keyboardType="number-pad"
+                  style={styles.weightInput}
+                />
+                <Text style={styles.weightPercent}>%</Text>
               </View>
-              <Text style={styles.discuss}>Discuss →</Text>
-            </Pressable>
+            </View>
           ))
         )}
 
@@ -191,6 +176,14 @@ export default function ProjectDetailScreen() {
             onChangeText={setTaskTitle}
             placeholder="New task title"
             placeholderTextColor={theme.colors.muted}
+            style={styles.input}
+          />
+          <TextInput
+            value={taskWeight}
+            onChangeText={setTaskWeight}
+            placeholder="Weight, e.g. 20 (% of project this task is worth)"
+            placeholderTextColor={theme.colors.muted}
+            keyboardType="number-pad"
             style={styles.input}
           />
           <View style={styles.ownerPicker}>
@@ -245,29 +238,10 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   primaryText: { color: '#fff', fontWeight: '600' },
-  secondarySmall: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  secondaryText: { color: theme.colors.text, fontWeight: '600' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   progressTrack: { flex: 1, height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
   progressValue: { color: theme.colors.navy, fontWeight: '700', width: 44, textAlign: 'right' },
-  progressButtons: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  progressInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    width: 100
-  },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -278,7 +252,20 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
-  discuss: { color: theme.colors.navy, fontSize: 12, fontWeight: '600' },
+  discuss: { color: theme.colors.navy, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  weightEditor: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  weightInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background,
+    width: 44,
+    textAlign: 'center'
+  },
+  weightPercent: { color: theme.colors.muted, fontSize: 13 },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   discussProject: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
