@@ -42,6 +42,11 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   keyboard's built-in microphone button, focused on the Drop text field.
 - Quote of the day on Home (`lib/quotes.ts`): the same line for both founders on the same calendar day, picked by
   indexing a curated list with the local date — no table, no sync, both phones just compute the same index.
+- Drop screen: edit or delete anything in "What you've sent" — editing re-triggers AI parsing against the corrected
+  text. Accepting a suggestion now shows an explicit "Done — …" confirmation instead of just removing the card, and
+  the `parse-drop` Edge Function re-validates every id a suggestion references (project/task/decision/organisation)
+  against the real workspace data before proposing it, so a suggestion can no longer look valid on screen and then
+  silently fail (or do nothing) when accepted.
 
 ## Testing without a local dev server
 

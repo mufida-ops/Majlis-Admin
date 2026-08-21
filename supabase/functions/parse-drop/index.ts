@@ -164,8 +164,30 @@ Deno.serve(async req => {
     const actions: Array<{ action_type: string; confidence?: number; payload: Record<string, unknown> }> =
       toolUse?.input?.actions ?? [];
 
+    // Claude occasionally hallucinates an id instead of correctly falling
+    // back to create_organisation/create_task for something new — the
+    // suggestion then looks perfectly normal on the Drop screen, but
+    // applying it silently no-ops or fails (the id matches nothing). Rather
+    // than trust the model's own id references, re-validate each one
+    // against the same context it was given, and drop the action instead of
+    // proposing something that can never actually apply.
+    const knownIds = {
+      project_id: new Set((projects ?? []).map(p => p.id)),
+      task_id: new Set((tasks ?? []).map(t => t.id)),
+      decision_id: new Set((decisions ?? []).map(d => d.id)),
+      organisation_id: new Set((organisations ?? []).map(o => o.id)),
+      owner_user_id: new Set((members ?? []).map(m => m.user_id))
+    };
+    const idFieldsToCheck: Array<keyof typeof knownIds> = ['project_id', 'task_id', 'decision_id', 'organisation_id', 'owner_user_id'];
+    const hasOnlyKnownIds = (payload: Record<string, unknown>) =>
+      idFieldsToCheck.every(field => {
+        const value = payload[field];
+        return value == null || typeof value !== 'string' || knownIds[field].has(value);
+      });
+
     const rows = actions
       .filter(a => (ACTION_TYPES as readonly string[]).includes(a.action_type))
+      .filter(a => hasOnlyKnownIds(a.payload ?? {}))
       .map(a => ({
         workspace_id: drop.workspace_id,
         drop_id: drop.id,

@@ -20,3 +20,23 @@ export async function markDropProcessed(id: string) {
   const result = await supabase.from('drops').update({ processed: true }).eq('id', id).select('*').single();
   return unwrap(result) as DropRow;
 }
+
+export async function updateDropText(id: string, rawText: string) {
+  const supabase = requireSupabase();
+  // Editing the text invalidates any summary/suggestions generated from the
+  // old wording, so this resets processed/summary — the caller re-triggers
+  // parse-drop right after, same as a fresh save.
+  const result = await supabase
+    .from('drops')
+    .update({ raw_text: rawText, processed: false, summary: null })
+    .eq('id', id)
+    .select('*')
+    .single();
+  return unwrap(result) as DropRow;
+}
+
+export async function deleteDrop(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('drops').delete().eq('id', id);
+  unwrap(result);
+}

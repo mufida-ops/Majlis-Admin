@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
@@ -8,7 +9,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { createDrop, listDrops } from '@/lib/repositories/drops';
+import { createDrop, listDrops, updateDropText, deleteDrop } from '@/lib/repositories/drops';
 import { requestDropParse, listProposedActions, applyAiAction, dismissAiAction } from '@/lib/repositories/aiActions';
 import { describeAiAction } from '@/lib/aiActionLabel';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
@@ -22,6 +23,9 @@ export default function DropScreen() {
   const [saving, setSaving] = useState(false);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [retryingDropId, setRetryingDropId] = useState<string | null>(null);
+  const [editingDropId, setEditingDropId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const {
     data: proposedActions,
@@ -44,11 +48,61 @@ export default function DropScreen() {
     try {
       await applyAiAction(action, session.user.id);
       setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
+      // Explicit confirmation, not just the card vanishing — a silent
+      // disappearance reads as "did that actually do anything?" to someone
+      // moving fast on a phone.
+      setFeedback(`Done — ${describeAiAction(action)}`);
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : 'Could not apply that suggestion.');
     } finally {
       setBusyActionId(null);
     }
+  };
+
+  const startEdit = (dropId: string, currentText: string) => {
+    setEditingDropId(dropId);
+    setEditText(currentText);
+  };
+
+  const cancelEdit = () => {
+    setEditingDropId(null);
+    setEditText('');
+  };
+
+  const saveEdit = async (dropId: string) => {
+    if (!editText.trim()) return;
+    setSavingEdit(true);
+    try {
+      await updateDropText(dropId, editText.trim());
+      setEditingDropId(null);
+      setEditText('');
+      await refreshDrops();
+      // Re-run AI parsing against the corrected text, same as a fresh drop.
+      requestDropParse(dropId)
+        .then(() => {
+          refreshActions();
+          refreshDrops();
+        })
+        .catch(() => {});
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Could not save that edit.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const confirmDeleteDrop = (dropId: string) => {
+    Alert.alert('Delete this drop?', "This removes it from your sent list. It won't undo anything it already created.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteDrop(dropId);
+          refreshDrops();
+        }
+      }
+    ]);
   };
 
   const retryParse = async (dropId: string) => {
@@ -194,25 +248,56 @@ export default function DropScreen() {
           }
           return (
             <View style={{ gap: 10 }}>
-              {mine.map(drop => (
-                <Card key={drop.id}>
-                  <Text style={styles.sentText}>{drop.raw_text}</Text>
-                  <Text style={styles.meta}>
-                    {formatRelative(drop.created_at)}
-                    {drop.urgent ? ' · Urgent' : ''}
-                    {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
-                  </Text>
-                  <Pressable
-                    style={styles.retry}
-                    onPress={() => retryParse(drop.id)}
-                    disabled={retryingDropId === drop.id}
-                  >
-                    <Text style={styles.retryText}>
-                      {retryingDropId === drop.id ? 'Rechecking…' : 'Recheck for suggestions'}
+              {mine.map(drop =>
+                editingDropId === drop.id ? (
+                  <Card key={drop.id}>
+                    <TextInput
+                      value={editText}
+                      onChangeText={setEditText}
+                      multiline
+                      style={styles.editInput}
+                      placeholderTextColor={theme.colors.muted}
+                      autoFocus
+                    />
+                    <View style={styles.buttons}>
+                      <Pressable style={styles.primary} onPress={() => saveEdit(drop.id)} disabled={savingEdit}>
+                        <Text style={styles.primaryText}>{savingEdit ? 'Saving…' : 'Save'}</Text>
+                      </Pressable>
+                      <Pressable style={styles.secondary} onPress={cancelEdit} disabled={savingEdit}>
+                        <Text style={styles.secondaryText}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  </Card>
+                ) : (
+                  <Card key={drop.id}>
+                    <View style={styles.sentHeader}>
+                      <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text}</Text>
+                      <View style={styles.sentIcons}>
+                        <Pressable hitSlop={10} onPress={() => startEdit(drop.id, drop.raw_text)}>
+                          <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                        <Pressable hitSlop={10} onPress={() => confirmDeleteDrop(drop.id)}>
+                          <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                      </View>
+                    </View>
+                    <Text style={styles.meta}>
+                      {formatRelative(drop.created_at)}
+                      {drop.urgent ? ' · Urgent' : ''}
+                      {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
                     </Text>
-                  </Pressable>
-                </Card>
-              ))}
+                    <Pressable
+                      style={styles.retry}
+                      onPress={() => retryParse(drop.id)}
+                      disabled={retryingDropId === drop.id}
+                    >
+                      <Text style={styles.retryText}>
+                        {retryingDropId === drop.id ? 'Rechecking…' : 'Recheck for suggestions'}
+                      </Text>
+                    </Pressable>
+                  </Card>
+                )
+              )}
             </View>
           );
         })()
@@ -243,6 +328,8 @@ const styles = StyleSheet.create({
   note: { color: theme.colors.muted, lineHeight: 21 },
   suggestion: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
   sentText: { color: theme.colors.text, lineHeight: 21, fontSize: 15 },
+  sentHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  sentIcons: { flexDirection: 'row', gap: 14, paddingTop: 2 },
   meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 },
   retry: {
     marginTop: 10,
@@ -252,5 +339,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center'
   },
-  retryText: { color: theme.colors.text, fontWeight: '600', fontSize: 13 }
+  retryText: { color: theme.colors.text, fontWeight: '600', fontSize: 13 },
+  editInput: {
+    minHeight: 100,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    color: theme.colors.text,
+    textAlignVertical: 'top',
+    backgroundColor: theme.colors.background
+  }
 });
