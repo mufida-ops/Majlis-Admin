@@ -3,6 +3,7 @@ import type { AiActionRow } from '@/types/db';
 import * as projects from '@/lib/repositories/projects';
 import * as decisions from '@/lib/repositories/decisions';
 import * as organisations from '@/lib/repositories/organisations';
+import * as events from '@/lib/repositories/events';
 
 export async function listProposedActions(workspaceId: string): Promise<AiActionRow[]> {
   const supabase = requireSupabase();
@@ -60,6 +61,22 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
       return organisations.createFollowUp(p.organisation_id, p.next_action, p.next_action_at ?? null);
     case 'mark_waiting_for':
       return projects.updateTask(p.task_id, { status: 'Waiting' });
+    case 'create_event': {
+      // Combined client-side (in the founder's own timezone) rather than by
+      // the Edge Function or Claude, exactly like the Calendar screen's own
+      // "New event" form does — the Edge Function only resolves *which*
+      // calendar date "tomorrow" means, never a UTC instant.
+      const allDay = Boolean(p.all_day) || !p.start_time;
+      const startAt = new Date(`${p.start_date}T${allDay ? '00:00' : p.start_time}:00`);
+      return events.createEvent({
+        workspace_id: workspaceId,
+        title: p.title,
+        description: p.description ?? null,
+        start_at: startAt.toISOString(),
+        all_day: allDay,
+        created_by: actorUserId
+      });
+    }
     case 'summarize_changes_since_last_seen':
       return null;
     default:

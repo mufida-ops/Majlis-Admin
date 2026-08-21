@@ -29,7 +29,8 @@ const ACTION_TYPES = [
   'add_crm_note',
   'update_pipeline_stage',
   'create_follow_up',
-  'mark_waiting_for'
+  'mark_waiting_for',
+  'create_event'
 ] as const;
 
 const PROPOSE_ACTIONS_TOOL = {
@@ -54,7 +55,7 @@ const PROPOSE_ACTIONS_TOOL = {
             payload: {
               type: 'object',
               description:
-                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one.'
+                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if the note actually mentions a specific time), all_day? (true when no specific time was mentioned), description?}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one.'
             }
           },
           required: ['action_type', 'payload']
@@ -95,7 +96,7 @@ Deno.serve(async req => {
 
     const [{ data: members }, { data: projects }, { data: tasks }, { data: decisions }, { data: organisations }] =
       await Promise.all([
-        supabase.from('workspace_members').select('user_id, display_name').eq('workspace_id', drop.workspace_id),
+        supabase.from('workspace_members').select('user_id, display_name, timezone').eq('workspace_id', drop.workspace_id),
         supabase.from('projects').select('id, title').eq('workspace_id', drop.workspace_id),
         supabase
           .from('project_tasks')
@@ -107,9 +108,19 @@ Deno.serve(async req => {
       ]);
 
     const author = (members ?? []).find(m => m.user_id === drop.created_by);
+    const authorTimezone = author?.timezone ?? 'Asia/Dubai';
+
+    // Computed in the author's own timezone (not the server's, which is
+    // arbitrary) so "today"/"tomorrow" in a dictated note resolve to the
+    // calendar date the author actually meant.
+    const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: authorTimezone }).format(d);
+    const todayDate = localDate(new Date());
+    const tomorrowDate = localDate(new Date(Date.now() + 86400000));
 
     const context = {
       author_name: author?.display_name ?? 'A founder',
+      today_date: todayDate,
+      tomorrow_date: tomorrowDate,
       members: (members ?? []).map(m => ({ user_id: m.user_id, name: m.display_name })),
       open_projects: (projects ?? []).map(p => ({ id: p.id, title: p.title })),
       open_tasks: (tasks ?? []).map(t => ({ id: t.id, title: t.title, status: t.status, project_id: t.project_id })),
@@ -134,7 +145,7 @@ Deno.serve(async req => {
             role: 'user',
             content:
               `${context.author_name} wrote this note ("drop"), which may be a rough voice-dictated rant:\n\n"""${drop.raw_text}"""\n\n` +
-              `Workspace context (only use these ids, never invent new ones):\n${JSON.stringify(context, null, 2)}\n\n` +
+              `Workspace context (only use these ids, never invent new ones; resolve relative dates like "today"/"tomorrow" using today_date/tomorrow_date, both already in ${context.author_name}'s own timezone):\n${JSON.stringify(context, null, 2)}\n\n` +
               'First, write the summary for their co-founder\'s catch-up feed. Then propose any structured follow-up actions this note clearly implies.'
           }
         ]

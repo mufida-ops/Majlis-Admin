@@ -33,8 +33,9 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   `activity_events` log that database triggers populate automatically (`supabase/schema.sql`).
 - Structured AI actions: a Drop can be parsed by the `parse-drop` Supabase Edge Function
   (`supabase/functions/parse-drop`) into reviewable `ai_actions` (create_task, assign_task, create_decision,
-  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for), shown for
-  Accept/Dismiss on the Drop screen.
+  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event), shown
+  for Accept/Dismiss on the Drop screen. create_event resolves relative dates ("tomorrow", "Friday") using the
+  author's own timezone, computed server-side and given to Claude as today_date/tomorrow_date context.
 - Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
   drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
@@ -140,4 +141,5 @@ supabase/
 - update_pipeline_stage
 - create_follow_up
 - mark_waiting_for
+- create_event
 - summarize_changes_since_last_seen
