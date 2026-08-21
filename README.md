@@ -31,14 +31,18 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   you" and "FYI", and advances `last_seen_at` once it's shown.
 - CRM activity history and overdue next-action highlighting on the organisation detail screen, backed by the
   `activity_events` log that database triggers populate automatically (`supabase/schema.sql`).
-- Structured AI actions: a Drop can be parsed by the `parse-drop` Supabase Edge Function
-  (`supabase/functions/parse-drop`) into reviewable `ai_actions` (create_task, assign_task, create_decision,
-  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event), shown
-  for Accept/Dismiss on the Drop screen. create_event resolves relative dates ("tomorrow", "Friday") using the
-  author's own timezone, computed server-side and given to Claude as today_date/tomorrow_date context. Saving a
-  drop (or editing one) only ever writes its catch-up summary — a drop is plain conversation between the two
-  founders by default. AI suggestions only get proposed when a founder explicitly taps "Action it" on that drop,
-  via a `propose_actions` flag on the same Edge Function call (`lib/repositories/aiActions.ts`'s `requestDropParse`).
+- Structured AI actions live on their own **AI Actions** screen (`app/(tabs)/ai.tsx`), deliberately separate from
+  Drop — Drop is plain conversation with your co-founder and never runs AI on its own; AI Actions lists your own
+  drops and lets you tap "Action it" on any of them to have the `parse-drop` Supabase Edge Function
+  (`supabase/functions/parse-drop`) propose structured `ai_actions` (create_task, assign_task, create_decision,
+  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event,
+  create_organisation) for Accept/Dismiss review right there. A suggestion can also be reclassified (Task /
+  Decision / CRM follow-up / Calendar) if the AI guessed the wrong category. create_event resolves relative dates
+  ("tomorrow", "Friday") using the author's own timezone, computed server-side and given to Claude as
+  today_date/tomorrow_date context. Saving or editing a drop only ever writes its catch-up summary — via a
+  `propose_actions` flag on the same Edge Function call (`lib/repositories/aiActions.ts`'s `requestDropParse`) that
+  Drop always sends as `false` and AI Actions always sends as `true` — so nothing AI-related ever happens without
+  an explicit tap on the AI Actions screen. Both Home and Drop link to it.
 - Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
   drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
@@ -125,16 +129,17 @@ of crashing — see below to connect one.
 
    `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically. `ANTHROPIC_MODEL` is optional and
    defaults to a fast/cheap model, since parsing a Drop is a background job, not the primary product surface. Without
-   this deployed, Drop still saves normally — the "Suggested from your drops" section on the Drop screen just stays
-   empty.
+   this deployed, Drop still saves normally — tapping "Action it" on the AI Actions screen just won't produce any
+   suggestions.
 
 ## Project structure
 
 ```
 app/
   (auth)/sign-in.tsx        sign in / sign up
-  (tabs)/home.tsx           focus list, quiet-hours pill, catch-up entry
-  (tabs)/drop.tsx           capture + AI action review
+  (tabs)/home.tsx           focus list, quiet-hours pill, catch-up + AI Actions entry
+  (tabs)/drop.tsx           capture — plain conversation with your co-founder, no AI
+  (tabs)/ai.tsx             AI Actions — action a drop, review/reclassify suggestions
   (tabs)/projects/          project list, detail (tasks, Gantt, next action)
   (tabs)/decisions.tsx      decision log
   (tabs)/crm/               CRM list, detail (stage, notes, activity history)

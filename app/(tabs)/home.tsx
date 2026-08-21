@@ -162,6 +162,11 @@ export default function HomeScreen() {
           See what {partner?.display_name ?? 'your partner'} changed while you were away →
         </Text>
       </Pressable>
+
+      <Pressable style={styles.aiActions} onPress={() => router.push('/(tabs)/ai')}>
+        <Text style={styles.aiActionsTitle}>AI Actions</Text>
+        <Text style={styles.aiActionsText}>Turn your drops into tasks, decisions, CRM updates, or calendar events →</Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -186,5 +191,8 @@ const styles = StyleSheet.create({
   emptyText: { padding: 16, marginTop: 0 },
   catchUp: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md },
   catchUpTitle: { color: theme.colors.navy, fontSize: 18, fontWeight: '600' },
-  catchUpText: { color: theme.colors.muted, marginTop: 4 }
+  catchUpText: { color: theme.colors.muted, marginTop: 4 },
+  aiActions: { borderWidth: 1, borderColor: theme.colors.border, padding: 16, borderRadius: theme.radius.md },
+  aiActionsTitle: { color: theme.colors.navy, fontSize: 18, fontWeight: '600' },
+  aiActionsText: { color: theme.colors.muted, marginTop: 4 }
 });
