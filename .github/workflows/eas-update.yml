@@ -1,0 +1,28 @@
+name: Publish Expo update
+
+# Publishes an OTA update to the "preview" branch/channel every time code
+# lands on the production branch, so Expo Go always has the latest build
+# without anyone needing a local dev server running.
+on:
+  push:
+    branches:
+      - claude/mvp-production-build-j5x1sd
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
