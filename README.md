@@ -40,6 +40,8 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
   keyboard's built-in microphone button, focused on the Drop text field.
+- Quote of the day on Home (`lib/quotes.ts`): the same line for both founders on the same calendar day, picked by
+  indexing a curated list with the local date — no table, no sync, both phones just compute the same index.
 
 ## Testing without a local dev server
 
