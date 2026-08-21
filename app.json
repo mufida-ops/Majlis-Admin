@@ -1,12 +1,24 @@
 {
   "expo": {
     "name": "Majlis Founder OS",
-    "slug": "majlis-founder-os",
+    "slug": "majlis-app",
+    "owner": "mufidasaids-team",
     "scheme": "majlisfounderos",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "plugins": ["expo-router"],
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3dac72a8-b799-45de-b3fd-209fe9e2876a"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3dac72a8-b799-45de-b3fd-209fe9e2876a"
+      }
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.majlisacademy.founderos"

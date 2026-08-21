@@ -40,6 +40,14 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
   keyboard's built-in microphone button, focused on the Drop text field.
 
+## Testing without a local dev server
+
+`.github/workflows/eas-update.yml` publishes an EAS Update to the `preview` branch on every push, using the
+`EXPO_TOKEN` repository secret. Once published, Expo Go (signed into the same Expo account the project lives
+under — `mufidasaids-team`) always loads the latest published JS bundle for this project, with no `npx expo
+start` or laptop involved. `app.json`'s `extra.eas.projectId` / `updates.url` point at that project
+(`majlis-app`, id `3dac72a8-b799-45de-b3fd-209fe9e2876a`).
+
 ## Run locally
 
 1. Install Node.js (this project was built against Node 22 / Expo SDK 54 — deliberately pinned one SDK below
