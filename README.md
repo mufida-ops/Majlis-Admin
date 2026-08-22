@@ -49,8 +49,7 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   create_event resolves relative dates ("tomorrow", "Friday") using your own timezone, computed server-side and
   given to Claude as today_date/tomorrow_date context. Each founder's conversation is private (not seen by their
   co-founder, same boundary as a Drop's raw text), backed by `ai_chat_messages` and the `ai-chat` Supabase Edge
-  Function (`supabase/functions/ai-chat`). Reached only from a link on Drop — deliberately absent from Home, which
-  stays focused on today's actual priorities.
+  Function (`supabase/functions/ai-chat`). Has its own bottom tab, plus a link from Drop.
 - Drop summaries: saving or editing a drop calls the separate `parse-drop` Edge Function (`propose_actions: false`)
   purely to write a short third-person `drops.summary`, overwriting that drop's `activity_events.summary` too, so a
   long voice-dictated rant reaches the co-founder's Catch-up feed as a clean couple of sentences instead of the raw
