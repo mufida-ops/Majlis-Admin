@@ -17,9 +17,18 @@ const indexPath = path.join(outDir, 'index.html');
 
 const html = fs.readFileSync(indexPath, 'utf8');
 
+// Same base path Expo's own export uses for the JS bundle/favicon (app.json
+// expo.experiments.baseUrl) — GitHub Pages serves this site from
+// /<repo-name>/, not the domain root, so every absolute link here needs the
+// same prefix or it 404s silently and the page never loads (this bit us:
+// the JS bundle 404ing looked like a totally blank page, nothing in the
+// console pointed at "wrong base path" directly).
+const appJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
+const base = (appJson.expo?.experiments?.baseUrl ?? '').replace(/\/+$/, '');
+
 const tags = `
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="${base}/manifest.json" />
+  <link rel="apple-touch-icon" href="${base}/apple-touch-icon.png" />
   <meta name="theme-color" content="#1B3A5C" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

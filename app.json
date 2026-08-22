@@ -30,6 +30,9 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./public/favicon.png"
+    },
+    "experiments": {
+      "baseUrl": "/Majlis-Admin"
     }
   }
 }
