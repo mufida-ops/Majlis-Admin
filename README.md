@@ -31,37 +31,34 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   you" and "FYI", and advances `last_seen_at` once it's shown.
 - CRM activity history and overdue next-action highlighting on the organisation detail screen, backed by the
   `activity_events` log that database triggers populate automatically (`supabase/schema.sql`).
-- Structured AI actions live on their own **AI Actions** screen (`app/(tabs)/ai.tsx`), deliberately separate from
-  Drop — Drop is plain conversation with your co-founder and never runs AI on its own; AI Actions lists your own
-  drops and lets you tap "Action it" on any of them to have the `parse-drop` Supabase Edge Function
-  (`supabase/functions/parse-drop`) propose structured `ai_actions` (create_task, assign_task, create_decision,
-  resolve_decision, add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event,
-  create_organisation) for Accept/Dismiss review right there. A suggestion can also be reclassified (Task /
-  Decision / CRM follow-up / Calendar) if the AI guessed the wrong category. create_event resolves relative dates
-  ("tomorrow", "Friday") using the author's own timezone, computed server-side and given to Claude as
-  today_date/tomorrow_date context. Saving or editing a drop only ever writes its catch-up summary — via a
-  `propose_actions` flag on the same Edge Function call (`lib/repositories/aiActions.ts`'s `requestDropParse`) that
-  Drop always sends as `false` and AI Actions always sends as `true` — so nothing AI-related ever happens without
-  an explicit tap on the AI Actions screen. Reached only from a link on Drop — deliberately absent from Home, which
+- **AI Chat** (`app/(tabs)/ai.tsx`): a real back-and-forth conversation with AI, deliberately separate from Drop —
+  Drop is plain conversation with your co-founder and never runs AI on its own; AI Chat is where you actually talk
+  to the assistant. Each founder's chat is private (not seen by their co-founder, same boundary as a Drop's raw
+  text), backed by `ai_chat_messages` and the `ai-chat` Supabase Edge Function (`supabase/functions/ai-chat`), which
+  keeps conversation history and replies with a normal chat message plus, when your message clearly calls for one,
+  a single structured `ai_actions` proposal (create_task, assign_task, create_decision, resolve_decision,
+  add_crm_note, update_pipeline_stage, create_follow_up, mark_waiting_for, create_event, create_organisation) shown
+  as Accept/Dismiss right under that reply — nothing is ever created without that explicit tap. A proposal can also
+  be reclassified (Task / Decision / CRM follow-up / Calendar) if the AI guessed the wrong category. create_event
+  resolves relative dates ("tomorrow", "Friday") using your own timezone, computed server-side and given to Claude
+  as today_date/tomorrow_date context. Reached only from a link on Drop — deliberately absent from Home, which
   stays focused on today's actual priorities.
-- Drop summaries: the same `parse-drop` call also writes a short third-person `drops.summary` and overwrites that
-  drop's `activity_events.summary`, so a long voice-dictated rant reaches the co-founder's Catch-up feed as a clean
-  couple of sentences instead of the raw text. Voice input itself needs no app code — dictation is the phone
-  keyboard's built-in microphone button, focused on the Drop text field.
+- Drop summaries: saving or editing a drop calls the separate `parse-drop` Edge Function (`propose_actions: false`)
+  purely to write a short third-person `drops.summary`, overwriting that drop's `activity_events.summary` too, so a
+  long voice-dictated rant reaches the co-founder's Catch-up feed as a clean couple of sentences instead of the raw
+  text — this never proposes AI actions, which is exclusively AI Chat's job. Voice input itself needs no app code —
+  dictation is the phone keyboard's built-in microphone button, focused on the Drop text field.
 - Quote of the day on Home (`lib/quotes.ts`): the same line for both founders on the same calendar day, picked by
   indexing a curated list with the local date — no table, no sync, both phones just compute the same index.
-- Drop screen: edit or delete anything in "What you've sent" — editing re-triggers AI parsing against the corrected
-  text. Each drop has its own "Action it" button and shows its own suggestions directly underneath it (rather than a
-  single pooled list at the top disconnected from which note produced them), with Accept/Dismiss right there.
-  Accepting a suggestion shows an explicit "Done — …" confirmation instead of just removing the card, and the
-  `parse-drop` Edge Function re-validates every id a suggestion references (project/task/decision/organisation)
-  against the real workspace data before proposing it, so a suggestion can no longer look valid on screen and then
-  silently fail (or do nothing) when accepted.
-- Reclassify a suggestion: every suggestion on the Drop screen has a "Wrong category? Move it to:" row (Task /
-  Decision / CRM follow-up / Calendar) — since the AI's own guess at a category is sometimes wrong (e.g. proposing a
-  CRM follow-up for what's really a calendar reschedule), tapping one opens a small inline form (title, plus
-  whatever that target needs — a project picker for Task, an organisation picker for CRM, a date for Calendar) and
-  creates the right thing directly, dismissing the original mis-categorised suggestion.
+- Drop screen: edit or delete anything in "What you've sent" — editing re-triggers the summary-only parse against
+  the corrected text, nothing more.
+- Reclassify a suggestion: every AI Chat suggestion has a "Wrong category? Move it to:" row (Task / Decision / CRM
+  follow-up / Calendar) — since the AI's own guess at a category is sometimes wrong (e.g. proposing a CRM follow-up
+  for what's really a calendar reschedule), tapping one opens a small inline form (title, plus whatever that target
+  needs — a project picker for Task, an organisation picker for CRM, a date for Calendar) and creates the right
+  thing directly, dismissing the original mis-categorised suggestion. Both `parse-drop` and `ai-chat` re-validate
+  every id a suggestion references (project/task/decision/organisation) against the real workspace data before
+  proposing it, so a suggestion can no longer look valid on screen and then silently fail when accepted.
 - Illustrations throughout: the two illustrations Mufida shared (`assets/images/sign-in-hero.jpg`,
   `assets/images/reading-together.jpg`) appear on Sign-in and Home's empty-focus-list card, and as a persistent
   header banner (`components/PageBanner.tsx`) on Projects, Decisions, CRM, Calendar, and Drop — shown always,
@@ -120,19 +117,21 @@ of crashing — see below to connect one.
 4. Restart Expo so the new env vars are picked up (`npx expo start -c` if you've already started once).
 5. Sign up as Mufida, then sign up again as Victoria (or vice versa) — the second signup automatically joins the
    first one's workspace via `bootstrap_workspace()`. A third signup gets its own separate workspace.
-6. (Optional) Deploy the AI action parser. `.github/workflows/deploy-supabase-functions.yml` does this automatically
-   on every push that touches `supabase/functions/**`, given two repo secrets: `SUPABASE_ACCESS_TOKEN` (a personal
-   access token from supabase.com/dashboard/account/tokens) and `ANTHROPIC_API_KEY`. To do it by hand instead:
+6. (Optional) Deploy the AI Edge Functions. `.github/workflows/deploy-supabase-functions.yml` does this
+   automatically on every push that touches `supabase/functions/**`, given two repo secrets: `SUPABASE_ACCESS_TOKEN`
+   (a personal access token from supabase.com/dashboard/account/tokens) and `ANTHROPIC_API_KEY`. To do it by hand
+   instead:
 
    ```
    supabase functions deploy parse-drop
+   supabase functions deploy ai-chat
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 
    `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically. `ANTHROPIC_MODEL` is optional and
-   defaults to a fast/cheap model, since parsing a Drop is a background job, not the primary product surface. Without
-   this deployed, Drop still saves normally — tapping "Action it" on the AI Actions screen just won't produce any
-   suggestions.
+   defaults to a fast/cheap model, since both are background/latency-tolerant calls, not the primary product
+   surface. Without these deployed, Drop still saves normally (no summary is generated) and AI Chat will show an
+   error instead of a reply.
 
 ## Project structure
 
@@ -141,7 +140,7 @@ app/
   (auth)/sign-in.tsx        sign in / sign up
   (tabs)/home.tsx           focus list, quiet-hours pill, catch-up entry
   (tabs)/drop.tsx           capture — plain conversation with your co-founder, no AI
-  (tabs)/ai.tsx             AI Actions — action a drop, review/reclassify suggestions
+  (tabs)/ai.tsx             AI Chat — a real conversation with AI; review/reclassify its suggestions inline
   (tabs)/projects/          project list, detail (tasks, Gantt, next action)
   (tabs)/decisions.tsx      decision log
   (tabs)/crm/               CRM list, detail (stage, notes, activity history)
@@ -154,7 +153,8 @@ lib/
   quietHours.ts, ownerLabel.ts, format.ts, useAsync.ts   shared helpers
 supabase/
   schema.sql                 tables, RLS, bootstrap_workspace(), activity triggers
-  functions/parse-drop/       Drop → structured ai_actions
+  functions/parse-drop/       Drop → catch-up summary only (no AI actions)
+  functions/ai-chat/          AI Chat → conversational reply + at most one structured ai_action
 ```
 
 ## Suggested AI actions

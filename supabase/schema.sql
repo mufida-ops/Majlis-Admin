@@ -202,10 +202,23 @@ create table if not exists ai_actions (
   created_at timestamptz not null default now()
 );
 
+-- A founder's private back-and-forth with the AI assistant (app/(tabs)/ai.tsx).
+-- Not shared with the co-founder — each member only ever sees their own
+-- conversation, same privacy boundary as a Drop's raw text.
+create table if not exists ai_chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  user_id uuid references auth.users(id) not null,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
 -- Columns added after the initial release; harmless no-ops on a fresh install.
 alter table project_tasks add column if not exists created_by uuid references auth.users(id);
 alter table decisions add column if not exists owner owner_type;
 alter table organisations add column if not exists created_by uuid references auth.users(id);
+alter table ai_actions add column if not exists chat_message_id uuid references ai_chat_messages(id) on delete cascade;
 
 create index if not exists idx_events_workspace_start on events(workspace_id, start_at);
 create index if not exists idx_project_tasks_project on project_tasks(project_id);
@@ -213,6 +226,8 @@ create index if not exists idx_activity_events_workspace_created on activity_eve
 create index if not exists idx_activity_events_organisation on activity_events(organisation_id, created_at desc);
 create index if not exists idx_ai_actions_workspace_status on ai_actions(workspace_id, status);
 create index if not exists idx_ai_actions_drop on ai_actions(drop_id);
+create index if not exists idx_ai_actions_chat_message on ai_actions(chat_message_id);
+create index if not exists idx_ai_chat_messages_user on ai_chat_messages(workspace_id, user_id, created_at);
 create index if not exists idx_threads_project on threads(project_id);
 create index if not exists idx_threads_task on threads(task_id);
 create index if not exists idx_threads_organisation on threads(organisation_id);
@@ -233,6 +248,7 @@ alter table threads enable row level security;
 alter table messages enable row level security;
 alter table activity_events enable row level security;
 alter table ai_actions enable row level security;
+alter table ai_chat_messages enable row level security;
 
 create or replace function public.is_workspace_member(target_workspace uuid)
 returns boolean
@@ -329,6 +345,13 @@ drop policy if exists "members manage ai actions" on ai_actions;
 create policy "members manage ai actions" on ai_actions
 for all using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
+
+-- Private to the author, unlike everything else in this file — a founder's
+-- own AI chat isn't visible to their co-founder.
+drop policy if exists "members manage own ai chat messages" on ai_chat_messages;
+create policy "members manage own ai chat messages" on ai_chat_messages
+for all using (public.is_workspace_member(workspace_id) and user_id = auth.uid())
+with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
 
 -- Joins the calling user to the shared workspace. Caps membership at two
 -- people: reuses the first workspace with a free seat, or creates one.

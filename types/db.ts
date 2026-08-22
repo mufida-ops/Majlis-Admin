@@ -160,11 +160,23 @@ export type AiActionRow = {
   id: string;
   workspace_id: string;
   drop_id: string | null;
+  chat_message_id: string | null;
   action_type: string;
   payload: Record<string, unknown>;
   confidence: number | null;
   status: AiActionStatus;
   applied_by: string | null;
   applied_at: string | null;
+  created_at: string;
+};
+
+export type AiChatRole = 'user' | 'assistant';
+
+export type AiChatMessageRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: AiChatRole;
+  content: string;
   created_at: string;
 };
