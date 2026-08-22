@@ -151,8 +151,8 @@ export default function DropScreen() {
       </Text>
 
       <Pressable style={styles.aiLink} onPress={() => router.push('/(tabs)/ai')}>
-        <Text style={styles.aiLinkTitle}>Want AI's help with any of this?</Text>
-        <Text style={styles.aiLinkText}>Chat it through — AI can add a task, decision, CRM update, or calendar event →</Text>
+        <Text style={styles.aiLinkTitle}>Want to talk it through?</Text>
+        <Text style={styles.aiLinkText}>Open Your AI Assistant — ask questions, get advice, or have it action things →</Text>
       </Pressable>
 
       <SectionTitle title="What you've sent" subtitle={`Your recent drops, in your own words.`} />

@@ -29,6 +29,8 @@ export function describeAiAction(action: AiActionRow): string {
       const when = str(p.start_date) + (p.all_day || !p.start_time ? '' : ` ${str(p.start_time)}`);
       return `New calendar event: "${str(p.title)}"${when ? ` · ${when}` : ''}`;
     }
+    case 'send_partner_message':
+      return `Send to your co-founder: "${str(p.message)}"${p.urgent ? ' · Urgent' : ''}`;
     case 'summarize_changes_since_last_seen':
       return 'Summarise recent changes';
     default:

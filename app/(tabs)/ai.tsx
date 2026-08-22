@@ -191,7 +191,10 @@ export default function AiChatScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen contentStyle={{ flex: 1, paddingBottom: 16 }}>
-        <SectionTitle title="AI Chat" subtitle="Talk it through with AI — ask it to add a task, log a decision, or update the CRM." />
+        <SectionTitle
+          title="Your AI Assistant"
+          subtitle="Ask a question, think out loud, or have it add a task, decision, CRM update, calendar event, or message to your co-founder."
+        />
         <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
 
         {messagesLoading ? (
@@ -199,7 +202,7 @@ export default function AiChatScreen() {
         ) : messagesError ? (
           <ErrorState message={messagesError} onRetry={refreshMessages} />
         ) : !messages || messages.length === 0 ? (
-          <EmptyState label="Say hello — try 'remind me to call Khaled tomorrow at 3pm' or 'add Brighton School to CRM'." />
+          <EmptyState label="Say hello — ask a question, think something through, or try 'remind me to call Khaled tomorrow at 3pm'." />
         ) : (
           <View style={{ gap: 10 }}>
             {messages.map(message => {
@@ -323,7 +326,7 @@ export default function AiChatScreen() {
         <TextInput
           value={input}
           onChangeText={setInput}
-          placeholder="Ask AI to add a task, decision, CRM update, or event…"
+          placeholder="Ask, think out loud, or add a task, decision, CRM update, event…"
           placeholderTextColor={theme.colors.muted}
           style={styles.input}
           multiline

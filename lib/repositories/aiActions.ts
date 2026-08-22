@@ -4,6 +4,7 @@ import * as projects from '@/lib/repositories/projects';
 import * as decisions from '@/lib/repositories/decisions';
 import * as organisations from '@/lib/repositories/organisations';
 import * as events from '@/lib/repositories/events';
+import * as drops from '@/lib/repositories/drops';
 
 export async function listProposedActions(workspaceId: string): Promise<AiActionRow[]> {
   const supabase = requireSupabase();
@@ -87,6 +88,18 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
         all_day: allDay,
         created_by: actorUserId
       });
+    }
+    case 'send_partner_message': {
+      // Goes through the exact same path as typing it into Drop yourself:
+      // a plain drop, summary-only (never proposes its own actions).
+      const drop = await drops.createDrop({
+        workspace_id: workspaceId,
+        created_by: actorUserId,
+        raw_text: p.message,
+        urgent: Boolean(p.urgent)
+      });
+      requestDropParse(drop.id, false).catch(() => {});
+      return drop;
     }
     case 'summarize_changes_since_last_seen':
       return null;

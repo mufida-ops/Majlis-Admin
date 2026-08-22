@@ -28,7 +28,8 @@ const ACTION_TYPES = [
   'create_follow_up',
   'mark_waiting_for',
   'create_event',
-  'create_organisation'
+  'create_organisation',
+  'send_partner_message'
 ] as const;
 
 const RESPOND_TOOL = {
@@ -52,7 +53,7 @@ const RESPOND_TOOL = {
           payload: {
             type: 'object',
             description:
-              'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if a specific time was mentioned), all_day? (true when no specific time was mentioned), description?}; create_organisation {name, stage? (one of Lead|Contacted|Meeting Booked|Proposal Sent|Negotiating|Won|Onboarding|Active Partner|Follow-up — default Lead unless clearly further along), note?, next_action?}. Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one; if a company/school/contact isn\'t already listed in organisations, propose create_organisation for it instead.'
+              'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if a specific time was mentioned), all_day? (true when no specific time was mentioned), description?}; create_organisation {name, stage? (one of Lead|Contacted|Meeting Booked|Proposal Sent|Negotiating|Won|Onboarding|Active Partner|Follow-up — default Lead unless clearly further along), note?, next_action?}; send_partner_message {message, urgent? (true only if this genuinely cannot wait — most late-night or "just thinking out loud" messages should be false, since false respects the co-founder\'s quiet hours and just waits for their next catch-up instead of interrupting them)} — use this when the founder wants something passed along to their co-founder rather than acted on in the workspace (e.g. "tell Victoria I\'m thinking about X", "let Mufida know Y", any message meant for the other person, especially late-night ones they don\'t want to send straight to WhatsApp). Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one; if a company/school/contact isn\'t already listed in organisations, propose create_organisation for it instead.'
           }
         },
         required: ['action_type', 'payload']
@@ -91,39 +92,66 @@ Deno.serve(async req => {
       .single();
     if (insertUserError) throw new Error(insertUserError.message);
 
-    const [{ data: history }, { data: members }, { data: projects }, { data: tasks }, { data: decisions }, { data: organisations }] =
-      await Promise.all([
-        supabase
-          .from('ai_chat_messages')
-          .select('role, content')
-          .eq('workspace_id', workspace_id)
-          .eq('user_id', user_id)
-          .order('created_at', { ascending: true })
-          .limit(40),
-        supabase.from('workspace_members').select('user_id, display_name, timezone').eq('workspace_id', workspace_id),
-        supabase.from('projects').select('id, title').eq('workspace_id', workspace_id),
-        supabase
-          .from('project_tasks')
-          .select('id, title, status, project_id')
-          .eq('workspace_id', workspace_id)
-          .neq('status', 'Done'),
-        supabase.from('decisions').select('id, title, status').eq('workspace_id', workspace_id).eq('status', 'Waiting'),
-        supabase.from('organisations').select('id, name, stage').eq('workspace_id', workspace_id)
-      ]);
+    const [
+      { data: history },
+      { data: members },
+      { data: projects },
+      { data: tasks },
+      { data: decisions },
+      { data: organisations },
+      { data: recentActivity }
+    ] = await Promise.all([
+      supabase
+        .from('ai_chat_messages')
+        .select('role, content')
+        .eq('workspace_id', workspace_id)
+        .eq('user_id', user_id)
+        .order('created_at', { ascending: true })
+        .limit(40),
+      supabase.from('workspace_members').select('user_id, display_name, timezone').eq('workspace_id', workspace_id),
+      supabase.from('projects').select('id, title, status').eq('workspace_id', workspace_id),
+      supabase.from('project_tasks').select('id, title, status, project_id').eq('workspace_id', workspace_id),
+      supabase.from('decisions').select('id, title, status').eq('workspace_id', workspace_id),
+      supabase
+        .from('organisations')
+        .select('id, name, stage, last_contact_at, next_action, next_action_at, notes')
+        .eq('workspace_id', workspace_id),
+      // Real history for "when did we..." / "what happened with..." questions —
+      // the open-items lists above only cover current state, not the past.
+      supabase
+        .from('activity_events')
+        .select('summary, created_at')
+        .eq('workspace_id', workspace_id)
+        .order('created_at', { ascending: false })
+        .limit(40)
+    ]);
 
     const author = (members ?? []).find(m => m.user_id === user_id);
     const authorTimezone = author?.timezone ?? 'Asia/Dubai';
     const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: authorTimezone }).format(d);
+    const openTasks = (tasks ?? []).filter(t => t.status !== 'Done');
+    const waitingDecisions = (decisions ?? []).filter(d => d.status === 'Waiting');
 
     const context = {
       author_name: author?.display_name ?? 'A founder',
       today_date: localDate(new Date()),
       tomorrow_date: localDate(new Date(Date.now() + 86400000)),
       members: (members ?? []).map(m => ({ user_id: m.user_id, name: m.display_name })),
-      open_projects: (projects ?? []).map(p => ({ id: p.id, title: p.title })),
-      open_tasks: (tasks ?? []).map(t => ({ id: t.id, title: t.title, status: t.status, project_id: t.project_id })),
-      waiting_decisions: (decisions ?? []).map(d => ({ id: d.id, title: d.title })),
-      organisations: (organisations ?? []).map(o => ({ id: o.id, name: o.name, stage: o.stage }))
+      open_projects: (projects ?? []).map(p => ({ id: p.id, title: p.title, status: p.status })),
+      open_tasks: openTasks.map(t => ({ id: t.id, title: t.title, status: t.status, project_id: t.project_id })),
+      waiting_decisions: waitingDecisions.map(d => ({ id: d.id, title: d.title })),
+      organisations: (organisations ?? []).map(o => ({
+        id: o.id,
+        name: o.name,
+        stage: o.stage,
+        last_contact_at: o.last_contact_at,
+        next_action: o.next_action,
+        next_action_at: o.next_action_at,
+        notes: o.notes
+      })),
+      // Newest first, timestamped — use this to answer questions about what
+      // happened and when (a CRM contact, a decision, a task change, etc.).
+      recent_history: (recentActivity ?? []).map(e => ({ when: e.created_at, what: e.summary }))
     };
 
     const anthropicMessages = (history ?? []).map((m: { role: string; content: string }) => ({
@@ -142,12 +170,20 @@ Deno.serve(async req => {
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         system:
-          `You're the AI assistant inside Majlis, a shared founder workspace app. You're chatting one-on-one and ` +
-          `privately with ${context.author_name} — this conversation is not seen by their co-founder. Be warm, ` +
-          `direct, and brief. When their message clearly calls for a concrete action (a task, decision, CRM ` +
-          `update, or calendar event), propose it via the tool's optional "action" field so it can be reviewed ` +
-          `before anything is created — never claim you've already done something. For plain conversation or a ` +
-          `question, just reply and leave action out.\n\n` +
+          `You're ${context.author_name}'s AI Assistant inside Majlis, a shared founder workspace app. You're ` +
+          `chatting one-on-one and privately with them — this conversation is not seen by their co-founder. Be ` +
+          `warm, direct, and concise.\n\n` +
+          `You can do three kinds of things here:\n` +
+          `1. Answer questions using the workspace context below — including recent_history, which is real dated ` +
+          `history (CRM contact, decisions, task changes, etc.), so answer "when did we..." / "what happened ` +
+          `with..." questions from there rather than guessing or saying you don't know.\n` +
+          `2. Give honest advice or thinking-partner input when they ask "should I do this or that" — reason it ` +
+          `through with them like a sharp co-founder would, using the real context you have, not generic advice.\n` +
+          `3. When their message clearly calls for a concrete action (a task, decision, CRM update, calendar ` +
+          `event, or passing a message to their co-founder), propose it via the tool's optional "action" field so ` +
+          `it can be reviewed before anything is created or sent — never claim you've already done something.\n\n` +
+          `For plain conversation, a question, or advice, just reply and leave action out — don't force an action ` +
+          `where none was asked for.\n\n` +
           `Workspace context (only use these ids, never invent new ones; resolve relative dates like "today"/` +
           `"tomorrow" using today_date/tomorrow_date, both already in ${context.author_name}'s own timezone):\n` +
           JSON.stringify(context, null, 2),
