@@ -22,12 +22,22 @@ export async function getProject(id: string): Promise<ProjectWithTasks> {
 export async function createProject(input: {
   workspace_id: string;
   title: string;
+  status?: ProjectStatus;
   priority?: PriorityLevel;
   next_action?: string;
   created_by: string;
 }) {
   const supabase = requireSupabase();
-  const result = await supabase.from('projects').insert(input).select('*').single();
+  // Set explicitly rather than relying on the DB column default, since
+  // that default still says 'Active' from before this project's lifecycle
+  // grew a 4th step (Not Started) — changing an enum's DEFAULT in the same
+  // migration that adds the new enum value hits Postgres's "unsafe use of
+  // new value" restriction, so this is set here instead.
+  const result = await supabase
+    .from('projects')
+    .insert({ status: 'Not Started', ...input })
+    .select('*')
+    .single();
   return unwrap(result) as ProjectRow;
 }
 

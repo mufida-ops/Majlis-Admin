@@ -14,7 +14,7 @@ import { useAsync } from '@/lib/useAsync';
 import { listProjects, createProject } from '@/lib/repositories/projects';
 import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
-import { PRIORITY_COLOR } from '@/lib/priority';
+import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
 import { computeProjectProgress } from '@/lib/taskStatus';
 
 export default function ProjectsScreen() {
@@ -54,7 +54,11 @@ export default function ProjectsScreen() {
       ) : !projects || projects.length === 0 ? (
         <EmptyState label="No projects yet. Start one below." />
       ) : (
-        projects.map(project => {
+        // Most important first — High priority projects lead the list
+        // instead of just being colored the same as everything else.
+        [...projects]
+          .sort((a, b) => PRIORITY_LEVELS.indexOf(b.priority) - PRIORITY_LEVELS.indexOf(a.priority))
+          .map(project => {
           const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
             id: task.id,
             title: task.title,
@@ -77,6 +81,12 @@ export default function ProjectsScreen() {
                     </Text>
                   </View>
                   <Text style={styles.progress}>{progress}%</Text>
+                </View>
+                <View style={styles.priorityChip}>
+                  <View style={[styles.priorityDot, { backgroundColor: PRIORITY_COLOR[project.priority] }]} />
+                  <Text style={[styles.priorityChipText, { color: PRIORITY_COLOR[project.priority] }]}>
+                    {project.priority} priority
+                  </Text>
                 </View>
                 {project.next_action ? <Text style={styles.next}>Next: {project.next_action}</Text> : null}
                 <View style={styles.progressTrack}>
@@ -126,6 +136,9 @@ const styles = StyleSheet.create({
   title: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
   meta: { color: theme.colors.muted, marginTop: 4, fontSize: 13 },
   progress: { color: theme.colors.navy, fontWeight: '700' },
+  priorityChip: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  priorityDot: { width: 8, height: 8, borderRadius: 4 },
+  priorityChipText: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   next: { color: theme.colors.text, marginTop: 12 },
   progressTrack: { height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, marginTop: 10, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },

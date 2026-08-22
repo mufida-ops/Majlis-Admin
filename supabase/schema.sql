@@ -25,6 +25,13 @@ begin
 end
 $$;
 
+-- Postgres can't add an enum value from inside the do-block above (ADD
+-- VALUE can't run in the same transaction as other enum DDL), so this is
+-- its own statement — a project's lifecycle is now 4 steps (Not Started ->
+-- Active -> Blocked -> Complete) instead of 3, since "Active" alone didn't
+-- distinguish a project that hasn't been picked up yet from one in motion.
+alter type project_status add value if not exists 'Not Started' before 'Active';
+
 create table if not exists workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,

@@ -18,7 +18,7 @@ import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
-const STATUSES: ProjectStatus[] = ['Active', 'Blocked', 'Complete'];
+const STATUSES: ProjectStatus[] = ['Not Started', 'Active', 'Blocked', 'Complete'];
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = { Todo: 'To do', Doing: 'Doing', Waiting: 'Waiting', Done: 'Done' };
 
 export default function ProjectDetailScreen() {

@@ -32,7 +32,12 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   `lib/ownerLabel.ts`, sorted by `user_id` so it can't flip depending on the viewer). A project's progress bar is
   computed from its own task list (`computeProjectProgress` in `lib/taskStatus.ts` — sum of weight across Done
   tasks) rather than trusted from the stored `projects.progress` column, and reads a flat 100% once the project's
-  own status is set to Complete, regardless of whether task weights happen to add up to exactly 100.
+  own status is set to Complete, regardless of whether task weights happen to add up to exactly 100. A project's
+  own lifecycle is 4 steps — Not Started / Active / Blocked / Complete (`ProjectStatus` in `types/db.ts`) —
+  `createProject` sets a new one to Not Started explicitly rather than via the DB column default, since changing
+  an enum's default in the same migration that adds the enum value hits Postgres's "unsafe use of new value"
+  restriction. The Projects list sorts by priority (High first) and shows a colored "High/Medium/Low priority"
+  chip per card — the left-edge color accent alone was too easy to miss.
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs

@@ -3,7 +3,7 @@
 // view-model shapes the UI renders.
 
 export type OwnerType = 'Mufida' | 'Victoria' | 'Both';
-export type ProjectStatus = 'Active' | 'Blocked' | 'Complete';
+export type ProjectStatus = 'Not Started' | 'Active' | 'Blocked' | 'Complete';
 export type TaskStatus = 'Todo' | 'Doing' | 'Waiting' | 'Done';
 export type PriorityLevel = 'Low' | 'Medium' | 'High';
 export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
