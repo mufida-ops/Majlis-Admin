@@ -15,6 +15,7 @@ import { listProjects, createProject } from '@/lib/repositories/projects';
 import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { PRIORITY_COLOR } from '@/lib/priority';
+import { computeProjectProgress } from '@/lib/taskStatus';
 
 export default function ProjectsScreen() {
   const { session } = useAuth();
@@ -63,6 +64,7 @@ export default function ProjectsScreen() {
             status: task.status
           }));
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
+          const progress = computeProjectProgress(project.project_tasks);
 
           return (
             <Pressable key={project.id} onPress={() => router.push(`/(tabs)/projects/${project.id}`)}>
@@ -74,11 +76,11 @@ export default function ProjectsScreen() {
                       {ownerLabel} · {project.status}
                     </Text>
                   </View>
-                  <Text style={styles.progress}>{project.progress}%</Text>
+                  <Text style={styles.progress}>{progress}%</Text>
                 </View>
                 {project.next_action ? <Text style={styles.next}>Next: {project.next_action}</Text> : null}
                 <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: `${project.progress}%` }]} />
+                  <View style={[styles.progressBar, { width: `${progress}%` }]} />
                 </View>
                 {ganttTasks.length > 0 ? (
                   <View style={{ marginTop: 18 }}>

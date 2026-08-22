@@ -15,7 +15,7 @@ import { useAsync } from '@/lib/useAsync';
 import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
-import { TASK_STATUSES } from '@/lib/taskStatus';
+import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const STATUSES: ProjectStatus[] = ['Active', 'Blocked', 'Complete'];
@@ -36,6 +36,8 @@ export default function ProjectDetailScreen() {
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
+
+  const progress = computeProjectProgress(project.project_tasks);
 
   const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
     id: task.id,
@@ -125,9 +127,9 @@ export default function ProjectDetailScreen() {
         <Text style={styles.label}>Progress</Text>
         <View style={styles.progressRow}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressBar, { width: `${project.progress}%` }]} />
+            <View style={[styles.progressBar, { width: `${progress}%` }]} />
           </View>
-          <Text style={styles.progressValue}>{project.progress}%</Text>
+          <Text style={styles.progressValue}>{progress}%</Text>
         </View>
         <Text style={styles.meta}>
           Calculated automatically — give each task a weight below, and progress adds up as tasks are checked off Done.
