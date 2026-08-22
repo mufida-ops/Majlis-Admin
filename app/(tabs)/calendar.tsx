@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -49,7 +49,10 @@ export default function CalendarScreen() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    if (events) syncEventReminders(events).catch(() => {});
+    // The website build doesn't get reliable reminder buzzes (a browser
+    // can't schedule these while closed the way the phone app can) — skip
+    // asking for notification permission there rather than pretending it works.
+    if (events && Platform.OS !== 'web') syncEventReminders(events).catch(() => {});
   }, [events]);
 
   const upcoming = useMemo(() => {
@@ -155,6 +158,9 @@ export default function CalendarScreen() {
     <Screen>
       <SectionTitle title="Calendar" subtitle="Shared events for both of you." />
       <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
+      {Platform.OS === 'web' ? (
+        <Text style={styles.webNote}>Reminder buzzes only work in the phone app — this website won't notify you.</Text>
+      ) : null}
 
       <View style={styles.viewToggle}>
         <Pressable style={[styles.toggleButton, view === 'agenda' && styles.toggleButtonActive]} onPress={() => setView('agenda')}>
@@ -263,6 +269,7 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
+  webNote: { color: theme.colors.muted, fontSize: 13 },
   viewToggle: { flexDirection: 'row', gap: 8 },
   toggleButton: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingVertical: 10, alignItems: 'center' },
   toggleButtonActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },

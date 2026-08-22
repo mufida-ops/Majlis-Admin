@@ -83,6 +83,34 @@ under — `mufidasaids-team`) always loads the latest published JS bundle for th
 start` or laptop involved. `app.json`'s `extra.eas.projectId` / `updates.url` point at that project
 (`majlis-app`, id `3dac72a8-b799-45de-b3fd-209fe9e2876a`).
 
+## Website version ("Add to Home Screen")
+
+The app also builds as a plain website, installable as a home-screen icon (a PWA) so it can be used without Expo
+Go at all. `.github/workflows/deploy-web.yml` runs `npm run build:web` on every push and publishes the result to
+GitHub Pages.
+
+- `npm run build:web` runs `expo export -p web` (Expo's own web bundler, using `react-native-web` — already a
+  dependency, nothing extra to install) into `dist/`, then `scripts/inject-pwa-head.js` patches the generated
+  `index.html` to add the manifest link, apple-touch-icon, and `theme-color`/`apple-mobile-web-app-*` meta tags
+  that make "Add to Home Screen" open full-screen instead of as a browser bookmark. That second step exists
+  because `app/+html.tsx` (Expo Router's normal way to customize these tags) only takes effect under
+  `web.output: "static"`, and that mode currently crashes on this Expo/React 19 combo (`s.resetServerContext is
+  not a function` — a version mismatch inside expo-router's static-render pipeline, not this app's code); `web.output: "single"`
+  (a plain one-file SPA, set in `app.json`) sidesteps that bundler bug entirely, so the script patches its output
+  after the fact instead.
+- `app.json`'s `web.favicon` and `public/manifest.json`/`public/icon-*.png`/`public/apple-touch-icon.png` are the
+  navy-and-gold "M" icon used both as the browser tab favicon and the home-screen icon.
+- `lib/supabase.ts` reads `localStorage` through a small guarded wrapper rather than directly, because Supabase's
+  client tries to read it synchronously the moment it's constructed — harmless in a real browser, but this module
+  also gets evaluated in Node during `expo export`'s bundling step, where no `localStorage` exists.
+- Calendar reminders don't fire on the website version — `syncEventReminders` is skipped when `Platform.OS ===
+  'web'` (`app/(tabs)/calendar.tsx`), with a note shown on that screen. A browser can't reliably wake a phone with
+  a notification while the site isn't open the way the native app can, so Expo Go stays the version to use for
+  anything that depends on a reminder actually buzzing; the website is for everything else.
+- One-time setup needed before this workflow's deploys actually go live: in the repo's Settings → Pages, set
+  Source to "GitHub Actions" (https://github.com/mufida-ops/Majlis-Admin/settings/pages). Until that's set, the
+  workflow still runs and builds successfully, it just has nowhere to publish to yet.
+
 ## Run locally
 
 1. Install Node.js (this project was built against Node 22 / Expo SDK 54 — deliberately pinned one SDK below

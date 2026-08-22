@@ -25,6 +25,11 @@
     },
     "android": {
       "package": "com.majlisacademy.founderos"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./public/favicon.png"
     }
   }
 }
