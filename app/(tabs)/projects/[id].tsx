@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
-import { memberLabel } from '@/lib/ownerLabel';
+import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
@@ -37,7 +37,10 @@ export default function ProjectDetailScreen() {
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
 
-  const progress = computeProjectProgress(project.project_tasks);
+  // A project marked Complete should always read 100%, even if its tasks'
+  // weights don't add up to exactly 100 (a missing weight, tasks added
+  // after the fact, etc.) — the status pill is the stronger signal.
+  const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
 
   const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
     id: task.id,
@@ -173,8 +176,17 @@ export default function ProjectDetailScreen() {
                 <Text style={styles.statusGroupLabel}>
                   {TASK_STATUS_LABEL[status]} · {tasksInStatus.length}
                 </Text>
-                {tasksInStatus.map(task => (
-                  <View key={task.id} style={[styles.taskRow, task.status === 'Done' && styles.taskRowDone]}>
+                {tasksInStatus.map(task => {
+                  const accent = ownerAccentColor(task.owner_user_id, me, partner);
+                  return (
+                  <View
+                    key={task.id}
+                    style={[
+                      styles.taskRow,
+                      task.status === 'Done' && styles.taskRowDone,
+                      accent ? { backgroundColor: `${accent}1F`, borderLeftWidth: 4, borderLeftColor: accent } : null
+                    ]}
+                  >
                     <Pressable
                       onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
                     >
@@ -200,7 +212,8 @@ export default function ProjectDetailScreen() {
                       </View>
                     </View>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             );
           })
@@ -282,9 +295,10 @@ const styles = StyleSheet.create({
   statusGroupLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   taskRow: {
     gap: 10,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    padding: 12,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     marginTop: 8
   },
   taskRowDone: { opacity: 0.6 },

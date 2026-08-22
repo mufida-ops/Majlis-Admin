@@ -64,7 +64,7 @@ export default function ProjectsScreen() {
             status: task.status
           }));
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
-          const progress = computeProjectProgress(project.project_tasks);
+          const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
 
           return (
             <Pressable key={project.id} onPress={() => router.push(`/(tabs)/projects/${project.id}`)}>

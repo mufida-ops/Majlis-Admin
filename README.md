@@ -27,7 +27,12 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   decisions and CRM organisations. A project's task list is grouped into status sections (To do / Doing / Waiting
   / Done, via `lib/taskStatus.ts`) instead of one flat list, with a tap-to-cycle `StatusBadge` per task
   (`components/StatusBadge.tsx`, same interaction as `PriorityBadge`) so status is actually changeable from this
-  screen — Done tasks stay visible but dimmed rather than disappearing.
+  screen — Done tasks stay visible but dimmed rather than disappearing. Each task's box is tinted by whoever owns
+  it — one color per founder, stable regardless of which of the two is signed in (`ownerAccentColor` in
+  `lib/ownerLabel.ts`, sorted by `user_id` so it can't flip depending on the viewer). A project's progress bar is
+  computed from its own task list (`computeProjectProgress` in `lib/taskStatus.ts` — sum of weight across Done
+  tasks) rather than trusted from the stored `projects.progress` column, and reads a flat 100% once the project's
+  own status is set to Complete, regardless of whether task weights happen to add up to exactly 100.
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs
