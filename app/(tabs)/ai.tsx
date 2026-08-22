@@ -177,7 +177,7 @@ export default function AiChatScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen contentStyle={{ flex: 1, paddingBottom: 16 }}>
+      <Screen contentStyle={{ paddingBottom: 16 }}>
         <SectionTitle
           title="Your AI Assistant"
           subtitle="Ask a question, think out loud, or have it add a task, discussion, CRM update, calendar event, or message to your co-founder."

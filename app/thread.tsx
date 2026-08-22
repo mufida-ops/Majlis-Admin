@@ -95,7 +95,7 @@ export default function ThreadScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ headerShown: true, title: params.title ?? 'Thread', headerStyle: { backgroundColor: theme.colors.background }, headerTintColor: theme.colors.navy }} />
-      <Screen contentStyle={{ flex: 1, paddingBottom: 16 }}>
+      <Screen contentStyle={{ paddingBottom: 16 }}>
         {loading ? (
           <LoadingState label="Loading thread…" />
         ) : error ? (
