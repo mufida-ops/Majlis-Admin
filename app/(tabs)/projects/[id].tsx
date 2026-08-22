@@ -5,6 +5,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
 import { PriorityBadge } from '@/components/PriorityBadge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Gantt, type GanttTask } from '@/components/Gantt';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
@@ -14,9 +15,11 @@ import { useAsync } from '@/lib/useAsync';
 import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
-import type { ProjectStatus, PriorityLevel } from '@/types/db';
+import { TASK_STATUSES } from '@/lib/taskStatus';
+import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const STATUSES: ProjectStatus[] = ['Active', 'Blocked', 'Complete'];
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = { Todo: 'To do', Doing: 'Doing', Waiting: 'Waiting', Done: 'Done' };
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -55,6 +58,11 @@ export default function ProjectDetailScreen() {
 
   const changeTaskPriority = async (taskId: string, priority: PriorityLevel) => {
     await updateTask(taskId, { priority });
+    refresh();
+  };
+
+  const changeTaskStatus = async (taskId: string, status: TaskStatus) => {
+    await updateTask(taskId, { status });
     refresh();
   };
 
@@ -155,32 +163,45 @@ export default function ProjectDetailScreen() {
         {project.project_tasks.length === 0 ? (
           <Text style={styles.meta}>No tasks yet.</Text>
         ) : (
-          project.project_tasks.map(task => (
-            <View key={task.id} style={styles.taskRow}>
-              <Pressable
-                style={{ flex: 1 }}
-                onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
-              >
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                <Text style={styles.meta}>
-                  {memberLabel(task.owner_user_id, me, partner)} · {task.status}
-                  {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
+          TASK_STATUSES.map(status => {
+            const tasksInStatus = project.project_tasks.filter((t: ProjectTaskRow) => t.status === status);
+            if (tasksInStatus.length === 0) return null;
+            return (
+              <View key={status} style={styles.statusGroup}>
+                <Text style={styles.statusGroupLabel}>
+                  {TASK_STATUS_LABEL[status]} · {tasksInStatus.length}
                 </Text>
-                <Text style={styles.discuss}>Discuss →</Text>
-              </Pressable>
-              <View style={styles.weightEditor}>
-                <TextInput
-                  value={weightDrafts[task.id] ?? String(task.weight)}
-                  onChangeText={text => setWeightDrafts(prev => ({ ...prev, [task.id]: text }))}
-                  onEndEditing={() => saveWeight(task.id)}
-                  keyboardType="number-pad"
-                  style={styles.weightInput}
-                />
-                <Text style={styles.weightPercent}>%</Text>
+                {tasksInStatus.map(task => (
+                  <View key={task.id} style={[styles.taskRow, task.status === 'Done' && styles.taskRowDone]}>
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
+                    >
+                      <Text style={styles.taskTitle}>{task.title}</Text>
+                      <Text style={styles.meta}>
+                        {memberLabel(task.owner_user_id, me, partner)}
+                        {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
+                      </Text>
+                      <Text style={styles.discuss}>Discuss →</Text>
+                    </Pressable>
+                    <View style={styles.taskControls}>
+                      <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
+                      <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
+                      <View style={styles.weightEditor}>
+                        <TextInput
+                          value={weightDrafts[task.id] ?? String(task.weight ?? 0)}
+                          onChangeText={text => setWeightDrafts(prev => ({ ...prev, [task.id]: text }))}
+                          onEndEditing={() => saveWeight(task.id)}
+                          keyboardType="number-pad"
+                          style={styles.weightInput}
+                        />
+                        <Text style={styles.weightPercent}>%</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
-              <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
-            </View>
-          ))
+            );
+          })
         )}
 
         <View style={styles.newTask}>
@@ -255,17 +276,19 @@ const styles = StyleSheet.create({
   progressTrack: { flex: 1, height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
   progressValue: { color: theme.colors.navy, fontWeight: '700', width: 44, textAlign: 'right' },
+  statusGroup: { marginTop: 16 },
+  statusGroupLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    marginTop: 12
+    marginTop: 8
   },
+  taskRowDone: { opacity: 0.6 },
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
   discuss: { color: theme.colors.navy, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   weightEditor: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   weightInput: {
     borderWidth: 1,

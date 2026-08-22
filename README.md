@@ -24,7 +24,10 @@ Product loop: **Drop → Discuss → Decide → Assign → Track → CRM → Cat
   repository layer in `lib/repositories/`. No mock data remains.
 - Project/task detail (`app/(tabs)/projects`), CRM organisation detail with activity history
   (`app/(tabs)/crm`), and a generic discussion thread (`app/thread.tsx`) reusable across projects, tasks,
-  decisions and CRM organisations.
+  decisions and CRM organisations. A project's task list is grouped into status sections (To do / Doing / Waiting
+  / Done, via `lib/taskStatus.ts`) instead of one flat list, with a tap-to-cycle `StatusBadge` per task
+  (`components/StatusBadge.tsx`, same interaction as `PriorityBadge`) so status is actually changeable from this
+  screen — Done tasks stay visible but dimmed rather than disappearing.
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Drop reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs
