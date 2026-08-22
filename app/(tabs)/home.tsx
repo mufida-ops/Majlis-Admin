@@ -63,7 +63,7 @@ export default function HomeScreen() {
     if (waitingDecision) {
       items.push({
         key: `decision-${waitingDecision.id}`,
-        eyebrow: 'Decision',
+        eyebrow: 'Discussion',
         title: waitingDecision.title,
         meta: waitingDecision.owner === 'Both' ? 'Needs both of you' : `${waitingDecision.owner ?? 'Someone'} needs to weigh in`,
         href: `/(tabs)/decisions`
@@ -126,8 +126,8 @@ export default function HomeScreen() {
 
       <Pressable onPress={() => router.push('/(tabs)/drop')}>
         <Card style={styles.capture}>
-          <Text style={styles.captureTitle}>Drop something in</Text>
-          <Text style={styles.captureText}>Thought, task, decision, follow-up — organise it later.</Text>
+          <Text style={styles.captureTitle}>Give something in</Text>
+          <Text style={styles.captureText}>Thought, task, discussion, follow-up — organise it later.</Text>
           <Text style={styles.capturePrompt}>What's on your mind?</Text>
         </Card>
       </Pressable>
@@ -141,7 +141,7 @@ export default function HomeScreen() {
         ) : focus.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Image source={require('@/assets/images/reading-together.jpg')} style={styles.emptyImage} resizeMode="cover" />
-            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Drop a thought in, or check Catch-up.</Text>
+            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Give a thought in, or check Catch-up.</Text>
           </Card>
         ) : (
           focus.map(item => (

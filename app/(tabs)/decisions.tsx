@@ -49,7 +49,7 @@ export default function DecisionsScreen() {
 
   return (
     <Screen>
-      <SectionTitle title="Decisions" subtitle="A durable record of what you actually agreed." />
+      <SectionTitle title="Discussions" subtitle="A durable record of what you actually agreed." />
       <PageBanner image={require('@/assets/images/reading-together.jpg')} />
 
       {loading ? (
@@ -57,7 +57,7 @@ export default function DecisionsScreen() {
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : !decisions || decisions.length === 0 ? (
-        <EmptyState label="No decisions logged yet." />
+        <EmptyState label="No discussions logged yet." />
       ) : (
         decisions.map(item => (
           <Card key={item.id}>
@@ -88,7 +88,7 @@ export default function DecisionsScreen() {
 
       {showNew ? (
         <Card>
-          <Text style={styles.label}>Raise a decision</Text>
+          <Text style={styles.label}>Raise a discussion</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
@@ -105,7 +105,7 @@ export default function DecisionsScreen() {
           </View>
           <View style={styles.buttons}>
             <Pressable style={styles.primary} onPress={create} disabled={creating || !title.trim()}>
-              <Text style={styles.primaryText}>{creating ? 'Raising…' : 'Raise decision'}</Text>
+              <Text style={styles.primaryText}>{creating ? 'Raising…' : 'Raise discussion'}</Text>
             </Pressable>
             <Pressable style={styles.secondary} onPress={() => setShowNew(false)}>
               <Text style={styles.secondaryText}>Cancel</Text>
@@ -114,7 +114,7 @@ export default function DecisionsScreen() {
         </Card>
       ) : (
         <Pressable style={styles.newButton} onPress={() => setShowNew(true)}>
-          <Text style={styles.newButtonText}>+ Raise a decision</Text>
+          <Text style={styles.newButtonText}>+ Raise a discussion</Text>
         </Pressable>
       )}
     </Screen>

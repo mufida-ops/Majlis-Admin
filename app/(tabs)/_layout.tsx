@@ -26,9 +26,9 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: ({color, size}) => <Ionicons name="home-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="drop" options={{ title: 'Drop', tabBarIcon: ({color, size}) => <Ionicons name="add-circle-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="drop" options={{ title: 'Give', tabBarIcon: ({color, size}) => <Ionicons name="add-circle-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="projects" options={{ title: 'Projects', tabBarIcon: ({color, size}) => <Ionicons name="layers-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="decisions" options={{ title: 'Decisions', tabBarIcon: ({color, size}) => <Ionicons name="checkmark-done-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="decisions" options={{ title: 'Discussions', tabBarIcon: ({color, size}) => <Ionicons name="checkmark-done-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="crm" options={{ title: 'CRM', tabBarIcon: ({color, size}) => <Ionicons name="people-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: ({color, size}) => <Ionicons name="calendar-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="ai" options={{ title: 'AI', tabBarIcon: ({color, size}) => <Ionicons name="sparkles-outline" color={color} size={size} /> }} />

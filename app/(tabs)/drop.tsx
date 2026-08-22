@@ -15,6 +15,10 @@ import { createDrop, listDrops, updateDropText, deleteDrop } from '@/lib/reposit
 import { requestDropParse } from '@/lib/repositories/aiActions';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
 import { formatRelative } from '@/lib/format';
+import { listOrganisations, createFollowUp } from '@/lib/repositories/organisations';
+import { createDecision } from '@/lib/repositories/decisions';
+import { createEvent } from '@/lib/repositories/events';
+import { LinkPicker, GIVE_LINK_TARGETS, type LinkPickerResult } from '@/components/LinkPicker';
 
 export default function DropScreen() {
   const { session } = useAuth();
@@ -25,12 +29,18 @@ export default function DropScreen() {
   const [editingDropId, setEditingDropId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [linkingDropId, setLinkingDropId] = useState<string | null>(null);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState('');
 
   const {
     data: myDrops,
     loading: dropsLoading,
     refresh: refreshDrops
   } = useAsync(() => (workspaceId ? listDrops(workspaceId) : Promise.resolve([])), [workspaceId]);
+
+  // Loaded only to power the CRM picker when linking a drop to a follow-up.
+  const { data: orgsList } = useAsync(() => (workspaceId ? listOrganisations(workspaceId) : Promise.resolve([])), [workspaceId]);
 
   const startEdit = (dropId: string, currentText: string) => {
     setEditingDropId(dropId);
@@ -62,8 +72,44 @@ export default function DropScreen() {
     }
   };
 
+  const startLink = (dropId: string) => {
+    setLinkingDropId(dropId);
+    setLinkError('');
+  };
+
+  const cancelLink = () => {
+    setLinkingDropId(null);
+    setLinkError('');
+  };
+
+  const saveLink = async (result: LinkPickerResult) => {
+    if (!session || !workspaceId) return;
+    setLinkSaving(true);
+    setLinkError('');
+    try {
+      if (result.target === 'calendar') {
+        await createEvent({
+          workspace_id: workspaceId,
+          title: result.title,
+          start_at: result.startAt,
+          all_day: result.allDay,
+          created_by: session.user.id
+        });
+      } else if (result.target === 'crm') {
+        await createFollowUp(result.organisationId, result.note);
+      } else if (result.target === 'discussion') {
+        await createDecision({ workspace_id: workspaceId, title: result.title, owner: result.owner, created_by: session.user.id });
+      }
+      setLinkingDropId(null);
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Could not link that.');
+    } finally {
+      setLinkSaving(false);
+    }
+  };
+
   const confirmDeleteDrop = (dropId: string) => {
-    Alert.alert('Delete this drop?', "This removes it from your sent list. It won't undo anything it already created.", [
+    Alert.alert('Delete this?', "This removes it from your sent list. It won't undo anything it already created.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -123,7 +169,7 @@ export default function DropScreen() {
 
   return (
     <Screen>
-      <SectionTitle title="Drop" subtitle="Capture first. Organise later." />
+      <SectionTitle title="Give" subtitle="Capture first. Organise later." />
       <Card>
         <Text style={styles.label}>What's on your mind?</Text>
         <TextInput
@@ -146,8 +192,8 @@ export default function DropScreen() {
       </Card>
       <Text style={styles.note}>
         Talk or type freely — tap the microphone on your keyboard to dictate. {partner?.display_name ?? 'Your co-founder'}{' '}
-        won't see the raw text: it's condensed into a short summary for their catch-up feed. Normal drops wait for their
-        next catch-up; urgent drops bypass quiet hours.
+        won't see the raw text: it's condensed into a short summary for their catch-up feed. Normal ones wait for their
+        next catch-up; urgent ones bypass quiet hours.
       </Text>
 
       <Pressable style={styles.aiLink} onPress={() => router.push('/(tabs)/ai')}>
@@ -165,7 +211,7 @@ export default function DropScreen() {
           if (mine.length === 0) {
             return (
               <EmptyState
-                label="Nothing sent yet — whatever you drop above will show up here."
+                label="Nothing sent yet — whatever you give above will show up here."
               />
             );
           }
@@ -196,6 +242,9 @@ export default function DropScreen() {
                     <View style={styles.sentHeader}>
                       <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text}</Text>
                       <View style={styles.sentIcons}>
+                        <Pressable hitSlop={10} onPress={() => startLink(drop.id)}>
+                          <Ionicons name="link-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
                         <Pressable hitSlop={10} onPress={() => startEdit(drop.id, drop.raw_text)}>
                           <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
                         </Pressable>
@@ -209,6 +258,17 @@ export default function DropScreen() {
                       {drop.urgent ? ' · Urgent' : ''}
                       {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
                     </Text>
+                    {linkingDropId === drop.id ? (
+                      <LinkPicker
+                        targets={GIVE_LINK_TARGETS}
+                        organisations={(orgsList ?? []).map(o => ({ id: o.id, name: o.name }))}
+                        seedTitle={drop.raw_text}
+                        saving={linkSaving}
+                        error={linkError}
+                        onSave={saveLink}
+                        onCancel={cancelLink}
+                      />
+                    ) : null}
                   </Card>
                 )
               )}

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
+import { LinkPicker, AI_LINK_TARGETS, GIVE_LINK_TARGETS, type LinkTarget, type LinkPickerResult } from '@/components/LinkPicker';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -15,17 +17,7 @@ import { createDecision } from '@/lib/repositories/decisions';
 import { listOrganisations, createFollowUp } from '@/lib/repositories/organisations';
 import { createEvent } from '@/lib/repositories/events';
 import { describeAiAction } from '@/lib/aiActionLabel';
-import { localDateKey } from '@/lib/format';
-import type { AiActionRow, AiChatMessageRow, OwnerType } from '@/types/db';
-
-type RecatTarget = 'task' | 'decision' | 'crm' | 'calendar';
-
-const RECAT_TARGETS: { key: RecatTarget; label: string }[] = [
-  { key: 'task', label: 'Task' },
-  { key: 'decision', label: 'Decision' },
-  { key: 'crm', label: 'CRM follow-up' },
-  { key: 'calendar', label: 'Calendar' }
-];
+import type { AiActionRow, AiChatMessageRow } from '@/types/db';
 
 function seedTitleFromAction(action: AiActionRow): string {
   const p = action.payload as Record<string, unknown>;
@@ -40,14 +32,12 @@ export default function AiChatScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
-  const [recategorizing, setRecategorizing] = useState<{ actionId: string; target: RecatTarget } | null>(null);
-  const [recatTitle, setRecatTitle] = useState('');
-  const [recatDate, setRecatDate] = useState('');
-  const [recatTime, setRecatTime] = useState('');
-  const [recatProjectId, setRecatProjectId] = useState('');
-  const [recatOrgId, setRecatOrgId] = useState('');
-  const [recatOwner, setRecatOwner] = useState<OwnerType>('Both');
+  const [recategorizing, setRecategorizing] = useState<{ actionId: string; target: LinkTarget } | null>(null);
   const [recatSaving, setRecatSaving] = useState(false);
+  const [recatError, setRecatError] = useState('');
+  const [linkingMessageId, setLinkingMessageId] = useState<string | null>(null);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState('');
 
   const {
     data: messages,
@@ -126,63 +116,60 @@ export default function AiChatScreen() {
     }
   };
 
-  const startRecategorize = (action: AiActionRow, target: RecatTarget) => {
+  const startRecategorize = (action: AiActionRow, target: LinkTarget) => {
     setRecategorizing({ actionId: action.id, target });
-    setRecatTitle(seedTitleFromAction(action));
-    setRecatDate(localDateKey());
-    setRecatTime('');
-    setRecatProjectId('');
-    setRecatOrgId('');
-    setRecatOwner('Both');
-    setError('');
+    setRecatError('');
   };
 
   const cancelRecategorize = () => setRecategorizing(null);
 
-  const targetLabel = (target: RecatTarget) =>
-    target === 'calendar' ? 'Calendar' : target === 'decision' ? 'Decisions' : target === 'task' ? 'Projects' : 'CRM';
-
-  const saveRecategorize = async () => {
+  const saveRecategorize = async (result: LinkPickerResult) => {
     if (!recategorizing || !session || !workspaceId) return;
-    const { actionId, target } = recategorizing;
-    if (!recatTitle.trim()) {
-      setError('Add a title first.');
-      return;
-    }
-    if (target === 'task' && !recatProjectId) {
-      setError('Pick a project first.');
-      return;
-    }
-    if (target === 'crm' && !recatOrgId) {
-      setError('Pick an organisation first.');
-      return;
-    }
+    const { actionId } = recategorizing;
     setRecatSaving(true);
+    setRecatError('');
     try {
-      if (target === 'calendar') {
-        const allDay = !recatTime.trim();
-        const startAt = new Date(`${recatDate}T${allDay ? '00:00' : recatTime}:00`);
-        await createEvent({
-          workspace_id: workspaceId,
-          title: recatTitle.trim(),
-          start_at: startAt.toISOString(),
-          all_day: allDay,
-          created_by: session.user.id
-        });
-      } else if (target === 'decision') {
-        await createDecision({ workspace_id: workspaceId, title: recatTitle.trim(), owner: recatOwner, created_by: session.user.id });
-      } else if (target === 'task') {
-        await createTask({ workspace_id: workspaceId, project_id: recatProjectId, title: recatTitle.trim(), created_by: session.user.id });
-      } else {
-        await createFollowUp(recatOrgId, recatTitle.trim());
-      }
+      await applyLink(result, session.user.id, workspaceId);
       await dismissAiAction(actionId);
       setProposedActions(prev => (prev ?? []).filter(a => a.id !== actionId));
       setRecategorizing(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save that.');
+      setRecatError(err instanceof Error ? err.message : 'Could not save that.');
     } finally {
       setRecatSaving(false);
+    }
+  };
+
+  const startLink = (messageId: string) => {
+    setLinkingMessageId(messageId);
+    setLinkError('');
+  };
+
+  const cancelLink = () => setLinkingMessageId(null);
+
+  const saveLink = async (result: LinkPickerResult) => {
+    if (!session || !workspaceId) return;
+    setLinkSaving(true);
+    setLinkError('');
+    try {
+      await applyLink(result, session.user.id, workspaceId);
+      setLinkingMessageId(null);
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Could not link that.');
+    } finally {
+      setLinkSaving(false);
+    }
+  };
+
+  const applyLink = async (result: LinkPickerResult, userId: string, wsId: string) => {
+    if (result.target === 'calendar') {
+      await createEvent({ workspace_id: wsId, title: result.title, start_at: result.startAt, all_day: result.allDay, created_by: userId });
+    } else if (result.target === 'discussion') {
+      await createDecision({ workspace_id: wsId, title: result.title, owner: result.owner, created_by: userId });
+    } else if (result.target === 'task') {
+      await createTask({ workspace_id: wsId, project_id: result.projectId, title: result.title, created_by: userId });
+    } else {
+      await createFollowUp(result.organisationId, result.note);
     }
   };
 
@@ -193,7 +180,7 @@ export default function AiChatScreen() {
       <Screen contentStyle={{ flex: 1, paddingBottom: 16 }}>
         <SectionTitle
           title="Your AI Assistant"
-          subtitle="Ask a question, think out loud, or have it add a task, decision, CRM update, calendar event, or message to your co-founder."
+          subtitle="Ask a question, think out loud, or have it add a task, discussion, CRM update, calendar event, or message to your co-founder."
         />
         <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
 
@@ -215,83 +202,38 @@ export default function AiChatScreen() {
                     </Text>
                   </View>
 
+                  {!message.id.startsWith('pending-') ? (
+                    linkingMessageId === message.id ? (
+                      <LinkPicker
+                        targets={GIVE_LINK_TARGETS}
+                        organisations={(orgsList ?? []).map(o => ({ id: o.id, name: o.name }))}
+                        seedTitle={message.content}
+                        saving={linkSaving}
+                        error={linkError}
+                        onSave={saveLink}
+                        onCancel={cancelLink}
+                      />
+                    ) : (
+                      <Pressable style={styles.linkRow} onPress={() => startLink(message.id)} hitSlop={6}>
+                        <Ionicons name="link-outline" size={14} color={theme.colors.muted} />
+                        <Text style={styles.linkRowText}>Link to calendar, CRM, or discussion</Text>
+                      </Pressable>
+                    )
+                  ) : null}
+
                   {action ? (
                     recategorizing?.actionId === action.id ? (
-                      <View style={styles.actionCard}>
-                        <Text style={styles.recatLabel}>Add to {targetLabel(recategorizing.target)} instead</Text>
-                        <TextInput
-                          value={recatTitle}
-                          onChangeText={setRecatTitle}
-                          placeholder="Title"
-                          placeholderTextColor={theme.colors.muted}
-                          style={styles.recatInput}
-                        />
-                        {recategorizing.target === 'calendar' ? (
-                          <View style={styles.recatRow}>
-                            <TextInput
-                              value={recatDate}
-                              onChangeText={setRecatDate}
-                              placeholder="YYYY-MM-DD"
-                              placeholderTextColor={theme.colors.muted}
-                              style={[styles.recatInput, { flex: 1 }]}
-                            />
-                            <TextInput
-                              value={recatTime}
-                              onChangeText={setRecatTime}
-                              placeholder="HH:MM (optional)"
-                              placeholderTextColor={theme.colors.muted}
-                              style={[styles.recatInput, { flex: 1 }]}
-                            />
-                          </View>
-                        ) : null}
-                        {recategorizing.target === 'task' ? (
-                          <View style={styles.chipRow}>
-                            {(projectsList ?? []).map(p => (
-                              <Pressable
-                                key={p.id}
-                                style={[styles.chip, recatProjectId === p.id && styles.chipActive]}
-                                onPress={() => setRecatProjectId(p.id)}
-                              >
-                                <Text style={[styles.chipText, recatProjectId === p.id && styles.chipTextActive]}>{p.title}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        ) : null}
-                        {recategorizing.target === 'crm' ? (
-                          <View style={styles.chipRow}>
-                            {(orgsList ?? []).map(o => (
-                              <Pressable
-                                key={o.id}
-                                style={[styles.chip, recatOrgId === o.id && styles.chipActive]}
-                                onPress={() => setRecatOrgId(o.id)}
-                              >
-                                <Text style={[styles.chipText, recatOrgId === o.id && styles.chipTextActive]}>{o.name}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        ) : null}
-                        {recategorizing.target === 'decision' ? (
-                          <View style={styles.chipRow}>
-                            {(['Both', 'Mufida', 'Victoria'] as OwnerType[]).map(owner => (
-                              <Pressable
-                                key={owner}
-                                style={[styles.chip, recatOwner === owner && styles.chipActive]}
-                                onPress={() => setRecatOwner(owner)}
-                              >
-                                <Text style={[styles.chipText, recatOwner === owner && styles.chipTextActive]}>{owner}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        ) : null}
-                        <View style={styles.actionButtons}>
-                          <Pressable style={styles.primary} onPress={saveRecategorize} disabled={recatSaving}>
-                            <Text style={styles.primaryText}>{recatSaving ? 'Saving…' : 'Save'}</Text>
-                          </Pressable>
-                          <Pressable style={styles.secondary} onPress={cancelRecategorize} disabled={recatSaving}>
-                            <Text style={styles.secondaryText}>Cancel</Text>
-                          </Pressable>
-                        </View>
-                      </View>
+                      <LinkPicker
+                        targets={AI_LINK_TARGETS}
+                        initialTarget={recategorizing.target}
+                        organisations={(orgsList ?? []).map(o => ({ id: o.id, name: o.name }))}
+                        projects={(projectsList ?? []).map(p => ({ id: p.id, title: p.title }))}
+                        seedTitle={seedTitleFromAction(action)}
+                        saving={recatSaving}
+                        error={recatError}
+                        onSave={saveRecategorize}
+                        onCancel={cancelRecategorize}
+                      />
                     ) : (
                       <View style={styles.actionCard}>
                         <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
@@ -305,7 +247,7 @@ export default function AiChatScreen() {
                         </View>
                         <Text style={styles.recatPrompt}>Wrong category? Move it to:</Text>
                         <View style={styles.chipRow}>
-                          {RECAT_TARGETS.map(t => (
+                          {AI_LINK_TARGETS.map(t => (
                             <Pressable key={t.key} style={styles.chipSmall} onPress={() => startRecategorize(action, t.key)}>
                               <Text style={styles.chipSmallText}>{t.label}</Text>
                             </Pressable>
@@ -326,7 +268,7 @@ export default function AiChatScreen() {
         <TextInput
           value={input}
           onChangeText={setInput}
-          placeholder="Ask, think out loud, or add a task, decision, CRM update, event…"
+          placeholder="Ask, think out loud, or add a task, discussion, CRM update, event…"
           placeholderTextColor={theme.colors.muted}
           style={styles.input}
           multiline
@@ -360,24 +302,11 @@ const styles = StyleSheet.create({
   secondary: { borderWidth: 1, borderColor: theme.colors.border, paddingVertical: 10, paddingHorizontal: 16, borderRadius: theme.radius.md, alignItems: 'center' },
   secondaryText: { color: theme.colors.text, fontWeight: '600', fontSize: 13 },
   recatPrompt: { color: theme.colors.muted, fontSize: 12, marginTop: 12 },
-  recatLabel: { color: theme.colors.navy, fontWeight: '600', fontSize: 14 },
-  recatInput: {
-    marginTop: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background
-  },
-  recatRow: { flexDirection: 'row', gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  chip: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
-  chipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
-  chipText: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
   chipSmall: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
   chipSmallText: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start' },
+  linkRowText: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
   error: { color: theme.colors.danger },
   composer: {
     flexDirection: 'row',

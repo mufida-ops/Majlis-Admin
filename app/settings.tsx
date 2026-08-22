@@ -93,7 +93,7 @@ export default function SettingsScreen() {
 
       <Card>
         <Text style={styles.label}>Your quiet hours</Text>
-        <Text style={styles.sub}>Non-urgent drops wait for {partner?.display_name ?? 'your co-founder'} until these hours end. Leave both blank to turn quiet hours off.</Text>
+        <Text style={styles.sub}>Non-urgent messages wait for {partner?.display_name ?? 'your co-founder'} until these hours end. Leave both blank to turn quiet hours off.</Text>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Starts</Text>
