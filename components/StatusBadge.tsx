@@ -3,8 +3,8 @@ import { theme } from '@/constants/theme';
 import { TASK_STATUS_COLOR, nextTaskStatus } from '@/lib/taskStatus';
 import type { TaskStatus } from '@/types/db';
 
-// Tapping cycles Todo → Doing → Waiting → Done → Todo, same interaction as
-// PriorityBadge, so a task's status never needs a picker sheet.
+// Tapping cycles Not Started → Started → Ongoing → Done → Not Started, same
+// interaction as PriorityBadge, so a task's status never needs a picker sheet.
 export function StatusBadge({ value, onChange }: { value: TaskStatus; onChange: (next: TaskStatus) => void }) {
   return (
     <Pressable style={styles.badge} onPress={() => onChange(nextTaskStatus(value))} hitSlop={8}>

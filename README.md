@@ -24,20 +24,22 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   repository layer in `lib/repositories/`. No mock data remains.
 - Project/task detail (`app/(tabs)/projects`), CRM organisation detail with activity history
   (`app/(tabs)/crm`), and a generic discussion thread (`app/thread.tsx`) reusable across projects, tasks,
-  decisions and CRM organisations. A project's task list is grouped into status sections (To do / Doing / Waiting
-  / Done, via `lib/taskStatus.ts`) instead of one flat list, with a tap-to-cycle `StatusBadge` per task
+  decisions and CRM organisations. A project's task list is grouped into status sections (Not Started / Started /
+  Ongoing / Done, via `lib/taskStatus.ts`) instead of one flat list, with a tap-to-cycle `StatusBadge` per task
   (`components/StatusBadge.tsx`, same interaction as `PriorityBadge`) so status is actually changeable from this
-  screen — Done tasks stay visible but dimmed rather than disappearing. Each task's box is tinted by whoever owns
-  it — one color per founder, stable regardless of which of the two is signed in (`ownerAccentColor` in
-  `lib/ownerLabel.ts`, sorted by `user_id` so it can't flip depending on the viewer). A project's progress bar is
-  computed from its own task list (`computeProjectProgress` in `lib/taskStatus.ts` — sum of weight across Done
-  tasks) rather than trusted from the stored `projects.progress` column, and reads a flat 100% once the project's
-  own status is set to Complete, regardless of whether task weights happen to add up to exactly 100. A project's
-  own lifecycle is 4 steps — Not Started / Active / Blocked / Complete (`ProjectStatus` in `types/db.ts`) —
-  `createProject` sets a new one to Not Started explicitly rather than via the DB column default, since changing
-  an enum's default in the same migration that adds the enum value hits Postgres's "unsafe use of new value"
-  restriction. The Projects list sorts by priority (High first) and shows a colored "High/Medium/Low priority"
-  chip per card — the left-edge color accent alone was too easy to miss.
+  screen — Done tasks stay visible but dimmed rather than disappearing. Tasks render as a slim list (a hairline
+  divider between rows, not boxed cards), and each row's whole background is tinted by whoever owns it — pink for
+  Victoria, purple for Mufida (`ownerAccentColor` in `lib/ownerLabel.ts`, matched by display name so it can't flip
+  depending on who's viewing). No per-task weight to enter: every task counts equally toward its project's
+  progress (`computeProjectProgress` in `lib/taskStatus.ts` — the share of a project's tasks marked Done, e.g. 100
+  tasks means each is worth 1% the moment it's checked off), computed from the project's own task list rather than
+  trusted from the stored `projects.progress` column, and reads a flat 100% once the project's own status is set
+  to Complete regardless of how many tasks exist. A project's own lifecycle is a separate 4 steps — Not Started /
+  Active / Blocked / Complete (`ProjectStatus` in `types/db.ts`) — `createProject` sets a new one to Not Started
+  explicitly rather than via the DB column default, since changing an enum's default in the same migration that
+  adds the enum value hits Postgres's "unsafe use of new value" restriction. The Projects list sorts by priority
+  (High first) and shows a colored "High/Medium/Low priority" chip per card — the left-edge color accent alone was
+  too easy to miss.
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs

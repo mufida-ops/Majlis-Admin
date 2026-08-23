@@ -61,7 +61,7 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
     case 'create_follow_up':
       return organisations.createFollowUp(p.organisation_id, p.next_action, p.next_action_at ?? null);
     case 'mark_waiting_for':
-      return projects.updateTask(p.task_id, { status: 'Waiting' });
+      return projects.updateTask(p.task_id, { status: 'Ongoing' });
     case 'create_organisation': {
       const org = await organisations.createOrganisation({
         workspace_id: workspaceId,

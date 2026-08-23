@@ -11,7 +11,7 @@ begin
     create type project_status as enum ('Active', 'Blocked', 'Complete');
   end if;
   if not exists (select 1 from pg_type where typname = 'task_status') then
-    create type task_status as enum ('Todo', 'Doing', 'Waiting', 'Done');
+    create type task_status as enum ('Not Started', 'Started', 'Ongoing', 'Done');
   end if;
   if not exists (select 1 from pg_type where typname = 'decision_status') then
     create type decision_status as enum ('Waiting', 'Agreed', 'Discuss');
@@ -31,6 +31,26 @@ $$;
 -- Active -> Blocked -> Complete) instead of 3, since "Active" alone didn't
 -- distinguish a project that hasn't been picked up yet from one in motion.
 alter type project_status add value if not exists 'Not Started' before 'Active';
+
+-- A task's lifecycle was originally Todo/Doing/Waiting/Done; Mufida found
+-- "Waiting" confusing next to a project's own "Blocked" and asked for
+-- clearer wording. RENAME VALUE (unlike ADD VALUE) is safe to run inside a
+-- transaction, but has no "IF EXISTS" of its own, so this checks pg_enum
+-- first for re-run safety (a fresh install's task_status is created with
+-- the new labels above already, so these renames are no-ops there).
+do $$
+begin
+  if exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'task_status' and e.enumlabel = 'Todo') then
+    alter type task_status rename value 'Todo' to 'Not Started';
+  end if;
+  if exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'task_status' and e.enumlabel = 'Doing') then
+    alter type task_status rename value 'Doing' to 'Started';
+  end if;
+  if exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'task_status' and e.enumlabel = 'Waiting') then
+    alter type task_status rename value 'Waiting' to 'Ongoing';
+  end if;
+end
+$$;
 
 create table if not exists workspaces (
   id uuid primary key default gen_random_uuid(),
@@ -75,7 +95,7 @@ create table if not exists project_tasks (
   project_id uuid references projects(id) on delete cascade not null,
   title text not null,
   owner_user_id uuid references auth.users(id),
-  status task_status not null default 'Todo',
+  status task_status not null default 'Not Started',
   weight integer not null default 0,
   priority priority_level not null default 'Medium',
   start_at timestamptz,
@@ -508,10 +528,11 @@ create trigger trg_log_event_activity
 after insert or update on events
 for each row execute function public.log_event_activity();
 
--- A project's progress is derived, not hand-set: each task carries a
--- weight (percentage points), and progress is the sum of weights of that
--- project's Done tasks. Recalculated whenever any task in the project is
--- added, changed, or removed, so it can never drift from the task list.
+-- A project's progress is derived, not hand-set: every task counts equally
+-- (no manual weight to enter — 100 tasks means each is worth 1%), and
+-- progress is the share of a project's tasks marked Done. Recalculated
+-- whenever any task in the project is added, changed, or removed, so it
+-- can never drift from the task list.
 create or replace function public.recalc_project_progress()
 returns trigger
 language plpgsql
@@ -521,14 +542,19 @@ as $$
 declare
   v_project_id uuid;
   v_total integer;
+  v_done integer;
 begin
   v_project_id := coalesce(new.project_id, old.project_id);
 
-  select coalesce(sum(weight), 0) into v_total
+  select count(*), count(*) filter (where status = 'Done')
+  into v_total, v_done
   from project_tasks
-  where project_id = v_project_id and status = 'Done';
+  where project_id = v_project_id;
 
-  update projects set progress = least(100, greatest(0, v_total)) where id = v_project_id;
+  update projects
+  set progress = case when v_total = 0 then 0 else round(100.0 * v_done / v_total) end
+  where id = v_project_id;
+
   return coalesce(new, old);
 end;
 $$;

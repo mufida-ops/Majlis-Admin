@@ -19,7 +19,12 @@ import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const STATUSES: ProjectStatus[] = ['Not Started', 'Active', 'Blocked', 'Complete'];
-const TASK_STATUS_LABEL: Record<TaskStatus, string> = { Todo: 'To do', Doing: 'Doing', Waiting: 'Waiting', Done: 'Done' };
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  'Not Started': 'Not Started',
+  Started: 'Started',
+  Ongoing: 'Ongoing',
+  Done: 'Done'
+};
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,16 +35,14 @@ export default function ProjectDetailScreen() {
   const [nextAction, setNextAction] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
-  const [taskWeight, setTaskWeight] = useState('');
   const [addingTask, setAddingTask] = useState(false);
-  const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
 
-  // A project marked Complete should always read 100%, even if its tasks'
-  // weights don't add up to exactly 100 (a missing weight, tasks added
-  // after the fact, etc.) — the status pill is the stronger signal.
+  // A project marked Complete should always read 100%, even if a task
+  // still shows as not-Done (e.g. added after the fact) — the status pill
+  // is the stronger signal.
   const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
 
   const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
@@ -82,35 +85,19 @@ export default function ProjectDetailScreen() {
     if (!taskTitle.trim() || !workspaceId || !session) return;
     setAddingTask(true);
     try {
-      const weight = Math.max(0, Math.min(100, Math.round(Number(taskWeight)) || 0));
       await createTask({
         workspace_id: workspaceId,
         project_id: project.id,
         title: taskTitle.trim(),
         owner_user_id: taskOwner,
-        weight,
         created_by: session.user.id
       });
       setTaskTitle('');
       setTaskOwner(null);
-      setTaskWeight('');
       refresh();
     } finally {
       setAddingTask(false);
     }
-  };
-
-  const saveWeight = async (taskId: string) => {
-    const draft = weightDrafts[taskId];
-    if (draft === undefined) return;
-    const weight = Math.max(0, Math.min(100, Math.round(Number(draft)) || 0));
-    setWeightDrafts(prev => {
-      const next = { ...prev };
-      delete next[taskId];
-      return next;
-    });
-    await updateTask(taskId, { weight });
-    refresh();
   };
 
   return (
@@ -135,7 +122,7 @@ export default function ProjectDetailScreen() {
           <Text style={styles.progressValue}>{progress}%</Text>
         </View>
         <Text style={styles.meta}>
-          Calculated automatically — give each task a weight below, and progress adds up as tasks are checked off Done.
+          Calculated automatically — every task counts equally, and progress adds up as tasks are checked off Done.
         </Text>
       </Card>
 
@@ -179,39 +166,29 @@ export default function ProjectDetailScreen() {
                 {tasksInStatus.map(task => {
                   const accent = ownerAccentColor(task.owner_user_id, me, partner);
                   return (
-                  <View
-                    key={task.id}
-                    style={[
-                      styles.taskRow,
-                      task.status === 'Done' && styles.taskRowDone,
-                      accent ? { backgroundColor: `${accent}1F`, borderLeftWidth: 4, borderLeftColor: accent } : null
-                    ]}
-                  >
-                    <Pressable
-                      onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
+                    <View
+                      key={task.id}
+                      style={[
+                        styles.taskRow,
+                        { backgroundColor: accent ?? theme.colors.background },
+                        task.status === 'Done' && styles.taskRowDone
+                      ]}
                     >
-                      <Text style={styles.taskTitle}>{task.title}</Text>
-                      <Text style={styles.meta}>
-                        {memberLabel(task.owner_user_id, me, partner)}
-                        {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
-                      </Text>
-                      <Text style={styles.discuss}>Discuss →</Text>
-                    </Pressable>
-                    <View style={styles.taskControls}>
-                      <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
-                      <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
-                      <View style={styles.weightEditor}>
-                        <TextInput
-                          value={weightDrafts[task.id] ?? String(task.weight ?? 0)}
-                          onChangeText={text => setWeightDrafts(prev => ({ ...prev, [task.id]: text }))}
-                          onEndEditing={() => saveWeight(task.id)}
-                          keyboardType="number-pad"
-                          style={styles.weightInput}
-                        />
-                        <Text style={styles.weightPercent}>%</Text>
+                      <Pressable
+                        style={{ flex: 1 }}
+                        onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
+                      >
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        <Text style={styles.meta}>
+                          {memberLabel(task.owner_user_id, me, partner)}
+                          {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
+                        </Text>
+                      </Pressable>
+                      <View style={styles.taskControls}>
+                        <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
+                        <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
                       </View>
                     </View>
-                  </View>
                   );
                 })}
               </View>
@@ -225,14 +202,6 @@ export default function ProjectDetailScreen() {
             onChangeText={setTaskTitle}
             placeholder="New task title"
             placeholderTextColor={theme.colors.muted}
-            style={styles.input}
-          />
-          <TextInput
-            value={taskWeight}
-            onChangeText={setTaskWeight}
-            placeholder="Weight, e.g. 20 (% of project this task is worth)"
-            placeholderTextColor={theme.colors.muted}
-            keyboardType="number-pad"
             style={styles.input}
           />
           <View style={styles.ownerPicker}>
@@ -293,31 +262,22 @@ const styles = StyleSheet.create({
   progressValue: { color: theme.colors.navy, fontWeight: '700', width: 44, textAlign: 'right' },
   statusGroup: { marginTop: 16 },
   statusGroupLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  // A slim list row, not a boxed card — rows sit directly one after another
+  // (a hairline divider between them, not a gap), and the owner's color
+  // fills the whole row rather than just a badge or edge accent.
   taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10,
-    padding: 12,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginTop: 8
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border
   },
   taskRowDone: { opacity: 0.6 },
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
-  discuss: { color: theme.colors.navy, fontSize: 12, fontWeight: '600', marginTop: 4 },
   taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  weightEditor: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  weightInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    width: 44,
-    textAlign: 'center'
-  },
-  weightPercent: { color: theme.colors.muted, fontSize: 13 },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   discussProject: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },

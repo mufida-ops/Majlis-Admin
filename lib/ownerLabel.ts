@@ -1,22 +1,21 @@
 import { theme } from '@/constants/theme';
 import type { WorkspaceMember } from '@/types/db';
 
-// One color per person, stable regardless of which of the two founders is
-// signed in (sorted by user_id rather than "me"/"partner", since which
-// member is "me" flips depending on the viewer's own phone).
-const OWNER_COLORS = [theme.colors.navy, theme.colors.gold] as const;
-
+// One color per person, matched by name (Mufida's own request: her tasks
+// are purple, Victoria's are pink) rather than by sign-in order, so it's
+// the same regardless of which of the two founders is looking at the screen.
 export function ownerAccentColor(
   userId: string | null | undefined,
   me: WorkspaceMember | null,
   partner: WorkspaceMember | null
 ): string | null {
   if (!userId) return null;
-  const members = [me, partner]
-    .filter((m): m is WorkspaceMember => m !== null)
-    .sort((a, b) => a.user_id.localeCompare(b.user_id));
-  const index = members.findIndex(m => m.user_id === userId);
-  return index === -1 ? null : OWNER_COLORS[index % OWNER_COLORS.length];
+  const owner = [me, partner].find(m => m?.user_id === userId);
+  if (!owner) return null;
+  const name = owner.display_name.toLowerCase();
+  if (name.includes('mufida')) return theme.colors.ownerPurple;
+  if (name.includes('victoria')) return theme.colors.ownerPink;
+  return null;
 }
 
 function withIcon(member: WorkspaceMember): string {

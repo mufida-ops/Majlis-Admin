@@ -1,22 +1,24 @@
 import { theme } from '@/constants/theme';
 import type { ProjectTaskRow, TaskStatus } from '@/types/db';
 
-export const TASK_STATUSES: TaskStatus[] = ['Todo', 'Doing', 'Waiting', 'Done'];
+export const TASK_STATUSES: TaskStatus[] = ['Not Started', 'Started', 'Ongoing', 'Done'];
 
-// Computed straight from a project's own task list rather than trusted from
-// the stored projects.progress column, which only updates when a task on
-// that project changes and so can go stale (e.g. left over from before its
-// tasks were deleted) and show a percentage that contradicts the task list
-// actually on screen.
-export function computeProjectProgress(tasks: Pick<ProjectTaskRow, 'status' | 'weight'>[]): number {
-  const total = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.weight ?? 0), 0);
-  return Math.max(0, Math.min(100, total));
+// Every task counts equally toward its project's progress — no manual
+// weight to enter. 100 tasks means each one is worth 1% the moment it's
+// marked Done; this is computed fresh from the task list on every render
+// rather than trusted from the stored projects.progress column, which can
+// otherwise go stale (e.g. left over from before a project's tasks were
+// deleted) and show a percentage that contradicts the task list on screen.
+export function computeProjectProgress(tasks: Pick<ProjectTaskRow, 'status'>[]): number {
+  if (tasks.length === 0) return 0;
+  const done = tasks.filter(t => t.status === 'Done').length;
+  return Math.round((done / tasks.length) * 100);
 }
 
 export const TASK_STATUS_COLOR: Record<TaskStatus, string> = {
-  Todo: theme.colors.muted,
-  Doing: theme.colors.navy,
-  Waiting: theme.colors.gold,
+  'Not Started': theme.colors.muted,
+  Started: theme.colors.navy,
+  Ongoing: theme.colors.gold,
   Done: theme.colors.success
 };
 
