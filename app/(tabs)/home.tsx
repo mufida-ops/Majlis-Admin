@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
@@ -39,6 +39,12 @@ export default function HomeScreen() {
     ]);
     return { projects, decisions, organisations };
   }, [workspaceId]);
+
+  // "Right now" reads task/project state that can change from screens
+  // reached deeper in the app (a task's thread, a project's own page) —
+  // refetch on every return to Home instead of showing what was true when
+  // the tab was first opened.
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const focus = useMemo<FocusItem[]>(() => {
     if (!data || !me) return [];

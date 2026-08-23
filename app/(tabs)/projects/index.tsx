@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -26,6 +26,11 @@ export default function ProjectsScreen() {
     () => (workspaceId ? listProjects(workspaceId) : Promise.resolve([])),
     [workspaceId]
   );
+
+  // Progress, status, and owner all come from the project's tasks, which
+  // can change from a task's own thread screen — refetch whenever this
+  // list comes back into view instead of showing what was true on mount.
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const [showNew, setShowNew] = useState(false);
   const [newKind, setNewKind] = useState<'project' | 'book'>('project');

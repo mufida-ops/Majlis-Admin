@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -38,6 +38,11 @@ export default function ProjectDetailScreen() {
   const { session } = useAuth();
   const { workspaceId, me, partner } = useWorkspace();
   const { data: project, loading, error, refresh, setData } = useAsync(() => getProject(id), [id]);
+
+  // Refetch whenever this screen regains focus — e.g. coming back from a
+  // task's own thread, where its status/owner/due date can change without
+  // this screen's already-fetched data knowing about it.
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const [nextAction, setNextAction] = useState('');
   const [projectDueDate, setProjectDueDate] = useState('');

@@ -79,6 +79,10 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   a "Flag for review" toggle (`projects.needs_review`, separate from any task's own flag) surfaces the same way
   on the partner's Home when it's not the flagger's own project. The two cards are merged into one, since they're
   really one "what's next and when" unit.
+- Changing a task's status/owner/due date/flag from its own thread screen used to leave the project detail page,
+  Projects list, and Home showing stale data — those screens had already fetched their data once and had no way
+  to know it changed elsewhere. All three now use `useFocusEffect` to refetch every time they come back into view,
+  not just on first load.
 - A project's Gantt timeline is collapsed by default behind a "Show timeline (N tasks)" toggle, on both the
   Projects list and the project detail page — a 59-task book project was rendering a bar per task and making the
   card (and the page) enormous.
