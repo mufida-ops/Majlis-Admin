@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Feather } from '@expo/vector-icons';
@@ -43,7 +44,7 @@ export function MediaTab({ contentItemId, canEdit }: { contentItemId: string; ca
       });
       reload();
     } catch (err) {
-      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+      showAlert('Upload failed', err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(null);
     }
@@ -63,7 +64,7 @@ export function MediaTab({ contentItemId, canEdit }: { contentItemId: string; ca
       });
       reload();
     } catch (err) {
-      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+      showAlert('Upload failed', err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(null);
     }

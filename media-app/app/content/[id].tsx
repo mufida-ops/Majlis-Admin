@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
@@ -38,7 +39,7 @@ export default function ContentDetail() {
   const canDelete = canDeleteContent(ctx);
 
   function confirmDelete() {
-    Alert.alert('Delete this content?', `"${item!.title}" will be removed from the pipeline. This can't be undone from the app.`, [
+    showAlert('Delete this content?', `"${item!.title}" will be removed from the pipeline. This can't be undone from the app.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
@@ -46,7 +47,7 @@ export default function ContentDetail() {
             await softDeleteContentItem(item!.id, item!.version);
             router.back();
           } catch (err) {
-            Alert.alert('Could not delete', err instanceof ConflictError ? err.message : String(err));
+            showAlert('Could not delete', err instanceof ConflictError ? err.message : String(err));
           }
         }
       }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Feather } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -117,7 +118,7 @@ function TagChip({ tag, onChanged }: { tag: Tag; onChanged: () => void }) {
   }
 
   function confirmDelete() {
-    Alert.alert('Delete tag', `Remove "${tag.name}" from everything it's tagged on?`, [
+    showAlert('Delete tag', `Remove "${tag.name}" from everything it's tagged on?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteTag(tag.id).then(onChanged) }
     ]);

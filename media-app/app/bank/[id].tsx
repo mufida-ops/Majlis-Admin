@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -48,7 +49,7 @@ export default function BankAssetDetail() {
   }
 
   function confirmDelete() {
-    Alert.alert('Delete this file?', `"${asset?.title}" and all its versions will be permanently removed. This can't be undone.`, [
+    showAlert('Delete this file?', `"${asset?.title}" and all its versions will be permanently removed. This can't be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
@@ -57,7 +58,7 @@ export default function BankAssetDetail() {
             await deleteBankAsset(id);
             router.back();
           } catch (err) {
-            Alert.alert('Could not delete', err instanceof Error ? err.message : String(err));
+            showAlert('Could not delete', err instanceof Error ? err.message : String(err));
             setDeleting(false);
           }
         }
@@ -78,7 +79,7 @@ export default function BankAssetDetail() {
   async function attach(contentItemId: string | null, section: MediaSection = 'raw') {
     if (!contentItemId) return;
     await attachBankAssetToContentItem(id, contentItemId, section);
-    Alert.alert('Attached', 'This file is now part of that content item.');
+    showAlert('Attached', 'This file is now part of that content item.');
     setAttachPicker(false);
   }
 
