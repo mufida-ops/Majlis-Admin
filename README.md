@@ -35,12 +35,16 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   depending on who's viewing). No per-task weight to enter: every task counts equally toward its project's
   progress (`computeProjectProgress` in `lib/taskStatus.ts` — the share of a project's tasks marked Done, e.g. 100
   tasks means each is worth 1% the moment it's checked off), computed from the project's own task list rather than
-  trusted from the stored `projects.progress` column, and reads a flat 100% once the project's own status is set
-  to Complete regardless of how many tasks exist. A project's own lifecycle is a separate 4 steps — Not Started /
-  Active / Blocked / Complete (`ProjectStatus` in `types/db.ts`) — `createProject` sets a new one to Not Started
-  explicitly rather than via the DB column default, since changing an enum's default in the same migration that
-  adds the enum value hits Postgres's "unsafe use of new value" restriction. The Projects list sorts by priority
-  (High first) and shows a colored "High/Medium/Low priority" chip per card — the left-edge color accent alone was
+  trusted from the stored `projects.progress` column. The percentage never gets overridden by the status pill
+  (it used to jump to a flat 100% once marked Complete, which read as dishonest against a task list that
+  disagreed) — it's always the literal share of tasks marked Done. A project's own lifecycle is a separate 4 steps
+  — Not Started / Active / Blocked / Complete (`ProjectStatus` in `types/db.ts`) — with a one-line plain-language
+  description shown under the status pills on the project detail page (`STATUS_DESCRIPTION` in
+  `app/(tabs)/projects/[id].tsx`) for anyone unsure what a given status actually means. `createProject` sets a new
+  one to Not Started explicitly rather than via the DB column default, since changing an enum's default in the
+  same migration that adds the enum value hits Postgres's "unsafe use of new value" restriction. The Projects list
+  sorts by priority (High first) and shows a colored "High/Medium/Low priority" chip per card — the left-edge
+  color accent alone was
   too easy to miss. Projects can also carry their own due date (`projects.due_at`), separate from any task's,
   editable from the project detail screen and shown on its list card.
 - Owner tags are just the initial — "M"/"V" — everywhere someone or something is labelled by who it belongs to

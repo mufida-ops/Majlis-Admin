@@ -129,7 +129,7 @@ export default function ProjectsScreen() {
           .sort((a, b) => PRIORITY_LEVELS.indexOf(b.priority) - PRIORITY_LEVELS.indexOf(a.priority))
           .map(project => {
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
-          const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
+          const progress = computeProjectProgress(project.project_tasks);
           const accent = PROJECT_STATUS_TINT[project.status];
           const isEditing = editingId === project.id;
 

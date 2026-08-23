@@ -26,6 +26,12 @@ const BOOK_SECTION_ORDER = BOOK_SECTIONS.map(s => s.section);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const STATUSES: ProjectStatus[] = ['Not Started', 'Active', 'Blocked', 'Complete'];
+const STATUS_DESCRIPTION: Record<ProjectStatus, string> = {
+  'Not Started': "Nothing's begun yet.",
+  Active: 'Work is under way.',
+  Blocked: "Stuck on something — can't move forward until that's sorted.",
+  Complete: 'Finished.'
+};
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   'Not Started': 'Not Started',
   Started: 'Started',
@@ -78,10 +84,10 @@ export default function ProjectDetailScreen() {
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
 
-  // A project marked Complete should always read 100%, even if a task
-  // still shows as not-Done (e.g. added after the fact) — the status pill
-  // is the stronger signal.
-  const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
+  // Always the real share of tasks marked Done — never overridden by the
+  // status pill, so the percentage can't say something the task list
+  // itself disagrees with.
+  const progress = computeProjectProgress(project.project_tasks);
 
   // Tinted by progress (red/amber/green), not by who created it — a
   // project is shared work, so an owner tint here answers the wrong
@@ -440,6 +446,7 @@ export default function ProjectDetailScreen() {
         ))}
         <PriorityBadge value={project.priority} onChange={changePriority} />
       </View>
+      <Text style={styles.statusDescription}>{STATUS_DESCRIPTION[project.status]}</Text>
 
       <Card>
         <Text style={styles.label}>Progress</Text>
@@ -599,6 +606,7 @@ export default function ProjectDetailScreen() {
 
 const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  statusDescription: { color: theme.colors.muted, fontSize: 13, marginTop: 8 },
   titleEditRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
