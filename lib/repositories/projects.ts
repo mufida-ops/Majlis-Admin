@@ -58,6 +58,12 @@ export async function updateProject(
   return unwrap(result) as ProjectRow;
 }
 
+export async function getTask(id: string): Promise<ProjectTaskRow> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('project_tasks').select('*').eq('id', id).single();
+  return unwrap(result) as ProjectTaskRow;
+}
+
 export async function createTask(input: {
   workspace_id: string;
   project_id: string;

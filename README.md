@@ -24,7 +24,9 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   repository layer in `lib/repositories/`. No mock data remains.
 - Project/task detail (`app/(tabs)/projects`), CRM organisation detail with activity history
   (`app/(tabs)/crm`), and a generic discussion thread (`app/thread.tsx`) reusable across projects, tasks,
-  decisions and CRM organisations. A project's task list is grouped into status sections (Not Started / Started /
+  decisions and CRM organisations — when opened for a task, that thread screen also shows the same `StatusBadge`/
+  `PriorityBadge` plus an editable due date, so status is changeable both from a project's task list and from
+  inside that task's own discussion, not only one or the other. A project's task list is grouped into status sections (Not Started / Started /
   Ongoing / Done, via `lib/taskStatus.ts`) instead of one flat list, with a tap-to-cycle `StatusBadge` per task
   (`components/StatusBadge.tsx`, same interaction as `PriorityBadge`) so status is actually changeable from this
   screen — Done tasks stay visible but dimmed rather than disappearing. Tasks render as a slim list (a hairline

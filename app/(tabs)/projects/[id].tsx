@@ -18,6 +18,8 @@ import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const STATUSES: ProjectStatus[] = ['Not Started', 'Active', 'Blocked', 'Complete'];
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   'Not Started': 'Not Started',
@@ -35,7 +37,9 @@ export default function ProjectDetailScreen() {
   const [nextAction, setNextAction] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
+  const [taskDueDate, setTaskDueDate] = useState('');
   const [addingTask, setAddingTask] = useState(false);
+  const [taskError, setTaskError] = useState('');
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -83,17 +87,24 @@ export default function ProjectDetailScreen() {
 
   const addTask = async () => {
     if (!taskTitle.trim() || !workspaceId || !session) return;
+    if (taskDueDate.trim() && !DATE_RE.test(taskDueDate.trim())) {
+      setTaskError('Due date should look like YYYY-MM-DD.');
+      return;
+    }
     setAddingTask(true);
+    setTaskError('');
     try {
       await createTask({
         workspace_id: workspaceId,
         project_id: project.id,
         title: taskTitle.trim(),
         owner_user_id: taskOwner,
+        due_at: taskDueDate.trim() ? new Date(`${taskDueDate.trim()}T00:00:00`).toISOString() : null,
         created_by: session.user.id
       });
       setTaskTitle('');
       setTaskOwner(null);
+      setTaskDueDate('');
       refresh();
     } finally {
       setAddingTask(false);
@@ -204,6 +215,14 @@ export default function ProjectDetailScreen() {
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
           />
+          <TextInput
+            value={taskDueDate}
+            onChangeText={setTaskDueDate}
+            placeholder="Due date, e.g. 2026-09-01 (optional)"
+            placeholderTextColor={theme.colors.muted}
+            style={styles.input}
+          />
+          {taskError ? <Text style={styles.taskError}>{taskError}</Text> : null}
           <View style={styles.ownerPicker}>
             {[
               { label: 'Unassigned', value: null },
@@ -279,6 +298,7 @@ const styles = StyleSheet.create({
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
   taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  taskError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
   ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   discussProject: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
   discussProjectText: { color: theme.colors.navy, fontWeight: '600' }

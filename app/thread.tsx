@@ -3,14 +3,17 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, Tex
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
+import { StatusBadge } from '@/components/StatusBadge';
+import { PriorityBadge } from '@/components/PriorityBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { getOrCreateThread, listMessages, postMessage, deleteMessage } from '@/lib/repositories/threads';
+import { getTask, updateTask } from '@/lib/repositories/projects';
 import { memberLabel } from '@/lib/ownerLabel';
-import { formatTime, formatShortDate } from '@/lib/format';
-import type { MessageRow, ThreadRow } from '@/types/db';
+import { formatTime, formatShortDate, toDateInputValue } from '@/lib/format';
+import type { MessageRow, ThreadRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
 
 type ThreadKind = 'project' | 'task' | 'organisation' | 'decision';
 
@@ -20,6 +23,8 @@ const anchorColumn: Record<ThreadKind, 'project_id' | 'task_id' | 'organisation_
   organisation: 'organisation_id',
   decision: 'decision_id'
 };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function ThreadScreen() {
   const params = useLocalSearchParams<{ kind: ThreadKind; id: string; title?: string }>();
@@ -32,6 +37,10 @@ export default function ThreadScreen() {
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [task, setTask] = useState<ProjectTaskRow | null>(null);
+  const [dueDateDraft, setDueDateDraft] = useState('');
+  const [savingDueDate, setSavingDueDate] = useState(false);
+  const [dueDateError, setDueDateError] = useState('');
 
   const load = useCallback(async () => {
     if (!workspaceId || !params.kind || !params.id) return;
@@ -39,10 +48,15 @@ export default function ThreadScreen() {
     setError(null);
     try {
       const column = anchorColumn[params.kind];
-      const t = await getOrCreateThread(workspaceId, { [column]: params.id } as never);
+      const [t, taskRow] = await Promise.all([
+        getOrCreateThread(workspaceId, { [column]: params.id } as never),
+        params.kind === 'task' ? getTask(params.id) : Promise.resolve(null)
+      ]);
       setThread(t);
       const msgs = await listMessages(t.id);
       setMessages(msgs);
+      setTask(taskRow);
+      setDueDateDraft(taskRow?.due_at ? toDateInputValue(taskRow.due_at) : '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this thread.');
     } finally {
@@ -70,6 +84,37 @@ export default function ThreadScreen() {
       setError(err instanceof Error ? err.message : 'Could not send that message.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const changeTaskStatus = async (status: TaskStatus) => {
+    if (!task) return;
+    const updated = await updateTask(task.id, { status });
+    setTask(updated);
+  };
+
+  const changeTaskPriority = async (priority: PriorityLevel) => {
+    if (!task) return;
+    const updated = await updateTask(task.id, { priority });
+    setTask(updated);
+  };
+
+  const saveDueDate = async () => {
+    if (!task) return;
+    if (dueDateDraft.trim() && !DATE_RE.test(dueDateDraft.trim())) {
+      setDueDateError('Due date should look like YYYY-MM-DD.');
+      return;
+    }
+    setSavingDueDate(true);
+    setDueDateError('');
+    try {
+      const due_at = dueDateDraft.trim() ? new Date(`${dueDateDraft.trim()}T00:00:00`).toISOString() : null;
+      const updated = await updateTask(task.id, { due_at });
+      setTask(updated);
+    } catch (err) {
+      setDueDateError(err instanceof Error ? err.message : 'Could not save that due date.');
+    } finally {
+      setSavingDueDate(false);
     }
   };
 
@@ -102,6 +147,28 @@ export default function ThreadScreen() {
           <ErrorState message={error} onRetry={load} />
         ) : (
           <View style={{ gap: 10 }}>
+            {task ? (
+              <Card>
+                <View style={styles.taskControlsRow}>
+                  <StatusBadge value={task.status} onChange={changeTaskStatus} />
+                  <PriorityBadge value={task.priority} onChange={changeTaskPriority} />
+                </View>
+                <Text style={styles.dueLabel}>Due date</Text>
+                <View style={styles.dueRow}>
+                  <TextInput
+                    value={dueDateDraft}
+                    onChangeText={setDueDateDraft}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={theme.colors.muted}
+                    style={[styles.input, { flex: 1, marginTop: 0 }]}
+                  />
+                  <Pressable style={styles.dueSave} onPress={saveDueDate} disabled={savingDueDate}>
+                    <Text style={styles.sendText}>{savingDueDate ? '…' : 'Save'}</Text>
+                  </Pressable>
+                </View>
+                {dueDateError ? <Text style={styles.dueError}>{dueDateError}</Text> : null}
+              </Card>
+            ) : null}
             {messages.length === 0 ? (
               <Card>
                 <Text style={styles.empty}>No messages yet. Start the discussion below.</Text>
@@ -145,6 +212,11 @@ export default function ThreadScreen() {
 
 const styles = StyleSheet.create({
   empty: { color: theme.colors.muted },
+  taskControlsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  dueLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '600', marginTop: 14 },
+  dueRow: { flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' },
+  dueSave: { backgroundColor: theme.colors.navy, paddingHorizontal: 16, paddingVertical: 12, borderRadius: theme.radius.md },
+  dueError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
   messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   author: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
   deleteMessage: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },
