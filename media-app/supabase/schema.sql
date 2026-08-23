@@ -1034,6 +1034,25 @@ create policy media_versions_select on media_versions for select to authenticate
 drop policy if exists media_versions_insert on media_versions;
 create policy media_versions_insert on media_versions for insert to authenticated with check (true);
 
+-- Deletion is allowed ONLY for unattached Content Bank items (is_bank_item,
+-- never used in a content item's production history yet) — by its uploader
+-- or an admin. A media_versions row that belongs to a real content item has
+-- no delete policy at all, on purpose: Section 10 requires production
+-- version history to never be lost, so there is no path to delete one.
+drop policy if exists media_assets_delete on media_assets;
+create policy media_assets_delete on media_assets for delete to authenticated
+  using (is_bank_item and content_item_id is null and (is_admin(auth.uid()) or created_by = auth.uid()));
+
+drop policy if exists media_versions_delete on media_versions;
+create policy media_versions_delete on media_versions for delete to authenticated
+  using (
+    exists (
+      select 1 from media_assets ma
+      where ma.id = media_asset_id and ma.is_bank_item and ma.content_item_id is null
+        and (is_admin(auth.uid()) or ma.created_by = auth.uid())
+    )
+  );
+
 -- platform_posts / platform_post_media
 drop policy if exists platform_posts_select on platform_posts;
 create policy platform_posts_select on platform_posts for select to authenticated using (true);

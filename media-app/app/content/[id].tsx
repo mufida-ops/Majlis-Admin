@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { useContentEditor } from '@/lib/hooks/useContentEditor';
 import { colors, radii, spacing } from '@/constants/theme';
 import { StageBadge } from '@/components/StatusBadge';
 import { SaveIndicator } from '@/components/SaveIndicator';
-import { canEditContent } from '@/lib/permissions';
+import { canEditContent, canDeleteContent } from '@/lib/permissions';
+import { softDeleteContentItem, ConflictError } from '@/lib/repositories/contentItems';
 import { OverviewTab } from '@/components/content/OverviewTab';
 import { MediaTab } from '@/components/content/MediaTab';
 import { PlatformsTab } from '@/components/content/PlatformsTab';
@@ -33,10 +35,34 @@ export default function ContentDetail() {
 
   const ctx = { userId: session?.user.id ?? null, roles };
   const canEdit = canEditContent(ctx, item);
+  const canDelete = canDeleteContent(ctx);
+
+  function confirmDelete() {
+    Alert.alert('Delete this content?', `"${item!.title}" will be removed from the pipeline. This can't be undone from the app.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await softDeleteContentItem(item!.id, item!.version);
+            router.back();
+          } catch (err) {
+            Alert.alert('Could not delete', err instanceof ConflictError ? err.message : String(err));
+          }
+        }
+      }
+    ]);
+  }
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen options={{
+        title: '',
+        headerRight: canDelete ? () => (
+          <Pressable onPress={confirmDelete} hitSlop={10}>
+            <Feather name="trash-2" size={19} color={colors.danger} />
+          </Pressable>
+        ) : undefined
+      }} />
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
