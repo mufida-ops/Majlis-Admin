@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Majlis Media Studio",
+    "slug": "majlis-media-studio",
+    "owner": "mufidasaids-team",
+    "scheme": "majlismediastudio",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.majlisacademy.mediastudio"
+    },
+    "android": {
+      "package": "com.majlisacademy.mediastudio"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}
