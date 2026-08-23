@@ -1,7 +1,7 @@
 # Majlis Founder OS
 
-A mobile-first shared founder workspace for Mufida and Victoria: quick capture, shared projects, simple Gantt views,
-discussions, CRM, and asynchronous catch-up.
+A mobile-first shared founder workspace for Mufida and Victoria: quick capture, shared projects, discussions, CRM,
+and asynchronous catch-up.
 
 ## Core product rule
 
@@ -94,9 +94,10 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   since a project is joint work rather than one founder's or the other's; the owner tint stays exactly where it
   still makes sense, on individual task rows. A Done task also turns the same green there (overriding its owner
   tint the same way), and already sorts to the bottom of its group since `TASK_STATUSES` orders Done last.
-- A project's Gantt timeline is collapsed by default behind a "Show timeline (N tasks)" toggle, on both the
-  Projects list and the project detail page — a 59-task book project was rendering a bar per task and making the
-  card (and the page) enormous.
+- The Gantt/"Show timeline" view (`components/Gantt.tsx`) was removed. It rendered every task as a flat,
+  unordered, non-interactive bar — no section grouping, no owner colors, no edit/delete/flag — sitting right next
+  to the real Tasks card, which does all of that. It was reported as confusing rather than useful (mistaken for
+  the actual task list) and never served a workflow Mufida or Victoria used, so it's gone rather than fixed.
 - Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
   plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
   blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used
@@ -267,7 +268,7 @@ app/
   (tabs)/home.tsx           focus list, quiet-hours pill, catch-up entry
   (tabs)/drop.tsx           Give — capture, plain conversation with your co-founder, no AI
   (tabs)/ai.tsx             Your AI Assistant — a real conversation with AI; review/reclassify its suggestions inline
-  (tabs)/projects/          project list, detail (tasks, Gantt, next action)
+  (tabs)/projects/          project list, detail (tasks, next action)
   (tabs)/decisions.tsx      Discussions — decision log
   (tabs)/crm/               CRM list, detail (stage, notes, activity history)
   (tabs)/catch-up.tsx       changes since last_seen_at

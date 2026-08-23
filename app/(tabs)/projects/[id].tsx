@@ -7,7 +7,6 @@ import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Gantt, type GanttTask } from '@/components/Gantt';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
@@ -65,7 +64,6 @@ export default function ProjectDetailScreen() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [savingTitle, setSavingTitle] = useState(false);
-  const [timelineExpanded, setTimelineExpanded] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const toggleSection = (section: string) => {
@@ -84,15 +82,6 @@ export default function ProjectDetailScreen() {
   // still shows as not-Done (e.g. added after the fact) — the status pill
   // is the stronger signal.
   const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
-
-  const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
-    id: task.id,
-    title: task.title,
-    owner: memberLabel(task.owner_user_id, me, partner),
-    start: toDateInputValue(task.start_at ?? task.created_at),
-    end: toDateInputValue(task.due_at ?? task.start_at ?? task.created_at),
-    status: task.status
-  }));
 
   // Tinted by progress (red/amber/green), not by who created it — a
   // project is shared work, so an owner tint here answers the wrong
@@ -523,24 +512,6 @@ export default function ProjectDetailScreen() {
           </Text>
         </Pressable>
       </Card>
-
-      {ganttTasks.length > 0 ? (
-        <Card>
-          <View style={styles.titleEditRow}>
-            <Text style={[styles.label, { flex: 1 }]}>Timeline</Text>
-            <Pressable hitSlop={8} onPress={() => setTimelineExpanded(v => !v)}>
-              <Text style={styles.saveText}>
-                {timelineExpanded ? 'Hide' : `Show (${ganttTasks.length} task${ganttTasks.length === 1 ? '' : 's'})`}
-              </Text>
-            </Pressable>
-          </View>
-          {timelineExpanded ? (
-            <View style={{ marginTop: 14 }}>
-              <Gantt tasks={ganttTasks} />
-            </View>
-          ) : null}
-        </Card>
-      ) : null}
 
       <Card>
         <Text style={styles.label}>Tasks</Text>

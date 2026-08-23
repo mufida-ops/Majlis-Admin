@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
-import { Gantt, type GanttTask } from '@/components/Gantt';
 import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
@@ -13,7 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { listProjects, createProject, createBookProject, updateProject, deleteProject } from '@/lib/repositories/projects';
-import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
+import { summarizeOwners } from '@/lib/ownerLabel';
 import { toDateInputValue, formatShortDate, formatMonthYear } from '@/lib/format';
 import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
@@ -40,16 +39,6 @@ export default function ProjectsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
-  const [expandedTimelines, setExpandedTimelines] = useState<Set<string>>(new Set());
-
-  const toggleTimeline = (id: string) => {
-    setExpandedTimelines(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const create = async () => {
     if (!title.trim() || !workspaceId || !session) return;
@@ -139,14 +128,6 @@ export default function ProjectsScreen() {
           .filter(p => p.status !== 'Complete')
           .sort((a, b) => PRIORITY_LEVELS.indexOf(b.priority) - PRIORITY_LEVELS.indexOf(a.priority))
           .map(project => {
-          const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
-            id: task.id,
-            title: task.title,
-            owner: memberLabel(task.owner_user_id, me, partner),
-            start: toDateInputValue(task.start_at ?? task.created_at),
-            end: toDateInputValue(task.due_at ?? task.start_at ?? task.created_at),
-            status: task.status
-          }));
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
           const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
           const accent = PROJECT_STATUS_TINT[project.status];
@@ -206,22 +187,6 @@ export default function ProjectsScreen() {
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressBar, { width: `${progress}%` }]} />
                 </View>
-                {ganttTasks.length > 0 ? (
-                  <View style={{ marginTop: 12 }}>
-                    <Pressable hitSlop={8} onPress={() => toggleTimeline(project.id)}>
-                      <Text style={styles.timelineToggle}>
-                        {expandedTimelines.has(project.id)
-                          ? '▾ Hide timeline'
-                          : `▸ Show timeline (${ganttTasks.length} task${ganttTasks.length === 1 ? '' : 's'})`}
-                      </Text>
-                    </Pressable>
-                    {expandedTimelines.has(project.id) ? (
-                      <View style={{ marginTop: 12 }}>
-                        <Gantt tasks={ganttTasks} />
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
               </Card>
             </Pressable>
           );
@@ -348,7 +313,6 @@ const styles = StyleSheet.create({
   next: { color: theme.colors.text, marginTop: 12 },
   progressTrack: { height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, marginTop: 10, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
-  timelineToggle: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   monthGroup: { gap: 10 },
   monthLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
