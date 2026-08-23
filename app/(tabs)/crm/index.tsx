@@ -12,14 +12,14 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listOrganisations, createOrganisation, deleteOrganisation } from '@/lib/repositories/organisations';
-import { memberLabel } from '@/lib/ownerLabel';
+import { listOrganisations, createOrganisation, updateOrganisation, deleteOrganisation } from '@/lib/repositories/organisations';
+import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { formatRelative } from '@/lib/format';
 
 export default function CrmScreen() {
   const { session } = useAuth();
   const { workspaceId, me, partner } = useWorkspace();
-  const { data: organisations, loading, error, refresh } = useAsync(
+  const { data: organisations, loading, error, refresh, setData } = useAsync(
     () => (workspaceId ? listOrganisations(workspaceId) : Promise.resolve([])),
     [workspaceId]
   );
@@ -27,6 +27,9 @@ export default function CrmScreen() {
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const create = async () => {
     if (!name.trim() || !workspaceId || !session) return;
@@ -38,6 +41,29 @@ export default function CrmScreen() {
       refresh();
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEdit = (id: string, currentName: string) => {
+    setEditingId(id);
+    setEditName(currentName);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editName.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateOrganisation(id, { name: editName.trim() });
+      setData(prev => (prev ?? []).map(o => (o.id === id ? { ...o, ...updated } : o)));
+      setEditingId(null);
+      setEditName('');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -67,29 +93,53 @@ export default function CrmScreen() {
       ) : !organisations || organisations.length === 0 ? (
         <EmptyState label="No organisations yet. Add one below." />
       ) : (
-        organisations.map(account => (
-          <Pressable key={account.id} onPress={() => router.push(`/(tabs)/crm/${account.id}`)}>
-            <Card>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>{account.name}</Text>
-                  <Text style={styles.meta}>
-                    {account.stage}
-                    {account.contacts[0] ? ` · ${account.contacts[0].name}` : ''}
-                  </Text>
+        organisations.map(account => {
+          const accent = ownerAccentColor(account.owner_user_id, me, partner);
+          const isEditing = editingId === account.id;
+          return (
+            <Pressable key={account.id} onPress={() => !isEditing && router.push(`/(tabs)/crm/${account.id}`)}>
+              <Card style={accent ? { backgroundColor: accent } : undefined}>
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    {isEditing ? (
+                      <TextInput value={editName} onChangeText={setEditName} style={styles.editInput} autoFocus />
+                    ) : (
+                      <Text style={styles.title}>{account.name}</Text>
+                    )}
+                    <Text style={styles.meta}>
+                      {account.stage}
+                      {account.contacts[0] ? ` · ${account.contacts[0].name}` : ''}
+                    </Text>
+                  </View>
+                  {!isEditing ? <Pill label={memberLabel(account.owner_user_id, me, partner)} /> : null}
+                  {isEditing ? (
+                    <>
+                      <Pressable hitSlop={10} onPress={() => saveEdit(account.id)} disabled={savingEdit}>
+                        <Text style={styles.saveText}>{savingEdit ? '…' : 'Save'}</Text>
+                      </Pressable>
+                      <Pressable hitSlop={10} onPress={cancelEdit} disabled={savingEdit}>
+                        <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable hitSlop={10} onPress={() => startEdit(account.id, account.name)}>
+                        <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                      </Pressable>
+                      <Pressable hitSlop={10} onPress={() => confirmDelete(account.id, account.name)}>
+                        <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                      </Pressable>
+                    </>
+                  )}
                 </View>
-                <Pill label={memberLabel(account.owner_user_id, me, partner)} />
-                <Pressable hitSlop={10} onPress={() => confirmDelete(account.id, account.name)}>
-                  <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
-                </Pressable>
-              </View>
-              {account.next_action ? <Text style={styles.next}>Next: {account.next_action}</Text> : null}
-              <Text style={styles.last}>
-                {account.last_contact_at ? `Last contact: ${formatRelative(account.last_contact_at)}` : 'No contact logged yet'}
-              </Text>
-            </Card>
-          </Pressable>
-        ))
+                {account.next_action ? <Text style={styles.next}>Next: {account.next_action}</Text> : null}
+                <Text style={styles.last}>
+                  {account.last_contact_at ? `Last contact: ${formatRelative(account.last_contact_at)}` : 'No contact logged yet'}
+                </Text>
+              </Card>
+            </Pressable>
+          );
+        })
       )}
 
       {showNew ? (
@@ -121,8 +171,17 @@ export default function CrmScreen() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   title: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
+  editInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: 8,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background
+  },
+  saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   meta: { color: theme.colors.muted, marginTop: 4 },
   next: { color: theme.colors.text, marginTop: 14, lineHeight: 21 },
   last: { color: theme.colors.muted, marginTop: 5, fontSize: 13 },

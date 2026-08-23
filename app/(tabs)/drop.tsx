@@ -19,10 +19,11 @@ import { listOrganisations, createFollowUp } from '@/lib/repositories/organisati
 import { createDecision } from '@/lib/repositories/decisions';
 import { createEvent } from '@/lib/repositories/events';
 import { LinkPicker, GIVE_LINK_TARGETS, type LinkPickerResult } from '@/components/LinkPicker';
+import { ownerAccentColor } from '@/lib/ownerLabel';
 
 export default function DropScreen() {
   const { session } = useAuth();
-  const { workspaceId, partner } = useWorkspace();
+  const { workspaceId, me, partner } = useWorkspace();
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState('');
   const [saving, setSaving] = useState(false);
@@ -238,7 +239,7 @@ export default function DropScreen() {
                     </View>
                   </Card>
                 ) : (
-                  <Card key={drop.id}>
+                  <Card key={drop.id} style={{ backgroundColor: ownerAccentColor(drop.created_by, me, partner) ?? theme.colors.surface }}>
                     <View style={styles.sentHeader}>
                       <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text}</Text>
                       <View style={styles.sentIcons}>

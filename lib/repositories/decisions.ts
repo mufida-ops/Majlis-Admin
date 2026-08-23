@@ -32,6 +32,12 @@ export async function setDecisionStatus(id: string, status: DecisionStatus) {
   return unwrap(result) as DecisionRow;
 }
 
+export async function updateDecisionTitle(id: string, title: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('decisions').update({ title }).eq('id', id).select('*').single();
+  return unwrap(result) as DecisionRow;
+}
+
 export async function deleteDecision(id: string) {
   const supabase = requireSupabase();
   const result = await supabase.from('decisions').delete().eq('id', id);

@@ -54,6 +54,12 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   event" form (now dual-purpose) with its title/date/time/notes and switches its button to "Save changes"
   (`updateEvent`, already in `lib/repositories/events.ts` but unused until now). Each event card is tinted by who
   created it, the same `ownerAccentColor` scheme as task rows (pink for Victoria, purple for Mufida).
+- Every screen with user-created entries — Projects list, project titles, Discussions, CRM (list and detail
+  organisation name), and Give — supports inline edit and delete with the same confirm-before-delete pattern, and
+  every card is tinted by whoever owns/created it using the shared pink(Victoria)/purple(Mufida) scheme:
+  `ownerAccentColor` for entities with a `user_id` owner (projects, tasks, CRM organisations, Give, calendar
+  events), `ownerTypeAccentColor` for Discussions, whose `owner` field is `'Mufida' | 'Victoria' | 'Both'` directly
+  rather than a user id (returns no tint for `'Both'`, since it isn't either person's alone).
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs

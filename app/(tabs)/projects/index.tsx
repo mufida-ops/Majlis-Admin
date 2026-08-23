@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -11,8 +12,8 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listProjects, createProject } from '@/lib/repositories/projects';
-import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
+import { listProjects, createProject, updateProject, deleteProject } from '@/lib/repositories/projects';
+import { summarizeOwners, memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
 import { computeProjectProgress } from '@/lib/taskStatus';
@@ -20,7 +21,7 @@ import { computeProjectProgress } from '@/lib/taskStatus';
 export default function ProjectsScreen() {
   const { session } = useAuth();
   const { workspaceId, me, partner } = useWorkspace();
-  const { data: projects, loading, error, refresh } = useAsync(
+  const { data: projects, loading, error, refresh, setData } = useAsync(
     () => (workspaceId ? listProjects(workspaceId) : Promise.resolve([])),
     [workspaceId]
   );
@@ -28,6 +29,9 @@ export default function ProjectsScreen() {
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const create = async () => {
     if (!title.trim() || !workspaceId || !session) return;
@@ -40,6 +44,43 @@ export default function ProjectsScreen() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const startEdit = (id: string, currentTitle: string) => {
+    setEditingId(id);
+    setEditTitle(currentTitle);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editTitle.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateProject(id, { title: editTitle.trim() });
+      setData(prev => (prev ?? []).map(p => (p.id === id ? { ...p, ...updated } : p)));
+      setEditingId(null);
+      setEditTitle('');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const confirmDelete = (id: string, projectTitle: string) => {
+    Alert.alert(`Delete "${projectTitle}"?`, "This removes it and all its tasks. This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteProject(id);
+          setData(prev => (prev ?? []).filter(p => p.id !== id));
+        }
+      }
+    ]);
   };
 
   return (
@@ -69,18 +110,51 @@ export default function ProjectsScreen() {
           }));
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
           const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
+          const accent = ownerAccentColor(project.created_by, me, partner);
+          const isEditing = editingId === project.id;
 
           return (
-            <Pressable key={project.id} onPress={() => router.push(`/(tabs)/projects/${project.id}`)}>
-              <Card style={{ borderLeftWidth: 4, borderLeftColor: PRIORITY_COLOR[project.priority] }}>
+            <Pressable key={project.id} onPress={() => !isEditing && router.push(`/(tabs)/projects/${project.id}`)}>
+              <Card
+                style={{
+                  borderLeftWidth: 4,
+                  borderLeftColor: PRIORITY_COLOR[project.priority],
+                  backgroundColor: accent ?? theme.colors.surface
+                }}
+              >
                 <View style={styles.row}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.title}>{project.title}</Text>
+                    {isEditing ? (
+                      <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.editInput} autoFocus />
+                    ) : (
+                      <Text style={styles.title}>{project.title}</Text>
+                    )}
                     <Text style={styles.meta}>
                       {ownerLabel} · {project.status}
                     </Text>
                   </View>
-                  <Text style={styles.progress}>{progress}%</Text>
+                  {isEditing ? (
+                    <View style={styles.iconRow}>
+                      <Pressable hitSlop={10} onPress={() => saveEdit(project.id)} disabled={savingEdit}>
+                        <Text style={styles.saveText}>{savingEdit ? '…' : 'Save'}</Text>
+                      </Pressable>
+                      <Pressable hitSlop={10} onPress={cancelEdit} disabled={savingEdit}>
+                        <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.progress}>{progress}%</Text>
+                      <View style={styles.iconRow}>
+                        <Pressable hitSlop={10} onPress={() => startEdit(project.id, project.title)}>
+                          <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                        <Pressable hitSlop={10} onPress={() => confirmDelete(project.id, project.title)}>
+                          <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                      </View>
+                    </>
+                  )}
                 </View>
                 <View style={styles.priorityChip}>
                   <View style={[styles.priorityDot, { backgroundColor: PRIORITY_COLOR[project.priority] }]} />
@@ -134,6 +208,18 @@ export default function ProjectsScreen() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   title: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
+  editInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: 8,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background,
+    fontSize: 18,
+    fontWeight: '600'
+  },
+  saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
+  iconRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   meta: { color: theme.colors.muted, marginTop: 4, fontSize: 13 },
   progress: { color: theme.colors.navy, fontWeight: '700' },
   priorityChip: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },

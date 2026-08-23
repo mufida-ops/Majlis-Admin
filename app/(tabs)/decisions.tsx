@@ -11,7 +11,8 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listDecisions, createDecision, setDecisionStatus, deleteDecision } from '@/lib/repositories/decisions';
+import { listDecisions, createDecision, setDecisionStatus, updateDecisionTitle, deleteDecision } from '@/lib/repositories/decisions';
+import { ownerTypeAccentColor } from '@/lib/ownerLabel';
 import { formatShortDate } from '@/lib/format';
 import type { OwnerType } from '@/types/db';
 
@@ -29,10 +30,36 @@ export default function DecisionsScreen() {
   const [title, setTitle] = useState('');
   const [owner, setOwner] = useState<OwnerType>('Both');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const update = async (id: string, status: 'Agreed' | 'Discuss') => {
     const updated = await setDecisionStatus(id, status);
     setData(prev => (prev ?? []).map(d => (d.id === id ? updated : d)));
+  };
+
+  const startEdit = (id: string, currentTitle: string) => {
+    setEditingId(id);
+    setEditTitle(currentTitle);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editTitle.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateDecisionTitle(id, editTitle.trim());
+      setData(prev => (prev ?? []).map(d => (d.id === id ? updated : d)));
+      setEditingId(null);
+      setEditTitle('');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const confirmDelete = (id: string, title: string) => {
@@ -74,36 +101,60 @@ export default function DecisionsScreen() {
       ) : !decisions || decisions.length === 0 ? (
         <EmptyState label="No discussions logged yet." />
       ) : (
-        decisions.map(item => (
-          <Card key={item.id}>
-            <View style={styles.headerRow}>
-              <Text style={styles.meta}>{formatShortDate(item.created_at)}</Text>
-              <Pressable hitSlop={10} onPress={() => confirmDelete(item.id, item.title)}>
-                <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
-              </Pressable>
-            </View>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.status}>{item.status}</Text>
-            <View style={styles.actions}>
-              {item.status === 'Waiting' ? (
+        decisions.map(item => {
+          const accent = ownerTypeAccentColor(item.owner);
+          return (
+            <Card key={item.id} style={accent ? { backgroundColor: accent } : undefined}>
+              <View style={styles.headerRow}>
+                <Text style={styles.meta}>{formatShortDate(item.created_at)}</Text>
+                <View style={styles.iconRow}>
+                  <Pressable hitSlop={10} onPress={() => startEdit(item.id, item.title)}>
+                    <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                  </Pressable>
+                  <Pressable hitSlop={10} onPress={() => confirmDelete(item.id, item.title)}>
+                    <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                  </Pressable>
+                </View>
+              </View>
+              {editingId === item.id ? (
                 <>
-                  <Pressable style={styles.primary} onPress={() => update(item.id, 'Agreed')}>
-                    <Text style={styles.primaryText}>Agree</Text>
-                  </Pressable>
-                  <Pressable style={styles.secondary} onPress={() => update(item.id, 'Discuss')}>
-                    <Text style={styles.secondaryText}>Discuss</Text>
-                  </Pressable>
+                  <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.input} autoFocus />
+                  <View style={styles.buttons}>
+                    <Pressable style={styles.primary} onPress={() => saveEdit(item.id)} disabled={savingEdit}>
+                      <Text style={styles.primaryText}>{savingEdit ? 'Saving…' : 'Save'}</Text>
+                    </Pressable>
+                    <Pressable style={styles.secondary} onPress={cancelEdit} disabled={savingEdit}>
+                      <Text style={styles.secondaryText}>Cancel</Text>
+                    </Pressable>
+                  </View>
                 </>
-              ) : null}
-              <Pressable
-                style={styles.secondary}
-                onPress={() => router.push({ pathname: '/thread', params: { kind: 'decision', id: item.id, title: item.title } })}
-              >
-                <Text style={styles.secondaryText}>Thread</Text>
-              </Pressable>
-            </View>
-          </Card>
-        ))
+              ) : (
+                <>
+                  <Text style={styles.title}>{item.title}</Text>
+                  <Text style={styles.status}>{item.status}</Text>
+                  <View style={styles.actions}>
+                    {item.status === 'Waiting' ? (
+                      <>
+                        <Pressable style={styles.primary} onPress={() => update(item.id, 'Agreed')}>
+                          <Text style={styles.primaryText}>Agree</Text>
+                        </Pressable>
+                        <Pressable style={styles.secondary} onPress={() => update(item.id, 'Discuss')}>
+                          <Text style={styles.secondaryText}>Discuss</Text>
+                        </Pressable>
+                      </>
+                    ) : null}
+                    <Pressable
+                      style={styles.secondary}
+                      onPress={() => router.push({ pathname: '/thread', params: { kind: 'decision', id: item.id, title: item.title } })}
+                    >
+                      <Text style={styles.secondaryText}>Thread</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </Card>
+          );
+        })
       )}
 
       {showNew ? (
@@ -143,6 +194,7 @@ export default function DecisionsScreen() {
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  iconRow: { flexDirection: 'row', gap: 14 },
   meta: { color: theme.colors.muted, fontSize: 13 },
   title: { color: theme.colors.text, fontSize: 17, fontWeight: '600', marginTop: 7, lineHeight: 23 },
   status: { color: theme.colors.gold, fontWeight: '700', marginTop: 10 },

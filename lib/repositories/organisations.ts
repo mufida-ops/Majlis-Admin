@@ -35,7 +35,7 @@ export async function createOrganisation(input: {
 export async function updateOrganisation(
   id: string,
   patch: Partial<
-    Pick<OrganisationRow, 'stage' | 'owner_user_id' | 'next_action' | 'next_action_at' | 'notes' | 'last_contact_at'>
+    Pick<OrganisationRow, 'name' | 'stage' | 'owner_user_id' | 'next_action' | 'next_action_at' | 'notes' | 'last_contact_at'>
   >
 ) {
   const supabase = requireSupabase();

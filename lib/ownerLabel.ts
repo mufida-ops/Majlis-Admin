@@ -1,9 +1,16 @@
 import { theme } from '@/constants/theme';
-import type { WorkspaceMember } from '@/types/db';
+import type { OwnerType, WorkspaceMember } from '@/types/db';
 
 // One color per person, matched by name (Mufida's own request: her tasks
 // are purple, Victoria's are pink) rather than by sign-in order, so it's
 // the same regardless of which of the two founders is looking at the screen.
+function colorForName(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.includes('mufida')) return theme.colors.ownerPurple;
+  if (lower.includes('victoria')) return theme.colors.ownerPink;
+  return null;
+}
+
 export function ownerAccentColor(
   userId: string | null | undefined,
   me: WorkspaceMember | null,
@@ -11,11 +18,15 @@ export function ownerAccentColor(
 ): string | null {
   if (!userId) return null;
   const owner = [me, partner].find(m => m?.user_id === userId);
-  if (!owner) return null;
-  const name = owner.display_name.toLowerCase();
-  if (name.includes('mufida')) return theme.colors.ownerPurple;
-  if (name.includes('victoria')) return theme.colors.ownerPink;
-  return null;
+  return owner ? colorForName(owner.display_name) : null;
+}
+
+// Same scheme, for entities (like decisions) that store a plain
+// 'Mufida' | 'Victoria' | 'Both' owner rather than a user_id — 'Both'
+// intentionally gets no tint since it isn't either person's alone.
+export function ownerTypeAccentColor(owner: OwnerType | null | undefined): string | null {
+  if (!owner || owner === 'Both') return null;
+  return colorForName(owner);
 }
 
 function withIcon(member: WorkspaceMember): string {

@@ -7,15 +7,17 @@ import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
+import { Ionicons } from '@expo/vector-icons';
 import {
   getOrganisation,
   updatePipelineStage,
+  updateOrganisation,
   addCrmNote,
   createFollowUp,
   deleteOrganisation
 } from '@/lib/repositories/organisations';
 import { listActivityForOrganisation } from '@/lib/repositories/activity';
-import { memberLabel } from '@/lib/ownerLabel';
+import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { formatRelative, formatShortDate } from '@/lib/format';
 
 const STAGES = ['Lead', 'Contacted', 'Meeting Booked', 'Proposal Sent', 'Negotiating', 'Won', 'Onboarding', 'Active Partner', 'Follow-up'];
@@ -33,15 +35,36 @@ export default function OrganisationDetailScreen() {
   const [followUp, setFollowUp] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   if (loading) return <LoadingState label="Loading organisation…" />;
   if (error || !org) return <ErrorState message={error ?? 'Not found.'} onRetry={refresh} />;
 
   const isOverdue = org.next_action_at && new Date(org.next_action_at).getTime() < Date.now();
+  const accent = ownerAccentColor(org.owner_user_id, me, partner);
 
   const changeStage = async (stage: string) => {
     const updated = await updatePipelineStage(org.id, stage);
     setData({ ...org, ...updated });
+  };
+
+  const startEditName = () => {
+    setEditingName(true);
+    setNameDraft(org.name);
+  };
+
+  const saveName = async () => {
+    if (!nameDraft.trim()) return;
+    setSavingName(true);
+    try {
+      const updated = await updateOrganisation(org.id, { name: nameDraft.trim() });
+      setData({ ...org, ...updated });
+      setEditingName(false);
+    } finally {
+      setSavingName(false);
+    }
   };
 
   const saveNote = async () => {
@@ -88,7 +111,28 @@ export default function OrganisationDetailScreen() {
     <Screen>
       <Stack.Screen options={{ title: org.name }} />
 
-      <Card>
+      <Card style={accent ? { backgroundColor: accent } : undefined}>
+        {editingName ? (
+          <View style={styles.nameEditRow}>
+            <TextInput value={nameDraft} onChangeText={setNameDraft} style={[styles.input, { flex: 1, marginTop: 0 }]} autoFocus />
+            <Pressable hitSlop={10} onPress={saveName} disabled={savingName}>
+              <Text style={styles.saveText}>{savingName ? '…' : 'Save'}</Text>
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => setEditingName(false)} disabled={savingName}>
+              <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.nameEditRow}>
+            <Text style={[styles.label, { flex: 1, fontSize: 18 }]}>{org.name}</Text>
+            <Pressable hitSlop={10} onPress={startEditName}>
+              <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          </View>
+        )}
+      </Card>
+
+      <Card style={accent ? { backgroundColor: accent } : undefined}>
         <Text style={styles.label}>Stage</Text>
         <View style={styles.stageRow}>
           {STAGES.map(stage => (
@@ -176,6 +220,8 @@ export default function OrganisationDetailScreen() {
 
 const styles = StyleSheet.create({
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
+  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   body: { color: theme.colors.text, marginTop: 8, lineHeight: 21 },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },
   stageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },

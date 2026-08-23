@@ -46,6 +46,9 @@ export default function ProjectDetailScreen() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
   const [savingTaskEdit, setSavingTaskEdit] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [savingTitle, setSavingTitle] = useState(false);
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -63,6 +66,25 @@ export default function ProjectDetailScreen() {
     end: toDateInputValue(task.due_at ?? task.start_at ?? task.created_at),
     status: task.status
   }));
+
+  const projectAccent = ownerAccentColor(project.created_by, me, partner);
+
+  const startEditTitle = () => {
+    setEditingTitle(true);
+    setTitleDraft(project.title);
+  };
+
+  const saveTitle = async () => {
+    if (!titleDraft.trim()) return;
+    setSavingTitle(true);
+    try {
+      const updated = await updateProject(project.id, { title: titleDraft.trim() });
+      setData({ ...project, ...updated });
+      setEditingTitle(false);
+    } finally {
+      setSavingTitle(false);
+    }
+  };
 
   const changeStatus = async (status: ProjectStatus) => {
     const updated = await setProjectStatus(project.id, status);
@@ -181,6 +203,27 @@ export default function ProjectDetailScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: project.title }} />
+
+      <Card style={projectAccent ? { backgroundColor: projectAccent } : undefined}>
+        {editingTitle ? (
+          <View style={styles.titleEditRow}>
+            <TextInput value={titleDraft} onChangeText={setTitleDraft} style={[styles.input, { flex: 1, marginTop: 0 }]} autoFocus />
+            <Pressable hitSlop={10} onPress={saveTitle} disabled={savingTitle}>
+              <Text style={styles.saveText}>{savingTitle ? '…' : 'Save'}</Text>
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => setEditingTitle(false)} disabled={savingTitle}>
+              <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.titleEditRow}>
+            <Text style={[styles.label, { flex: 1, fontSize: 18 }]}>{project.title}</Text>
+            <Pressable hitSlop={10} onPress={startEditTitle}>
+              <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          </View>
+        )}
+      </Card>
 
       <View style={styles.statusRow}>
         {STATUSES.map(status => (
@@ -356,6 +399,8 @@ export default function ProjectDetailScreen() {
 
 const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  titleEditRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   nextAction: { color: theme.colors.text, marginTop: 8, lineHeight: 21 },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 4 },
