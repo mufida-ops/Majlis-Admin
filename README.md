@@ -50,6 +50,10 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   `log_task_activity`'s trigger already writes on every status/owner/due-date change, not a separate log the
   client has to maintain. Projects and Discussions both have delete buttons too (`deleteProject`/`deleteDecision`),
   matching the confirm-and-remove pattern CRM organisations already had.
+- Calendar events are editable, not just create-and-delete — tapping "Edit" on an event repopulates the same "New
+  event" form (now dual-purpose) with its title/date/time/notes and switches its button to "Save changes"
+  (`updateEvent`, already in `lib/repositories/events.ts` but unused until now). Each event card is tinted by who
+  created it, the same `ownerAccentColor` scheme as task rows (pink for Victoria, purple for Mufida).
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs

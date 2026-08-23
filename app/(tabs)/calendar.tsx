@@ -10,8 +10,8 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listEvents, createEvent, deleteEvent } from '@/lib/repositories/events';
-import { memberLabel } from '@/lib/ownerLabel';
+import { listEvents, createEvent, updateEvent, deleteEvent } from '@/lib/repositories/events';
+import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { formatTime, localDateKey } from '@/lib/format';
 import { syncEventReminders } from '@/lib/notifications';
 import type { EventRow } from '@/types/db';
@@ -21,6 +21,11 @@ const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 function dateHeader(dateKey: string): string {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function toTimeInputValue(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 const MONTH_LABEL_FMT = new Intl.DateTimeFormat([], { month: 'long', year: 'numeric' });
@@ -47,6 +52,7 @@ export default function CalendarScreen() {
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   useEffect(() => {
     // The website build doesn't get reliable reminder buzzes (a browser
@@ -86,7 +92,26 @@ export default function CalendarScreen() {
     });
   };
 
-  const create = async () => {
+  const resetForm = () => {
+    setTitle('');
+    setTime('');
+    setDescription('');
+    setAllDay(false);
+    setDate(localDateKey());
+    setEditingEventId(null);
+  };
+
+  const startEdit = (event: EventRow) => {
+    setEditingEventId(event.id);
+    setTitle(event.title);
+    setDate(localDateKey(new Date(event.start_at)));
+    setTime(event.all_day ? '' : toTimeInputValue(event.start_at));
+    setAllDay(event.all_day);
+    setDescription(event.description ?? '');
+    setFormError('');
+  };
+
+  const save = async () => {
     setFormError('');
     if (!title.trim() || !workspaceId || !session) return;
     if (!DATE_RE.test(date)) {
@@ -104,19 +129,24 @@ export default function CalendarScreen() {
     }
     setCreating(true);
     try {
-      await createEvent({
-        workspace_id: workspaceId,
-        title: title.trim(),
-        description: description.trim() || null,
-        start_at: startAt.toISOString(),
-        all_day: allDay,
-        created_by: session.user.id
-      });
-      setTitle('');
-      setTime('');
-      setDescription('');
-      setAllDay(false);
-      setDate(localDateKey());
+      if (editingEventId) {
+        await updateEvent(editingEventId, {
+          title: title.trim(),
+          description: description.trim() || null,
+          start_at: startAt.toISOString(),
+          all_day: allDay
+        });
+      } else {
+        await createEvent({
+          workspace_id: workspaceId,
+          title: title.trim(),
+          description: description.trim() || null,
+          start_at: startAt.toISOString(),
+          all_day: allDay,
+          created_by: session.user.id
+        });
+      }
+      resetForm();
       refresh();
     } finally {
       setCreating(false);
@@ -137,22 +167,30 @@ export default function CalendarScreen() {
     ]);
   };
 
-  const eventCard = (event: EventRow) => (
-    <Card key={event.id}>
-      <View style={styles.eventRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.meta}>
-            {event.all_day ? 'All day' : formatTime(event.start_at)} · {memberLabel(event.created_by, me, partner)}
-          </Text>
-          {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
+  const eventCard = (event: EventRow) => {
+    const accent = ownerAccentColor(event.created_by, me, partner);
+    return (
+      <Card key={event.id} style={accent ? { backgroundColor: accent } : undefined}>
+        <View style={styles.eventRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.meta}>
+              {event.all_day ? 'All day' : formatTime(event.start_at)} · {memberLabel(event.created_by, me, partner)}
+            </Text>
+            {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
+          </View>
+          <View style={styles.eventActions}>
+            <Pressable hitSlop={10} onPress={() => startEdit(event)}>
+              <Text style={styles.edit}>Edit</Text>
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => confirmDelete(event)}>
+              <Text style={styles.delete}>Delete</Text>
+            </Pressable>
+          </View>
         </View>
-        <Pressable hitSlop={10} onPress={() => confirmDelete(event)}>
-          <Text style={styles.delete}>Delete</Text>
-        </Pressable>
-      </View>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   return (
     <Screen>
@@ -220,7 +258,7 @@ export default function CalendarScreen() {
       )}
 
       <Card>
-        <Text style={styles.label}>New event</Text>
+        <Text style={styles.label}>{editingEventId ? 'Edit event' : 'New event'}</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -259,9 +297,16 @@ export default function CalendarScreen() {
           style={[styles.input, { minHeight: 60 }]}
         />
         {formError ? <Text style={styles.error}>{formError}</Text> : null}
-        <Pressable style={styles.primary} onPress={create} disabled={creating || !title.trim()}>
-          <Text style={styles.primaryText}>{creating ? 'Adding…' : '+ Add event'}</Text>
-        </Pressable>
+        <View style={styles.formButtons}>
+          <Pressable style={styles.primary} onPress={save} disabled={creating || !title.trim()}>
+            <Text style={styles.primaryText}>{creating ? 'Saving…' : editingEventId ? 'Save changes' : '+ Add event'}</Text>
+          </Pressable>
+          {editingEventId ? (
+            <Pressable style={styles.secondary} onPress={resetForm}>
+              <Text style={styles.secondaryText}>Cancel</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.reminderNote}>You'll get a reminder on this phone — 30 minutes before a timed event, or 9am for an all-day one.</Text>
       </Card>
     </Screen>
@@ -284,6 +329,8 @@ const styles = StyleSheet.create({
   eventTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 4 },
   description: { color: theme.colors.text, marginTop: 8, lineHeight: 20 },
+  eventActions: { flexDirection: 'row', gap: 14 },
+  edit: { color: theme.colors.navy, fontSize: 12, fontWeight: '600' },
   delete: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   fieldLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
@@ -299,7 +346,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background
   },
   error: { color: theme.colors.danger, marginTop: 12 },
-  primary: { backgroundColor: theme.colors.navy, padding: 14, borderRadius: theme.radius.md, alignItems: 'center', marginTop: 14 },
+  formButtons: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  primary: { flex: 1, backgroundColor: theme.colors.navy, padding: 14, borderRadius: theme.radius.md, alignItems: 'center' },
   primaryText: { color: '#fff', fontWeight: '600' },
+  secondary: { borderWidth: 1, borderColor: theme.colors.border, padding: 14, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { color: theme.colors.text, fontWeight: '600' },
   reminderNote: { color: theme.colors.muted, fontSize: 12, marginTop: 12, lineHeight: 17 }
 });
