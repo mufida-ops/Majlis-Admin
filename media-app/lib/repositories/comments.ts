@@ -59,3 +59,13 @@ export async function postComment(input: {
 
   return comment;
 }
+
+export async function updateComment(id: string, body: string) {
+  const { error } = await db().from('comments').update({ body, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteComment(id: string) {
+  const { error } = await db().from('comments').delete().eq('id', id);
+  if (error) throw error;
+}
