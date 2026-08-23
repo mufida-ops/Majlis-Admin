@@ -8,8 +8,3 @@ export const PRIORITY_COLOR: Record<PriorityLevel, string> = {
   Medium: theme.colors.gold,
   High: theme.colors.danger
 };
-
-export function nextPriority(current: PriorityLevel): PriorityLevel {
-  const i = PRIORITY_LEVELS.indexOf(current);
-  return PRIORITY_LEVELS[(i + 1) % PRIORITY_LEVELS.length];
-}

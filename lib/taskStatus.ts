@@ -6,8 +6,8 @@ export const TASK_STATUSES: TaskStatus[] = ['Not Started', 'Started', 'Ongoing',
 // Display order for grouping task lists — once a task has started it moves
 // up above the not-yet-started ones, since that's the work actually moving,
 // with Done sinking to the bottom. TASK_STATUSES itself stays in lifecycle
-// order (Not Started → … → Done) for pickers and the cycling status badge,
-// where that's the order that makes sense to pick from.
+// order (Not Started → … → Done) for the status picker, where that's the
+// order that makes sense to pick from.
 export const TASK_STATUS_DISPLAY_ORDER: TaskStatus[] = ['Started', 'Ongoing', 'Not Started', 'Done'];
 
 // Every task counts equally toward its project's progress — no manual
@@ -32,8 +32,3 @@ export const TASK_STATUS_COLOR: Record<TaskStatus, string> = {
   Ongoing: theme.colors.gold,
   Done: theme.colors.success
 };
-
-export function nextTaskStatus(current: TaskStatus): TaskStatus {
-  const i = TASK_STATUSES.indexOf(current);
-  return TASK_STATUSES[(i + 1) % TASK_STATUSES.length];
-}

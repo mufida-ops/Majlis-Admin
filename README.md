@@ -98,10 +98,14 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
 - Task groups within a project display in `TASK_STATUS_DISPLAY_ORDER` (`lib/taskStatus.ts`) — Started and Ongoing
   first, then Not Started, then Done last — not the lifecycle order tasks move through. A task that's actually
   being worked on should sit above ones that haven't started yet, not below them; `TASK_STATUSES` itself stays in
-  lifecycle order for the status picker and the cycling badge, where that order is the one that makes sense to
-  pick from. The status dot also carries no color judgment before a task has started (Not Started stays neutral
-  grey) — amber kicks in once it's Started or Ongoing, green on Done, the same red-less progression used for
-  projects.
+  lifecycle order for the status picker, where that order is the one that makes sense to pick from. The status dot
+  also carries no color judgment before a task has started (Not Started stays neutral grey) — amber kicks in once
+  it's Started or Ongoing, green on Done, the same red-less progression used for projects.
+- `StatusBadge` and `PriorityBadge` (the compact pills on each task row) are real dropdowns now, not cycle-on-tap.
+  The chevron on them always looked like a dropdown, but tapping actually just advanced one step — and since
+  tasks are grouped by status, a successful tap instantly relocated the row into a different group, reading as
+  "the dropdown isn't working." Tapping now opens all the options directly (an absolutely-positioned menu under
+  the pill) and picking one both commits and closes it.
 - The Gantt/"Show timeline" view (`components/Gantt.tsx`) was removed. It rendered every task as a flat,
   unordered, non-interactive bar — no section grouping, no owner colors, no edit/delete/flag — sitting right next
   to the real Tasks card, which does all of that. It was reported as confusing rather than useful (mistaken for
