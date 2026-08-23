@@ -433,7 +433,6 @@ export default function ProjectDetailScreen() {
                       ]}
                     >
                       <Pressable
-                        style={{ flex: 1 }}
                         onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
                       >
                         <Text style={styles.taskTitle}>{task.title}</Text>
@@ -563,11 +562,8 @@ const styles = StyleSheet.create({
   // (a hairline divider between them, not a gap), and the owner's color
   // fills the whole row rather than just a badge or edge accent.
   taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border
@@ -581,6 +577,8 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border
   },
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
+  // Its own row below the title, not squeezed beside it — a long task
+  // title used to force this into a narrow column and wrap badly.
   taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   taskError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
