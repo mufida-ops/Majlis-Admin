@@ -18,6 +18,7 @@ import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import { PRIORITY_LEVELS } from '@/lib/priority';
+import { PROJECT_STATUS_TINT } from '@/lib/projectStatus';
 import { BOOK_SECTIONS } from '@/lib/bookTemplate';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
@@ -93,7 +94,10 @@ export default function ProjectDetailScreen() {
     status: task.status
   }));
 
-  const projectAccent = ownerAccentColor(project.created_by, me, partner);
+  // Tinted by progress (red/amber/green), not by who created it — a
+  // project is shared work, so an owner tint here answers the wrong
+  // question (unlike individual tasks, which do belong to one person).
+  const projectAccent = PROJECT_STATUS_TINT[project.status];
 
   const startEditTitle = () => {
     setEditingTitle(true);
@@ -291,7 +295,9 @@ export default function ProjectDetailScreen() {
   };
 
   const renderTaskRow = (task: ProjectTaskRow) => {
-    const accent = ownerAccentColor(task.owner_user_id, me, partner);
+    // Done overrides the owner tint with green — "finished" is a stronger,
+    // more useful signal at a glance than whose task it was.
+    const accent = task.status === 'Done' ? theme.colors.completedGreen : ownerAccentColor(task.owner_user_id, me, partner);
     if (editingTaskId === task.id) {
       return (
         <View key={task.id} style={[styles.taskRowEditing, { backgroundColor: accent ?? theme.colors.background }]}>
@@ -343,10 +349,7 @@ export default function ProjectDetailScreen() {
       );
     }
     return (
-      <View
-        key={task.id}
-        style={[styles.taskRow, { backgroundColor: accent ?? theme.colors.background }, task.status === 'Done' && styles.taskRowDone]}
-      >
+      <View key={task.id} style={[styles.taskRow, { backgroundColor: accent ?? theme.colors.background }]}>
         <Pressable onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}>
           <Text style={styles.taskTitle}>{task.title}</Text>
           <Text style={styles.meta}>
@@ -419,7 +422,7 @@ export default function ProjectDetailScreen() {
     <Screen>
       <Stack.Screen options={{ title: project.title }} />
 
-      <Card style={projectAccent ? { backgroundColor: projectAccent } : undefined}>
+      <Card style={{ backgroundColor: projectAccent }}>
         {editingTitle ? (
           <View style={styles.titleEditRow}>
             <TextInput value={titleDraft} onChangeText={setTitleDraft} style={[styles.input, { flex: 1, marginTop: 0 }]} autoFocus />
@@ -666,7 +669,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border
   },
-  taskRowDone: { opacity: 0.6 },
   needsReview: { color: theme.colors.danger, fontSize: 12, fontWeight: '700', marginTop: 4 },
   taskRowEditing: {
     paddingVertical: 12,

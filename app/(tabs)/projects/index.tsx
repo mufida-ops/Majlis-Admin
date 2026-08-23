@@ -13,10 +13,11 @@ import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { listProjects, createProject, createBookProject, updateProject, deleteProject } from '@/lib/repositories/projects';
-import { summarizeOwners, memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
+import { summarizeOwners, memberLabel } from '@/lib/ownerLabel';
 import { toDateInputValue, formatShortDate, formatMonthYear } from '@/lib/format';
 import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
+import { PROJECT_STATUS_TINT } from '@/lib/projectStatus';
 import { computeProjectProgress } from '@/lib/taskStatus';
 
 export default function ProjectsScreen() {
@@ -148,7 +149,7 @@ export default function ProjectsScreen() {
           }));
           const ownerLabel = summarizeOwners(project.project_tasks.map(t => t.owner_user_id), me, partner);
           const progress = project.status === 'Complete' ? 100 : computeProjectProgress(project.project_tasks);
-          const accent = ownerAccentColor(project.created_by, me, partner);
+          const accent = PROJECT_STATUS_TINT[project.status];
           const isEditing = editingId === project.id;
 
           return (
