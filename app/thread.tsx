@@ -11,9 +11,10 @@ import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { getOrCreateThread, listMessages, postMessage, deleteMessage } from '@/lib/repositories/threads';
 import { getTask, updateTask } from '@/lib/repositories/projects';
+import { listActivityForTask } from '@/lib/repositories/activity';
 import { memberLabel } from '@/lib/ownerLabel';
 import { formatTime, formatShortDate, toDateInputValue } from '@/lib/format';
-import type { MessageRow, ThreadRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
+import type { MessageRow, ThreadRow, ProjectTaskRow, TaskStatus, PriorityLevel, ActivityEventRow } from '@/types/db';
 
 type ThreadKind = 'project' | 'task' | 'organisation' | 'decision';
 
@@ -38,6 +39,7 @@ export default function ThreadScreen() {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [task, setTask] = useState<ProjectTaskRow | null>(null);
+  const [taskHistory, setTaskHistory] = useState<ActivityEventRow[]>([]);
   const [dueDateDraft, setDueDateDraft] = useState('');
   const [savingDueDate, setSavingDueDate] = useState(false);
   const [dueDateError, setDueDateError] = useState('');
@@ -48,14 +50,16 @@ export default function ThreadScreen() {
     setError(null);
     try {
       const column = anchorColumn[params.kind];
-      const [t, taskRow] = await Promise.all([
+      const [t, taskRow, history] = await Promise.all([
         getOrCreateThread(workspaceId, { [column]: params.id } as never),
-        params.kind === 'task' ? getTask(params.id) : Promise.resolve(null)
+        params.kind === 'task' ? getTask(params.id) : Promise.resolve(null),
+        params.kind === 'task' ? listActivityForTask(params.id) : Promise.resolve([])
       ]);
       setThread(t);
       const msgs = await listMessages(t.id);
       setMessages(msgs);
       setTask(taskRow);
+      setTaskHistory(history);
       setDueDateDraft(taskRow?.due_at ? toDateInputValue(taskRow.due_at) : '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this thread.');
@@ -91,6 +95,7 @@ export default function ThreadScreen() {
     if (!task) return;
     const updated = await updateTask(task.id, { status });
     setTask(updated);
+    listActivityForTask(task.id).then(setTaskHistory).catch(() => {});
   };
 
   const changeTaskPriority = async (priority: PriorityLevel) => {
@@ -167,6 +172,16 @@ export default function ThreadScreen() {
                   </Pressable>
                 </View>
                 {dueDateError ? <Text style={styles.dueError}>{dueDateError}</Text> : null}
+                {taskHistory.length > 0 ? (
+                  <View style={styles.history}>
+                    <Text style={styles.dueLabel}>History</Text>
+                    {taskHistory.map(event => (
+                      <Text key={event.id} style={styles.historyLine}>
+                        {formatShortDate(event.created_at)} {formatTime(event.created_at)} — {event.summary}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </Card>
             ) : null}
             {messages.length === 0 ? (
@@ -217,6 +232,8 @@ const styles = StyleSheet.create({
   dueRow: { flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' },
   dueSave: { backgroundColor: theme.colors.navy, paddingHorizontal: 16, paddingVertical: 12, borderRadius: theme.radius.md },
   dueError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
+  history: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  historyLine: { color: theme.colors.muted, fontSize: 12, marginTop: 6 },
   messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   author: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
   deleteMessage: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },

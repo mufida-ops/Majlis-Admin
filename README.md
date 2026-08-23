@@ -42,6 +42,14 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   adds the enum value hits Postgres's "unsafe use of new value" restriction. The Projects list sorts by priority
   (High first) and shows a colored "High/Medium/Low priority" chip per card — the left-edge color accent alone was
   too easy to miss.
+- Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
+  plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
+  blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used
+  everywhere else. Opening a task's own discussion (`app/thread.tsx`) also shows its status-change history —
+  "Started" and when, "moved to Ongoing" and when, etc — read straight from the `activity_events` log that
+  `log_task_activity`'s trigger already writes on every status/owner/due-date change, not a separate log the
+  client has to maintain. Projects and Discussions both have delete buttons too (`deleteProject`/`deleteDecision`),
+  matching the confirm-and-remove pattern CRM organisations already had.
 - Quiet hours: each member sets their own quiet hours in `app/settings.tsx`; Home and Give reflect the partner's
   real quiet-hours state (`lib/quietHours.ts`).
 - Catch-up: `app/(tabs)/catch-up.tsx` reads everything that changed since your `last_seen_at`, split into "Needs

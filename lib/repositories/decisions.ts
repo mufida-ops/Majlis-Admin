@@ -31,3 +31,9 @@ export async function setDecisionStatus(id: string, status: DecisionStatus) {
   const result = await supabase.from('decisions').update(patch).eq('id', id).select('*').single();
   return unwrap(result) as DecisionRow;
 }
+
+export async function deleteDecision(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('decisions').delete().eq('id', id);
+  unwrap(result);
+}

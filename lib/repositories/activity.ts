@@ -25,6 +25,21 @@ export async function listActivityForOrganisation(organisationId: string): Promi
   return unwrap(result) as ActivityEventRow[];
 }
 
+// A task's own status-change history — when it moved to Started, Ongoing,
+// etc, and when — logged automatically by log_task_activity's trigger, not
+// anything the client has to write itself.
+export async function listActivityForTask(taskId: string): Promise<ActivityEventRow[]> {
+  const supabase = requireSupabase();
+  const result = await supabase
+    .from('activity_events')
+    .select('*')
+    .eq('entity_type', 'task')
+    .eq('entity_id', taskId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  return unwrap(result) as ActivityEventRow[];
+}
+
 export async function listRecentActivity(workspaceId: string, limit = 20): Promise<ActivityEventRow[]> {
   const supabase = requireSupabase();
   const result = await supabase

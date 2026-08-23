@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
@@ -12,10 +13,11 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { getProject, createTask, updateTask, setProjectStatus, updateProject } from '@/lib/repositories/projects';
+import { getProject, createTask, updateTask, deleteTask, deleteProject, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
+import { PRIORITY_LEVELS } from '@/lib/priority';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,9 +39,13 @@ export default function ProjectDetailScreen() {
   const [nextAction, setNextAction] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
+  const [taskPriority, setTaskPriority] = useState<PriorityLevel>('Medium');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [addingTask, setAddingTask] = useState(false);
   const [taskError, setTaskError] = useState('');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [savingTaskEdit, setSavingTaskEdit] = useState(false);
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -87,7 +93,15 @@ export default function ProjectDetailScreen() {
 
   const addTask = async () => {
     if (!taskTitle.trim() || !workspaceId || !session) return;
-    if (taskDueDate.trim() && !DATE_RE.test(taskDueDate.trim())) {
+    if (!taskOwner) {
+      setTaskError('Pick who this is for first.');
+      return;
+    }
+    if (!taskDueDate.trim()) {
+      setTaskError('Add a due date first.');
+      return;
+    }
+    if (!DATE_RE.test(taskDueDate.trim())) {
       setTaskError('Due date should look like YYYY-MM-DD.');
       return;
     }
@@ -99,16 +113,69 @@ export default function ProjectDetailScreen() {
         project_id: project.id,
         title: taskTitle.trim(),
         owner_user_id: taskOwner,
-        due_at: taskDueDate.trim() ? new Date(`${taskDueDate.trim()}T00:00:00`).toISOString() : null,
+        priority: taskPriority,
+        due_at: new Date(`${taskDueDate.trim()}T00:00:00`).toISOString(),
         created_by: session.user.id
       });
       setTaskTitle('');
       setTaskOwner(null);
+      setTaskPriority('Medium');
       setTaskDueDate('');
       refresh();
     } finally {
       setAddingTask(false);
     }
+  };
+
+  const startEditTask = (task: ProjectTaskRow) => {
+    setEditingTaskId(task.id);
+    setEditTaskTitle(task.title);
+  };
+
+  const cancelEditTask = () => {
+    setEditingTaskId(null);
+    setEditTaskTitle('');
+  };
+
+  const saveEditTask = async (taskId: string) => {
+    if (!editTaskTitle.trim()) return;
+    setSavingTaskEdit(true);
+    try {
+      await updateTask(taskId, { title: editTaskTitle.trim() });
+      setEditingTaskId(null);
+      setEditTaskTitle('');
+      refresh();
+    } finally {
+      setSavingTaskEdit(false);
+    }
+  };
+
+  const confirmDeleteTask = (taskId: string, title: string) => {
+    Alert.alert(`Delete "${title}"?`, "This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteTask(taskId);
+          refresh();
+        }
+      }
+    ]);
+  };
+
+  const confirmDeleteProject = () => {
+    Alert.alert(`Delete "${project.title}"?`, "This removes it and all its tasks. This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteProject(project.id);
+          router.back();
+        }
+      }
+    ]);
   };
 
   return (
@@ -176,6 +243,26 @@ export default function ProjectDetailScreen() {
                 </Text>
                 {tasksInStatus.map(task => {
                   const accent = ownerAccentColor(task.owner_user_id, me, partner);
+                  if (editingTaskId === task.id) {
+                    return (
+                      <View key={task.id} style={[styles.taskRow, { backgroundColor: accent ?? theme.colors.background }]}>
+                        <TextInput
+                          value={editTaskTitle}
+                          onChangeText={setEditTaskTitle}
+                          style={[styles.input, { flex: 1, marginTop: 0 }]}
+                          autoFocus
+                        />
+                        <View style={styles.taskControls}>
+                          <Pressable style={styles.primarySmall} onPress={() => saveEditTask(task.id)} disabled={savingTaskEdit}>
+                            <Text style={styles.primaryText}>{savingTaskEdit ? '…' : 'Save'}</Text>
+                          </Pressable>
+                          <Pressable hitSlop={8} onPress={cancelEditTask}>
+                            <Text style={styles.meta}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    );
+                  }
                   return (
                     <View
                       key={task.id}
@@ -192,12 +279,18 @@ export default function ProjectDetailScreen() {
                         <Text style={styles.taskTitle}>{task.title}</Text>
                         <Text style={styles.meta}>
                           {memberLabel(task.owner_user_id, me, partner)}
-                          {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ''}
+                          {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ' · no due date'}
                         </Text>
                       </Pressable>
                       <View style={styles.taskControls}>
                         <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
                         <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
+                        <Pressable hitSlop={8} onPress={() => startEditTask(task)}>
+                          <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                        <Pressable hitSlop={8} onPress={() => confirmDeleteTask(task.id, task.title)}>
+                          <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
                       </View>
                     </View>
                   );
@@ -218,24 +311,29 @@ export default function ProjectDetailScreen() {
           <TextInput
             value={taskDueDate}
             onChangeText={setTaskDueDate}
-            placeholder="Due date, e.g. 2026-09-01 (optional)"
+            placeholder="Due date, e.g. 2026-09-01"
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
           />
-          {taskError ? <Text style={styles.taskError}>{taskError}</Text> : null}
+          <Text style={styles.fieldLabel}>Who's this for?</Text>
           <View style={styles.ownerPicker}>
-            {[
-              { label: 'Unassigned', value: null },
-              me ? { label: me.display_name, value: me.user_id } : null,
-              partner ? { label: partner.display_name, value: partner.user_id } : null
-            ]
-              .filter((o): o is { label: string; value: string | null } => o !== null)
+            {[me ? { label: me.display_name, value: me.user_id } : null, partner ? { label: partner.display_name, value: partner.user_id } : null]
+              .filter((o): o is { label: string; value: string } => o !== null)
               .map(option => (
                 <Pressable key={option.label} onPress={() => setTaskOwner(option.value)}>
                   <Pill label={taskOwner === option.value ? `● ${option.label}` : option.label} />
                 </Pressable>
               ))}
           </View>
+          <Text style={styles.fieldLabel}>How important?</Text>
+          <View style={styles.ownerPicker}>
+            {PRIORITY_LEVELS.map(level => (
+              <Pressable key={level} onPress={() => setTaskPriority(level)}>
+                <Pill label={taskPriority === level ? `● ${level}` : level} />
+              </Pressable>
+            ))}
+          </View>
+          {taskError ? <Text style={styles.taskError}>{taskError}</Text> : null}
           <Pressable style={styles.primarySmall} onPress={addTask} disabled={addingTask || !taskTitle.trim()}>
             <Text style={styles.primaryText}>{addingTask ? 'Adding…' : '+ Add task'}</Text>
           </Pressable>
@@ -247,6 +345,10 @@ export default function ProjectDetailScreen() {
         onPress={() => router.push({ pathname: '/thread', params: { kind: 'project', id: project.id, title: project.title } })}
       >
         <Text style={styles.discussProjectText}>Discuss this project →</Text>
+      </Pressable>
+
+      <Pressable style={styles.deleteProjectButton} onPress={confirmDeleteProject}>
+        <Text style={styles.deleteProjectText}>Delete project</Text>
       </Pressable>
     </Screen>
   );
@@ -299,7 +401,10 @@ const styles = StyleSheet.create({
   taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   taskError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
+  fieldLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 12 },
   ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   discussProject: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
+  deleteProjectButton: { padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
+  deleteProjectText: { color: theme.colors.danger, fontWeight: '600' },
   discussProjectText: { color: theme.colors.navy, fontWeight: '600' }
 });

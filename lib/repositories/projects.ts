@@ -64,6 +64,12 @@ export async function getTask(id: string): Promise<ProjectTaskRow> {
   return unwrap(result) as ProjectTaskRow;
 }
 
+export async function deleteProject(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('projects').delete().eq('id', id);
+  unwrap(result);
+}
+
 export async function createTask(input: {
   workspace_id: string;
   project_id: string;
@@ -96,6 +102,12 @@ export async function updateTask(
 
 export async function setTaskStatus(id: string, status: TaskStatus) {
   return updateTask(id, { status });
+}
+
+export async function deleteTask(id: string) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('project_tasks').delete().eq('id', id);
+  unwrap(result);
 }
 
 export async function setProjectStatus(id: string, status: ProjectStatus) {
