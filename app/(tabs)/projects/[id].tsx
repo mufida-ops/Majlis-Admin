@@ -305,8 +305,12 @@ export default function ProjectDetailScreen() {
           placeholderTextColor={theme.colors.muted}
           style={styles.input}
         />
-        <Pressable style={styles.primarySmall} onPress={saveNextAction} disabled={!nextAction.trim()}>
-          <Text style={styles.primaryText}>Save</Text>
+        <Pressable
+          style={[styles.primarySmall, !nextAction.trim() && styles.primarySmallDisabled]}
+          onPress={saveNextAction}
+          disabled={!nextAction.trim()}
+        >
+          <Text style={styles.primaryText}>Save next action</Text>
         </Pressable>
       </Card>
 
@@ -321,8 +325,12 @@ export default function ProjectDetailScreen() {
           style={styles.input}
         />
         {projectDueDateError ? <Text style={styles.taskError}>{projectDueDateError}</Text> : null}
-        <Pressable style={styles.primarySmall} onPress={saveProjectDueDate} disabled={!projectDueDate.trim()}>
-          <Text style={styles.primaryText}>Save</Text>
+        <Pressable
+          style={[styles.primarySmall, !projectDueDate.trim() && styles.primarySmallDisabled]}
+          onPress={saveProjectDueDate}
+          disabled={!projectDueDate.trim()}
+        >
+          <Text style={styles.primaryText}>Save due date</Text>
         </Pressable>
       </Card>
 
