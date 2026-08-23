@@ -46,6 +46,14 @@ const PROPOSE_ITEMS_TOOL = {
               enum: ['low', 'normal', 'high', 'urgent'],
               description: "Best guess from the text's tone/urgency, or an explicit \"suggested priority\" — default to normal."
             },
+            content_type: {
+              type: 'string',
+              enum: ['reel', 'image', 'carousel', 'story', 'testimonial', 'founder_video', 'educational', 'product', 'behind_the_scenes', 'long_form', 'other'],
+              description:
+                'The format of this piece of content — pick the closest match from the enum based on what the ' +
+                'text calls it (e.g. "Carousel" -> carousel, "Reel" -> reel, a founder-to-camera video -> ' +
+                'founder_video). Default to "other" only if genuinely nothing in the text implies a format.'
+            },
             description: {
               type: ['string', 'null'],
               description:
@@ -76,7 +84,7 @@ const PROPOSE_ITEMS_TOOL = {
                 'assets needed, people needed, format/platform, hook, or other detail. Null if nothing is left over.'
             }
           },
-          required: ['title', 'priority']
+          required: ['title', 'priority', 'content_type']
         }
       }
     },
@@ -141,6 +149,7 @@ Deno.serve(async req => {
       title: string;
       due_date?: string | null;
       priority?: string;
+      content_type?: string;
       description?: string | null;
       script?: string | null;
       campaign?: string | null;
