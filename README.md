@@ -78,7 +78,8 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   tasks, not just a plain text field with a Save button: a trash icon clears the next action or the due date, and
   a "Flag for review" toggle (`projects.needs_review`, separate from any task's own flag) surfaces the same way
   on the partner's Home when it's not the flagger's own project. The two cards are merged into one, since they're
-  really one "what's next and when" unit.
+  really one "what's next and when" unit. That merged card now sits below Tasks on the project detail page, not
+  above it — the task list is what you actually came to look at; a single next-action note is secondary.
 - Changing a task's status/owner/due date/flag from its own thread screen used to leave the project detail page,
   Projects list, and Home showing stale data — those screens had already fetched their data once and had no way
   to know it changed elsewhere. All three now use `useFocusEffect` to refetch every time they come back into view,

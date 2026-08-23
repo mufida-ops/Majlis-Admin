@@ -455,65 +455,6 @@ export default function ProjectDetailScreen() {
       </Card>
 
       <Card>
-        <View style={styles.titleEditRow}>
-          <Text style={[styles.label, { flex: 1 }]}>Next action</Text>
-          {project.next_action ? (
-            <Pressable hitSlop={8} onPress={clearNextAction}>
-              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-        <Text style={styles.nextAction}>{project.next_action ?? 'Not set yet.'}</Text>
-        <TextInput
-          value={nextAction}
-          onChangeText={setNextAction}
-          placeholder="Update the next action…"
-          placeholderTextColor={theme.colors.muted}
-          style={styles.input}
-        />
-        <Pressable
-          style={[styles.primarySmall, !nextAction.trim() && styles.primarySmallDisabled]}
-          onPress={saveNextAction}
-          disabled={!nextAction.trim()}
-        >
-          <Text style={styles.primaryText}>Save next action</Text>
-        </Pressable>
-
-        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Due date</Text>
-        <View style={styles.titleEditRow}>
-          <Text style={[styles.nextAction, { flex: 1, marginTop: 0 }]}>
-            {project.due_at ? toDateInputValue(project.due_at) : 'Not set yet.'}
-          </Text>
-          {project.due_at ? (
-            <Pressable hitSlop={8} onPress={clearProjectDueDate}>
-              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-        <TextInput
-          value={projectDueDate}
-          onChangeText={setProjectDueDate}
-          placeholder="Due date, e.g. 2026-09-01"
-          placeholderTextColor={theme.colors.muted}
-          style={styles.input}
-        />
-        {projectDueDateError ? <Text style={styles.taskError}>{projectDueDateError}</Text> : null}
-        <Pressable
-          style={[styles.primarySmall, !projectDueDate.trim() && styles.primarySmallDisabled]}
-          onPress={saveProjectDueDate}
-          disabled={!projectDueDate.trim()}
-        >
-          <Text style={styles.primaryText}>Save due date</Text>
-        </Pressable>
-
-        <Pressable style={styles.reviewToggle} onPress={toggleProjectNeedsReview} hitSlop={8}>
-          <Text style={project.needs_review ? styles.needsReview : styles.fieldLabel}>
-            {project.needs_review ? '🔍 Needs review — tap to clear' : '+ Flag for review'}
-          </Text>
-        </Pressable>
-      </Card>
-
-      <Card>
         <Text style={styles.label}>Tasks</Text>
         {project.project_tasks.length === 0 ? (
           <Text style={styles.meta}>No tasks yet.</Text>
@@ -581,6 +522,65 @@ export default function ProjectDetailScreen() {
             <Text style={styles.primaryText}>{addingTask ? 'Adding…' : '+ Add task'}</Text>
           </Pressable>
         </View>
+      </Card>
+
+      <Card>
+        <View style={styles.titleEditRow}>
+          <Text style={[styles.label, { flex: 1 }]}>Next action</Text>
+          {project.next_action ? (
+            <Pressable hitSlop={8} onPress={clearNextAction}>
+              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.nextAction}>{project.next_action ?? 'Not set yet.'}</Text>
+        <TextInput
+          value={nextAction}
+          onChangeText={setNextAction}
+          placeholder="Update the next action…"
+          placeholderTextColor={theme.colors.muted}
+          style={styles.input}
+        />
+        <Pressable
+          style={[styles.primarySmall, !nextAction.trim() && styles.primarySmallDisabled]}
+          onPress={saveNextAction}
+          disabled={!nextAction.trim()}
+        >
+          <Text style={styles.primaryText}>Save next action</Text>
+        </Pressable>
+
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Due date</Text>
+        <View style={styles.titleEditRow}>
+          <Text style={[styles.nextAction, { flex: 1, marginTop: 0 }]}>
+            {project.due_at ? toDateInputValue(project.due_at) : 'Not set yet.'}
+          </Text>
+          {project.due_at ? (
+            <Pressable hitSlop={8} onPress={clearProjectDueDate}>
+              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+        <TextInput
+          value={projectDueDate}
+          onChangeText={setProjectDueDate}
+          placeholder="Due date, e.g. 2026-09-01"
+          placeholderTextColor={theme.colors.muted}
+          style={styles.input}
+        />
+        {projectDueDateError ? <Text style={styles.taskError}>{projectDueDateError}</Text> : null}
+        <Pressable
+          style={[styles.primarySmall, !projectDueDate.trim() && styles.primarySmallDisabled]}
+          onPress={saveProjectDueDate}
+          disabled={!projectDueDate.trim()}
+        >
+          <Text style={styles.primaryText}>Save due date</Text>
+        </Pressable>
+
+        <Pressable style={styles.reviewToggle} onPress={toggleProjectNeedsReview} hitSlop={8}>
+          <Text style={project.needs_review ? styles.needsReview : styles.fieldLabel}>
+            {project.needs_review ? '🔍 Needs review — tap to clear' : '+ Flag for review'}
+          </Text>
+        </Pressable>
       </Card>
 
       <Pressable
