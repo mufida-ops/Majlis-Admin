@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, Tex
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
+import { Pill } from '@/components/Pill';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
@@ -14,7 +15,15 @@ import { getTask, updateTask } from '@/lib/repositories/projects';
 import { listActivityForTask } from '@/lib/repositories/activity';
 import { memberLabel } from '@/lib/ownerLabel';
 import { formatTime, formatShortDate, toDateInputValue } from '@/lib/format';
+import { TASK_STATUSES } from '@/lib/taskStatus';
 import type { MessageRow, ThreadRow, ProjectTaskRow, TaskStatus, PriorityLevel, ActivityEventRow } from '@/types/db';
+
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  'Not Started': 'Not Started',
+  Started: 'Started',
+  Ongoing: 'Ongoing',
+  Done: 'Done'
+};
 
 type ThreadKind = 'project' | 'task' | 'organisation' | 'decision';
 
@@ -104,6 +113,12 @@ export default function ThreadScreen() {
     setTask(updated);
   };
 
+  const changeTaskOwner = async (ownerUserId: string) => {
+    if (!task) return;
+    const updated = await updateTask(task.id, { owner_user_id: ownerUserId });
+    setTask(updated);
+  };
+
   const saveDueDate = async () => {
     if (!task) return;
     if (dueDateDraft.trim() && !DATE_RE.test(dueDateDraft.trim())) {
@@ -157,6 +172,25 @@ export default function ThreadScreen() {
                 <View style={styles.taskControlsRow}>
                   <StatusBadge value={task.status} onChange={changeTaskStatus} />
                   <PriorityBadge value={task.priority} onChange={changeTaskPriority} />
+                </View>
+                <Text style={styles.dueLabel}>Assigned to</Text>
+                <View style={styles.chipRow}>
+                  {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
+                    partner ? { label: partner.display_name.charAt(0).toUpperCase(), value: partner.user_id } : null]
+                    .filter((o): o is { label: string; value: string } => o !== null)
+                    .map(option => (
+                      <Pressable key={option.value} onPress={() => changeTaskOwner(option.value)}>
+                        <Pill label={task.owner_user_id === option.value ? `● ${option.label}` : option.label} />
+                      </Pressable>
+                    ))}
+                </View>
+                <Text style={styles.dueLabel}>Progress</Text>
+                <View style={styles.chipRow}>
+                  {TASK_STATUSES.map(status => (
+                    <Pressable key={status} onPress={() => changeTaskStatus(status)}>
+                      <Pill label={task.status === status ? `● ${TASK_STATUS_LABEL[status]}` : TASK_STATUS_LABEL[status]} />
+                    </Pressable>
+                  ))}
                 </View>
                 <Text style={styles.dueLabel}>Due date</Text>
                 <View style={styles.dueRow}>
@@ -228,6 +262,7 @@ export default function ThreadScreen() {
 const styles = StyleSheet.create({
   empty: { color: theme.colors.muted },
   taskControlsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 },
   dueLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '600', marginTop: 14 },
   dueRow: { flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' },
   dueSave: { backgroundColor: theme.colors.navy, paddingHorizontal: 16, paddingVertical: 12, borderRadius: theme.radius.md },

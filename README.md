@@ -53,6 +53,9 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
 - "+ Add task" is always tappable, even with an empty title — it validates on tap and shows what's missing (title,
   owner, or due date) instead of silently doing nothing, which is what a disabled-but-visually-identical button
   looked like before.
+- A task's own thread screen (opened by tapping the task row itself, not the pencil) also has explicit "Assigned
+  to" and "Progress" chip rows now, not just the compact cycling badges — the project detail page wasn't the only
+  place a task could be opened from, so it needed the same explicit controls.
 - Projects can be started from a "Book" template as well as a blank one (a toggle on the "New project" form): pick
   "Book", enter the book's title, and it creates the project pre-loaded with the ~60-item checklist Mufida already
   runs by hand for every book (`lib/bookTemplate.ts`, `createBookProject` in `lib/repositories/projects.ts`) — Book
