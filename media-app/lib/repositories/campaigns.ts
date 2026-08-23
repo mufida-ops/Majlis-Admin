@@ -20,6 +20,16 @@ export async function createCampaign(name: string, createdBy: string, descriptio
   return data as Campaign;
 }
 
+export async function findOrCreateCampaign(name: string, createdBy: string): Promise<Campaign> {
+  const client = db();
+  const trimmed = name.trim();
+  const { data: existing } = await client.from('campaigns').select('*').ilike('name', trimmed).maybeSingle();
+  if (existing) return existing as Campaign;
+  const { data, error } = await client.from('campaigns').insert({ name: trimmed, created_by: createdBy }).select('*').single();
+  if (error) throw error;
+  return data as Campaign;
+}
+
 export async function setCampaignActive(id: string, isActive: boolean) {
   const { error } = await db().from('campaigns').update({ is_active: isActive }).eq('id', id);
   if (error) throw error;
