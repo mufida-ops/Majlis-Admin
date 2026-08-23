@@ -5,7 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { parseContentBatch, type ProposedContentItem } from '@/lib/repositories/contentBatch';
 import { createContentItem } from '@/lib/repositories/contentItems';
-import { findOrCreateCampaign, findOrCreateTag, tagContentItem } from '@/lib/repositories/campaigns';
+import { findOrCreateCampaign, findOrCreateTag, tagContentItem, listContentTypes } from '@/lib/repositories/campaigns';
+import { useAsync } from '@/lib/useAsync';
 import { todayInOrgTz } from '@/lib/timezone';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { ContentPriority } from '@/types/db';
@@ -16,6 +17,7 @@ const PRIORITIES: ContentPriority[] = ['low', 'normal', 'high', 'urgent'];
 
 export default function BatchAddContent() {
   const { session } = useAuth();
+  const { data: contentTypes } = useAsync(() => listContentTypes(), []);
   const [text, setText] = useState('');
   const [items, setItems] = useState<ReviewItem[] | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -71,11 +73,14 @@ export default function BatchAddContent() {
           }
         }
 
+        const contentTypeId = contentTypes?.find(t => t.key === item.content_type)?.id ?? null;
+
         const created = await createContentItem({
           title: item.title.trim(),
           description: item.description?.trim() || null,
           script: item.script?.trim() || null,
           internal_notes: item.notes?.trim() || null,
+          content_type_id: contentTypeId,
           campaign_id: campaignId,
           owner_id: session.user.id,
           due_date: item.due_date || null,
@@ -176,6 +181,16 @@ export default function BatchAddContent() {
 
                 {item.expanded && (
                   <View style={styles.detailsBlock}>
+                    <FieldLabel text="Content type" />
+                    <View style={styles.priorityRow}>
+                      {(contentTypes ?? []).map(t => (
+                        <Pressable key={t.id} onPress={() => updateItem(index, { content_type: t.key })} style={[styles.priorityChip, item.content_type === t.key && styles.priorityChipActive]}>
+                          {t.icon && <Feather name={t.icon as any} size={11} color={item.content_type === t.key ? '#FFF' : colors.textSecondary} />}
+                          <Text style={[styles.priorityChipText, item.content_type === t.key && styles.priorityChipTextActive]}>{t.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
                     <FieldLabel text="Priority" />
                     <View style={styles.priorityRow}>
                       {PRIORITIES.map(p => (
@@ -297,8 +312,8 @@ const styles = StyleSheet.create({
   fieldInput: { backgroundColor: colors.surfaceMuted, borderRadius: radii.sm, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: colors.textPrimary },
   fieldTextArea: { backgroundColor: colors.surfaceMuted, borderRadius: radii.sm, padding: 10, fontSize: 13, color: colors.textPrimary, minHeight: 70, textAlignVertical: 'top' },
   scriptArea: { minHeight: 160 },
-  priorityRow: { flexDirection: 'row', gap: 6 },
-  priorityChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: colors.surfaceMuted },
+  priorityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  priorityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: colors.surfaceMuted },
   priorityChipActive: { backgroundColor: colors.navy },
   priorityChipText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
   priorityChipTextActive: { color: '#FFF' }
