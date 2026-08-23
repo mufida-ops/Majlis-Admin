@@ -70,6 +70,22 @@ export default function HomeScreen() {
       });
     }
 
+    // Flagged for review by whoever's not the task's own owner — someone
+    // finished their part and needs the other founder to look it over, not
+    // a reminder to the same person who flagged it.
+    const flaggedTask = data.projects
+      .flatMap(p => p.project_tasks.map(t => ({ task: t, project: p })))
+      .find(({ task }) => task.needs_review && task.owner_user_id !== me.user_id);
+    if (flaggedTask) {
+      items.push({
+        key: `review-${flaggedTask.task.id}`,
+        eyebrow: `Needs review · ${flaggedTask.project.title}`,
+        title: flaggedTask.task.title,
+        meta: '🔍 Flagged for you to check',
+        href: `/(tabs)/projects/${flaggedTask.project.id}`
+      });
+    }
+
     const myTask = data.projects
       .flatMap(p => p.project_tasks.map(t => ({ task: t, project: p })))
       .filter(({ task }) => task.status !== 'Done' && task.owner_user_id === me.user_id)

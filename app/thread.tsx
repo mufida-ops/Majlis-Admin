@@ -52,6 +52,7 @@ export default function ThreadScreen() {
   const [dueDateDraft, setDueDateDraft] = useState('');
   const [savingDueDate, setSavingDueDate] = useState(false);
   const [dueDateError, setDueDateError] = useState('');
+  const [reviewError, setReviewError] = useState('');
 
   const load = useCallback(async () => {
     if (!workspaceId || !params.kind || !params.id) return;
@@ -121,9 +122,14 @@ export default function ThreadScreen() {
 
   const toggleNeedsReview = async () => {
     if (!task) return;
-    const updated = await updateTask(task.id, { needs_review: !task.needs_review });
-    setTask(updated);
-    listActivityForTask(task.id).then(setTaskHistory).catch(() => {});
+    try {
+      const updated = await updateTask(task.id, { needs_review: !task.needs_review });
+      setTask(updated);
+      setReviewError('');
+      listActivityForTask(task.id).then(setTaskHistory).catch(() => {});
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : 'Could not flag that task.');
+    }
   };
 
   const saveDueDate = async () => {
@@ -218,6 +224,7 @@ export default function ThreadScreen() {
                     {task.needs_review ? '🔍 Needs review — tap to clear' : '+ Flag for review'}
                   </Text>
                 </Pressable>
+                {reviewError ? <Text style={styles.dueError}>{reviewError}</Text> : null}
                 {taskHistory.length > 0 ? (
                   <View style={styles.history}>
                     <Text style={styles.dueLabel}>History</Text>

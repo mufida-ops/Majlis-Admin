@@ -115,8 +115,12 @@ export default function ProjectDetailScreen() {
   };
 
   const toggleNeedsReview = async (taskId: string, current: boolean) => {
-    await updateTask(taskId, { needs_review: !current });
-    refresh();
+    try {
+      await updateTask(taskId, { needs_review: !current });
+      refresh();
+    } catch (err) {
+      Alert.alert('Could not flag that task', err instanceof Error ? err.message : 'Please try again.');
+    }
   };
 
   const saveNextAction = async () => {
