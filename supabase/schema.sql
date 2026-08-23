@@ -102,11 +102,13 @@ create table if not exists project_tasks (
   priority priority_level not null default 'Medium',
   start_at timestamptz,
   due_at timestamptz,
+  needs_review boolean not null default false,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table project_tasks add column if not exists weight integer not null default 0;
+alter table project_tasks add column if not exists needs_review boolean not null default false;
 alter table project_tasks add column if not exists priority priority_level not null default 'Medium';
 
 create table if not exists task_dependencies (

@@ -119,6 +119,13 @@ export default function ThreadScreen() {
     setTask(updated);
   };
 
+  const toggleNeedsReview = async () => {
+    if (!task) return;
+    const updated = await updateTask(task.id, { needs_review: !task.needs_review });
+    setTask(updated);
+    listActivityForTask(task.id).then(setTaskHistory).catch(() => {});
+  };
+
   const saveDueDate = async () => {
     if (!task) return;
     if (dueDateDraft.trim() && !DATE_RE.test(dueDateDraft.trim())) {
@@ -206,6 +213,11 @@ export default function ThreadScreen() {
                   </Pressable>
                 </View>
                 {dueDateError ? <Text style={styles.dueError}>{dueDateError}</Text> : null}
+                <Pressable style={styles.reviewToggle} onPress={toggleNeedsReview} hitSlop={8}>
+                  <Text style={task.needs_review ? styles.reviewOn : styles.reviewOff}>
+                    {task.needs_review ? '🔍 Needs review — tap to clear' : '+ Flag for review'}
+                  </Text>
+                </Pressable>
                 {taskHistory.length > 0 ? (
                   <View style={styles.history}>
                     <Text style={styles.dueLabel}>History</Text>
@@ -267,6 +279,9 @@ const styles = StyleSheet.create({
   dueRow: { flexDirection: 'row', gap: 10, marginTop: 8, alignItems: 'center' },
   dueSave: { backgroundColor: theme.colors.navy, paddingHorizontal: 16, paddingVertical: 12, borderRadius: theme.radius.md },
   dueError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
+  reviewToggle: { marginTop: 14 },
+  reviewOn: { color: theme.colors.danger, fontSize: 13, fontWeight: '700' },
+  reviewOff: { color: theme.colors.muted, fontSize: 13, fontWeight: '600' },
   history: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: theme.colors.border },
   historyLine: { color: theme.colors.muted, fontSize: 12, marginTop: 6 },
   messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

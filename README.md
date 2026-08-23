@@ -62,6 +62,11 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   Creation, Book Checking, ISBN, Book Box Paper Resources, Hello Chef Guidance, Props, Praveen, and the Cultural
   Box. Those tasks start unassigned and undated (there's no single sensible default across ~60 items) — assign and
   date each one via the task edit form above as work starts on it.
+- Handing a task off for the other founder to look over doesn't need reassigning it (that changes who's doing the
+  work): tap the flag icon on a task row, or "Flag for review" on its thread screen, and it's marked
+  `project_tasks.needs_review` and shows a "🔍 Needs review" line until whoever looks it over taps the flag again to
+  clear it. Independent of status/priority/owner — a task can be Ongoing, assigned to either founder, and flagged
+  for review all at once.
 - Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
   plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
   blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used

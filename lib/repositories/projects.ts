@@ -106,7 +106,7 @@ export async function createTask(input: {
 
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<ProjectTaskRow, 'title' | 'status' | 'owner_user_id' | 'weight' | 'priority' | 'start_at' | 'due_at'>>
+  patch: Partial<Pick<ProjectTaskRow, 'title' | 'status' | 'owner_user_id' | 'weight' | 'priority' | 'start_at' | 'due_at' | 'needs_review'>>
 ) {
   const supabase = requireSupabase();
   const result = await supabase

@@ -113,6 +113,11 @@ export default function ProjectDetailScreen() {
     refresh();
   };
 
+  const toggleNeedsReview = async (taskId: string, current: boolean) => {
+    await updateTask(taskId, { needs_review: !current });
+    refresh();
+  };
+
   const saveNextAction = async () => {
     if (!nextAction.trim()) return;
     const updated = await updateProject(project.id, { next_action: nextAction.trim() });
@@ -426,10 +431,18 @@ export default function ProjectDetailScreen() {
                           {memberLabel(task.owner_user_id, me, partner)}
                           {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ' · no due date'}
                         </Text>
+                        {task.needs_review ? <Text style={styles.needsReview}>🔍 Needs review</Text> : null}
                       </Pressable>
                       <View style={styles.taskControls}>
                         <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
                         <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
+                        <Pressable hitSlop={8} onPress={() => toggleNeedsReview(task.id, task.needs_review)}>
+                          <Ionicons
+                            name={task.needs_review ? 'flag' : 'flag-outline'}
+                            size={18}
+                            color={task.needs_review ? theme.colors.danger : theme.colors.muted}
+                          />
+                        </Pressable>
                         <Pressable hitSlop={8} onPress={() => startEditTask(task)}>
                           <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
                         </Pressable>
@@ -550,6 +563,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border
   },
   taskRowDone: { opacity: 0.6 },
+  needsReview: { color: theme.colors.danger, fontSize: 12, fontWeight: '700', marginTop: 4 },
   taskRowEditing: {
     paddingVertical: 12,
     paddingHorizontal: 12,

@@ -51,6 +51,7 @@ export type ProjectTaskRow = {
   priority: PriorityLevel;
   start_at: string | null;
   due_at: string | null;
+  needs_review: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
