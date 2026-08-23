@@ -31,6 +31,10 @@ export function describeActivity(entry: ActivityLogEntry, actorName: string): st
     case 'platform_changes_requested': return `${actorName} requested changes on a platform version`;
     case 'platform_approval_revoked': return `Approval was revoked on ${d.platform} — content changed after approval`;
     case 'publication_status_changed': return `${d.platform} publishing status changed to ${d.to}`;
+    case 'team_notified': {
+      const count = Array.isArray(d.user_ids) ? d.user_ids.length : 0;
+      return `${actorName} notified ${count} team member${count === 1 ? '' : 's'} about this`;
+    }
     default: return `${actorName} ${entry.action.replace(/_/g, ' ')}`;
   }
 }
