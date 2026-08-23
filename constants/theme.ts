@@ -13,8 +13,9 @@ export const theme = {
     ownerPink: '#F1D4DE', // Victoria's task box color
     ownerPurple: '#DCD0EA', // Mufida's task box color
     completedGreen: '#DCE6D5', // finished-project / finished-task row tint
-    statusRedPale: '#F0D9D2', // Not Started / Blocked project row tint
-    statusAmberPale: '#F2E4C0' // Active project row tint
+    statusRedPale: '#F0D9D2', // Not Started project row tint
+    statusAmberPale: '#F2E4C0', // Active project row tint
+    statusOrangePale: '#EFC49B' // Blocked project row tint
   },
   radius: {
     sm: 10,
