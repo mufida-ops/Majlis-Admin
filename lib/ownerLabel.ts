@@ -29,8 +29,11 @@ export function ownerTypeAccentColor(owner: OwnerType | null | undefined): strin
   return colorForName(owner);
 }
 
-function withIcon(member: WorkspaceMember): string {
-  return member.avatar_emoji ? `${member.avatar_emoji} ${member.display_name}` : member.display_name;
+// Compact tag form (Mufida's request) — labels/pills show just the
+// initial instead of the full name, everywhere an item is tagged with
+// who it belongs to.
+function initial(member: WorkspaceMember): string {
+  return member.display_name.charAt(0).toUpperCase();
 }
 
 export function memberLabel(
@@ -39,8 +42,8 @@ export function memberLabel(
   partner: WorkspaceMember | null
 ): string {
   if (!userId) return 'Unassigned';
-  if (me && userId === me.user_id) return withIcon(me);
-  if (partner && userId === partner.user_id) return withIcon(partner);
+  if (me && userId === me.user_id) return initial(me);
+  if (partner && userId === partner.user_id) return initial(partner);
   return 'Team member';
 }
 

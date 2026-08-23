@@ -37,6 +37,8 @@ export default function ProjectDetailScreen() {
   const { data: project, loading, error, refresh, setData } = useAsync(() => getProject(id), [id]);
 
   const [nextAction, setNextAction] = useState('');
+  const [projectDueDate, setProjectDueDate] = useState('');
+  const [projectDueDateError, setProjectDueDateError] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
   const [taskPriority, setTaskPriority] = useState<PriorityLevel>('Medium');
@@ -45,6 +47,10 @@ export default function ProjectDetailScreen() {
   const [taskError, setTaskError] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskOwner, setEditTaskOwner] = useState<string | null>(null);
+  const [editTaskPriority, setEditTaskPriority] = useState<PriorityLevel>('Medium');
+  const [editTaskDueDate, setEditTaskDueDate] = useState('');
+  const [editTaskError, setEditTaskError] = useState('');
   const [savingTaskEdit, setSavingTaskEdit] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -113,6 +119,18 @@ export default function ProjectDetailScreen() {
     setNextAction('');
   };
 
+  const saveProjectDueDate = async () => {
+    if (!projectDueDate.trim()) return;
+    if (!DATE_RE.test(projectDueDate.trim())) {
+      setProjectDueDateError('Due date should look like YYYY-MM-DD.');
+      return;
+    }
+    setProjectDueDateError('');
+    const updated = await updateProject(project.id, { due_at: new Date(`${projectDueDate.trim()}T00:00:00`).toISOString() });
+    setData({ ...project, ...updated });
+    setProjectDueDate('');
+  };
+
   const addTask = async () => {
     if (!taskTitle.trim() || !workspaceId || !session) return;
     if (!taskOwner) {
@@ -152,18 +170,41 @@ export default function ProjectDetailScreen() {
   const startEditTask = (task: ProjectTaskRow) => {
     setEditingTaskId(task.id);
     setEditTaskTitle(task.title);
+    setEditTaskOwner(task.owner_user_id);
+    setEditTaskPriority(task.priority);
+    setEditTaskDueDate(task.due_at ? toDateInputValue(task.due_at) : '');
+    setEditTaskError('');
   };
 
   const cancelEditTask = () => {
     setEditingTaskId(null);
     setEditTaskTitle('');
+    setEditTaskError('');
   };
 
   const saveEditTask = async (taskId: string) => {
     if (!editTaskTitle.trim()) return;
+    if (!editTaskOwner) {
+      setEditTaskError('Pick who this is for first.');
+      return;
+    }
+    if (!editTaskDueDate.trim()) {
+      setEditTaskError('Add a due date first.');
+      return;
+    }
+    if (!DATE_RE.test(editTaskDueDate.trim())) {
+      setEditTaskError('Due date should look like YYYY-MM-DD.');
+      return;
+    }
     setSavingTaskEdit(true);
+    setEditTaskError('');
     try {
-      await updateTask(taskId, { title: editTaskTitle.trim() });
+      await updateTask(taskId, {
+        title: editTaskTitle.trim(),
+        owner_user_id: editTaskOwner,
+        priority: editTaskPriority,
+        due_at: new Date(`${editTaskDueDate.trim()}T00:00:00`).toISOString()
+      });
       setEditingTaskId(null);
       setEditTaskTitle('');
       refresh();
@@ -262,6 +303,22 @@ export default function ProjectDetailScreen() {
         </Pressable>
       </Card>
 
+      <Card>
+        <Text style={styles.label}>Due date</Text>
+        <Text style={styles.nextAction}>{project.due_at ? toDateInputValue(project.due_at) : 'Not set yet.'}</Text>
+        <TextInput
+          value={projectDueDate}
+          onChangeText={setProjectDueDate}
+          placeholder="Due date, e.g. 2026-09-01"
+          placeholderTextColor={theme.colors.muted}
+          style={styles.input}
+        />
+        {projectDueDateError ? <Text style={styles.taskError}>{projectDueDateError}</Text> : null}
+        <Pressable style={styles.primarySmall} onPress={saveProjectDueDate} disabled={!projectDueDate.trim()}>
+          <Text style={styles.primaryText}>Save</Text>
+        </Pressable>
+      </Card>
+
       {ganttTasks.length > 0 ? (
         <Card>
           <Text style={styles.label}>Timeline</Text>
@@ -288,13 +345,35 @@ export default function ProjectDetailScreen() {
                   const accent = ownerAccentColor(task.owner_user_id, me, partner);
                   if (editingTaskId === task.id) {
                     return (
-                      <View key={task.id} style={[styles.taskRow, { backgroundColor: accent ?? theme.colors.background }]}>
+                      <View key={task.id} style={[styles.taskRowEditing, { backgroundColor: accent ?? theme.colors.background }]}>
+                        <TextInput value={editTaskTitle} onChangeText={setEditTaskTitle} style={styles.input} autoFocus />
                         <TextInput
-                          value={editTaskTitle}
-                          onChangeText={setEditTaskTitle}
-                          style={[styles.input, { flex: 1, marginTop: 0 }]}
-                          autoFocus
+                          value={editTaskDueDate}
+                          onChangeText={setEditTaskDueDate}
+                          placeholder="Due date, e.g. 2026-09-01"
+                          placeholderTextColor={theme.colors.muted}
+                          style={styles.input}
                         />
+                        <Text style={styles.fieldLabel}>Who's this for?</Text>
+                        <View style={styles.ownerPicker}>
+                          {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
+                            partner ? { label: partner.display_name.charAt(0).toUpperCase(), value: partner.user_id } : null]
+                            .filter((o): o is { label: string; value: string } => o !== null)
+                            .map(option => (
+                              <Pressable key={option.label} onPress={() => setEditTaskOwner(option.value)}>
+                                <Pill label={editTaskOwner === option.value ? `● ${option.label}` : option.label} />
+                              </Pressable>
+                            ))}
+                        </View>
+                        <Text style={styles.fieldLabel}>How important?</Text>
+                        <View style={styles.ownerPicker}>
+                          {PRIORITY_LEVELS.map(level => (
+                            <Pressable key={level} onPress={() => setEditTaskPriority(level)}>
+                              <Pill label={editTaskPriority === level ? `● ${level}` : level} />
+                            </Pressable>
+                          ))}
+                        </View>
+                        {editTaskError ? <Text style={styles.taskError}>{editTaskError}</Text> : null}
                         <View style={styles.taskControls}>
                           <Pressable style={styles.primarySmall} onPress={() => saveEditTask(task.id)} disabled={savingTaskEdit}>
                             <Text style={styles.primaryText}>{savingTaskEdit ? '…' : 'Save'}</Text>
@@ -360,7 +439,8 @@ export default function ProjectDetailScreen() {
           />
           <Text style={styles.fieldLabel}>Who's this for?</Text>
           <View style={styles.ownerPicker}>
-            {[me ? { label: me.display_name, value: me.user_id } : null, partner ? { label: partner.display_name, value: partner.user_id } : null]
+            {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
+              partner ? { label: partner.display_name.charAt(0).toUpperCase(), value: partner.user_id } : null]
               .filter((o): o is { label: string; value: string } => o !== null)
               .map(option => (
                 <Pressable key={option.label} onPress={() => setTaskOwner(option.value)}>
@@ -442,6 +522,12 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border
   },
   taskRowDone: { opacity: 0.6 },
+  taskRowEditing: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border
+  },
   taskTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
   taskControls: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },

@@ -83,11 +83,13 @@ create table if not exists projects (
   progress int not null default 0 check (progress between 0 and 100),
   priority priority_level not null default 'Medium',
   next_action text,
+  due_at timestamptz,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table projects add column if not exists priority priority_level not null default 'Medium';
+alter table projects add column if not exists due_at timestamptz;
 
 create table if not exists project_tasks (
   id uuid primary key default gen_random_uuid(),

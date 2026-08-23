@@ -17,6 +17,7 @@ import { formatShortDate } from '@/lib/format';
 import type { OwnerType } from '@/types/db';
 
 const OWNERS: OwnerType[] = ['Mufida', 'Victoria', 'Both'];
+const OWNER_CHIP_LABEL: Record<OwnerType, string> = { Mufida: 'M', Victoria: 'V', Both: 'Both' };
 
 export default function DecisionsScreen() {
   const { session } = useAuth();
@@ -170,7 +171,7 @@ export default function DecisionsScreen() {
           <View style={styles.ownerPicker}>
             {OWNERS.map(o => (
               <Pressable key={o} onPress={() => setOwner(o)}>
-                <Text style={[styles.ownerChip, owner === o && styles.ownerChipActive]}>{o}</Text>
+                <Text style={[styles.ownerChip, owner === o && styles.ownerChipActive]}>{OWNER_CHIP_LABEL[o]}</Text>
               </Pressable>
             ))}
           </View>

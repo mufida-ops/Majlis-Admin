@@ -1,4 +1,5 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
+import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import type { ProjectRow, ProjectStatus, TaskDependencyRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
 
 export type ProjectWithTasks = ProjectRow & { project_tasks: ProjectTaskRow[] };
@@ -41,9 +42,26 @@ export async function createProject(input: {
   return unwrap(result) as ProjectRow;
 }
 
+// Creates a project pre-loaded with the standard book-production checklist
+// (see lib/bookTemplate.ts) instead of an empty task list.
+export async function createBookProject(input: { workspace_id: string; title: string; created_by: string }) {
+  const project = await createProject({ workspace_id: input.workspace_id, title: input.title, created_by: input.created_by });
+  const supabase = requireSupabase();
+  const result = await supabase.from('project_tasks').insert(
+    BOOK_TASK_TEMPLATE.map(title => ({
+      workspace_id: input.workspace_id,
+      project_id: project.id,
+      title,
+      created_by: input.created_by
+    }))
+  );
+  unwrap(result);
+  return project;
+}
+
 export async function updateProject(
   id: string,
-  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action'>>
+  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at'>>
 ) {
   // progress is intentionally not editable here: it's derived server-side
   // (see recalc_project_progress in supabase/schema.sql) from the sum of

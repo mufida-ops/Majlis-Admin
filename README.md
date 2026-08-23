@@ -41,7 +41,19 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   explicitly rather than via the DB column default, since changing an enum's default in the same migration that
   adds the enum value hits Postgres's "unsafe use of new value" restriction. The Projects list sorts by priority
   (High first) and shows a colored "High/Medium/Low priority" chip per card — the left-edge color accent alone was
-  too easy to miss.
+  too easy to miss. Projects can also carry their own due date (`projects.due_at`), separate from any task's,
+  editable from the project detail screen and shown on its list card.
+- Owner tags are just the initial — "M"/"V" — everywhere someone or something is labelled by who it belongs to
+  (task rows, the owner picker when adding/editing a task, CRM pills, Discussion owner chips), not the full name.
+  `memberLabel` in `lib/ownerLabel.ts` is the single place this is decided.
+- A task's edit (pencil icon) opens its title, owner, priority, and due date together as one inline form — not
+  just the title — so reassigning or redating a task never requires opening its thread.
+- Projects can be started from a "Book" template as well as a blank one (a toggle on the "New project" form): pick
+  "Book", enter the book's title, and it creates the project pre-loaded with the ~60-item checklist Mufida already
+  runs by hand for every book (`lib/bookTemplate.ts`, `createBookProject` in `lib/repositories/projects.ts`) — Book
+  Creation, Book Checking, ISBN, Book Box Paper Resources, Hello Chef Guidance, Props, Praveen, and the Cultural
+  Box. Those tasks start unassigned and undated (there's no single sensible default across ~60 items) — assign and
+  date each one via the task edit form above as work starts on it.
 - Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
   plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
   blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used

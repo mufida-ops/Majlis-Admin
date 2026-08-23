@@ -12,9 +12,10 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listProjects, createProject, updateProject, deleteProject } from '@/lib/repositories/projects';
+import { listProjects, createProject, createBookProject, updateProject, deleteProject } from '@/lib/repositories/projects';
 import { summarizeOwners, memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
+import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
 import { computeProjectProgress } from '@/lib/taskStatus';
 
@@ -27,6 +28,7 @@ export default function ProjectsScreen() {
   );
 
   const [showNew, setShowNew] = useState(false);
+  const [newKind, setNewKind] = useState<'project' | 'book'>('project');
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,9 +39,14 @@ export default function ProjectsScreen() {
     if (!title.trim() || !workspaceId || !session) return;
     setCreating(true);
     try {
-      await createProject({ workspace_id: workspaceId, title: title.trim(), created_by: session.user.id });
+      if (newKind === 'book') {
+        await createBookProject({ workspace_id: workspaceId, title: title.trim(), created_by: session.user.id });
+      } else {
+        await createProject({ workspace_id: workspaceId, title: title.trim(), created_by: session.user.id });
+      }
       setTitle('');
       setShowNew(false);
+      setNewKind('project');
       refresh();
     } finally {
       setCreating(false);
@@ -131,6 +138,7 @@ export default function ProjectsScreen() {
                     )}
                     <Text style={styles.meta}>
                       {ownerLabel} · {project.status}
+                      {project.due_at ? ` · due ${toDateInputValue(project.due_at)}` : ''}
                     </Text>
                   </View>
                   {isEditing ? (
@@ -179,17 +187,33 @@ export default function ProjectsScreen() {
 
       {showNew ? (
         <Card>
-          <Text style={styles.label}>New project</Text>
+          <Text style={styles.label}>{newKind === 'book' ? 'New book' : 'New project'}</Text>
+          <View style={styles.kindPicker}>
+            <Pressable onPress={() => setNewKind('project')}>
+              <Text style={[styles.kindChip, newKind === 'project' && styles.kindChipActive]}>Project</Text>
+            </Pressable>
+            <Pressable onPress={() => setNewKind('book')}>
+              <Text style={[styles.kindChip, newKind === 'book' && styles.kindChipActive]}>Book</Text>
+            </Pressable>
+          </View>
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="Project title"
+            placeholder={newKind === 'book' ? 'Book title' : 'Project title'}
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
           />
+          {newKind === 'book' ? (
+            <Text style={styles.meta}>
+              Creates {BOOK_TASK_TEMPLATE.length} tasks for the usual book workflow — book creation, checking, ISBN,
+              props, Praveen, and the cultural box. Assign and date each one from the project.
+            </Text>
+          ) : null}
           <View style={styles.buttons}>
             <Pressable style={styles.primary} onPress={create} disabled={creating || !title.trim()}>
-              <Text style={styles.primaryText}>{creating ? 'Creating…' : 'Create project'}</Text>
+              <Text style={styles.primaryText}>
+                {creating ? 'Creating…' : newKind === 'book' ? 'Create book project' : 'Create project'}
+              </Text>
             </Pressable>
             <Pressable style={styles.secondary} onPress={() => setShowNew(false)}>
               <Text style={styles.secondaryText}>Cancel</Text>
@@ -229,6 +253,17 @@ const styles = StyleSheet.create({
   progressTrack: { height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, marginTop: 10, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
+  kindPicker: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  kindChip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    color: theme.colors.text,
+    fontSize: 13
+  },
+  kindChipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, color: '#fff' },
   input: {
     marginTop: 12,
     padding: 14,

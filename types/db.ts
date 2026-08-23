@@ -34,6 +34,7 @@ export type ProjectRow = {
   progress: number;
   priority: PriorityLevel;
   next_action: string | null;
+  due_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
