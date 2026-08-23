@@ -15,7 +15,7 @@ import { useAsync } from '@/lib/useAsync';
 import { getProject, createTask, updateTask, deleteTask, deleteProject, setProjectStatus, updateProject } from '@/lib/repositories/projects';
 import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
-import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
+import { TASK_STATUSES, TASK_STATUS_DISPLAY_ORDER, computeProjectProgress } from '@/lib/taskStatus';
 import { PRIORITY_LEVELS } from '@/lib/priority';
 import { PROJECT_STATUS_TINT } from '@/lib/projectStatus';
 import { BOOK_SECTIONS } from '@/lib/bookTemplate';
@@ -369,7 +369,7 @@ export default function ProjectDetailScreen() {
   };
 
   const renderTaskGroups = (tasks: ProjectTaskRow[]) =>
-    TASK_STATUSES.map(status => {
+    TASK_STATUS_DISPLAY_ORDER.map(status => {
       const tasksInStatus = tasks.filter(t => t.status === status);
       if (tasksInStatus.length === 0) return null;
       return (

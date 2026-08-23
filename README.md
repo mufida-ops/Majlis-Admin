@@ -94,7 +94,14 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   Active, green for Complete (`PROJECT_STATUS_TINT` in `lib/projectStatus.ts`) — not by who created the project,
   since a project is joint work rather than one founder's or the other's; the owner tint stays exactly where it
   still makes sense, on individual task rows. A Done task also turns the same green there (overriding its owner
-  tint the same way), and already sorts to the bottom of its group since `TASK_STATUSES` orders Done last.
+  tint the same way).
+- Task groups within a project display in `TASK_STATUS_DISPLAY_ORDER` (`lib/taskStatus.ts`) — Started and Ongoing
+  first, then Not Started, then Done last — not the lifecycle order tasks move through. A task that's actually
+  being worked on should sit above ones that haven't started yet, not below them; `TASK_STATUSES` itself stays in
+  lifecycle order for the status picker and the cycling badge, where that order is the one that makes sense to
+  pick from. The status dot also carries no color judgment before a task has started (Not Started stays neutral
+  grey) — amber kicks in once it's Started or Ongoing, green on Done, the same red-less progression used for
+  projects.
 - The Gantt/"Show timeline" view (`components/Gantt.tsx`) was removed. It rendered every task as a flat,
   unordered, non-interactive bar — no section grouping, no owner colors, no edit/delete/flag — sitting right next
   to the real Tasks card, which does all of that. It was reported as confusing rather than useful (mistaken for
