@@ -34,6 +34,16 @@ export default function ProjectsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [expandedTimelines, setExpandedTimelines] = useState<Set<string>>(new Set());
+
+  const toggleTimeline = (id: string) => {
+    setExpandedTimelines(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const create = async () => {
     if (!title.trim() || !workspaceId || !session) return;
@@ -175,8 +185,19 @@ export default function ProjectsScreen() {
                   <View style={[styles.progressBar, { width: `${progress}%` }]} />
                 </View>
                 {ganttTasks.length > 0 ? (
-                  <View style={{ marginTop: 18 }}>
-                    <Gantt tasks={ganttTasks} />
+                  <View style={{ marginTop: 12 }}>
+                    <Pressable hitSlop={8} onPress={() => toggleTimeline(project.id)}>
+                      <Text style={styles.timelineToggle}>
+                        {expandedTimelines.has(project.id)
+                          ? '▾ Hide timeline'
+                          : `▸ Show timeline (${ganttTasks.length} task${ganttTasks.length === 1 ? '' : 's'})`}
+                      </Text>
+                    </Pressable>
+                    {expandedTimelines.has(project.id) ? (
+                      <View style={{ marginTop: 12 }}>
+                        <Gantt tasks={ganttTasks} />
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </Card>
@@ -252,6 +273,7 @@ const styles = StyleSheet.create({
   next: { color: theme.colors.text, marginTop: 12 },
   progressTrack: { height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, marginTop: 10, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
+  timelineToggle: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   kindPicker: { flexDirection: 'row', gap: 8, marginTop: 12 },
   kindChip: {

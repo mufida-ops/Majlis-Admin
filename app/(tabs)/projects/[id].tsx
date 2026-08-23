@@ -56,6 +56,7 @@ export default function ProjectDetailScreen() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [savingTitle, setSavingTitle] = useState(false);
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -341,10 +342,19 @@ export default function ProjectDetailScreen() {
 
       {ganttTasks.length > 0 ? (
         <Card>
-          <Text style={styles.label}>Timeline</Text>
-          <View style={{ marginTop: 14 }}>
-            <Gantt tasks={ganttTasks} />
+          <View style={styles.titleEditRow}>
+            <Text style={[styles.label, { flex: 1 }]}>Timeline</Text>
+            <Pressable hitSlop={8} onPress={() => setTimelineExpanded(v => !v)}>
+              <Text style={styles.saveText}>
+                {timelineExpanded ? 'Hide' : `Show (${ganttTasks.length} task${ganttTasks.length === 1 ? '' : 's'})`}
+              </Text>
+            </Pressable>
           </View>
+          {timelineExpanded ? (
+            <View style={{ marginTop: 14 }}>
+              <Gantt tasks={ganttTasks} />
+            </View>
+          ) : null}
         </Card>
       ) : null}
 

@@ -67,6 +67,9 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   `project_tasks.needs_review` and shows a "🔍 Needs review" line until whoever looks it over taps the flag again to
   clear it. Independent of status/priority/owner — a task can be Ongoing, assigned to either founder, and flagged
   for review all at once.
+- A project's Gantt timeline is collapsed by default behind a "Show timeline (N tasks)" toggle, on both the
+  Projects list and the project detail page — a 59-task book project was rendering a bar per task and making the
+  card (and the page) enormous.
 - Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
   plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
   blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used
