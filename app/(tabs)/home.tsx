@@ -86,6 +86,17 @@ export default function HomeScreen() {
       });
     }
 
+    const flaggedProject = data.projects.find(p => p.needs_review && p.created_by !== me.user_id);
+    if (flaggedProject) {
+      items.push({
+        key: `review-project-${flaggedProject.id}`,
+        eyebrow: `Needs review · ${flaggedProject.title}`,
+        title: flaggedProject.next_action ?? 'Next action',
+        meta: '🔍 Flagged for you to check',
+        href: `/(tabs)/projects/${flaggedProject.id}`
+      });
+    }
+
     const myTask = data.projects
       .flatMap(p => p.project_tasks.map(t => ({ task: t, project: p })))
       .filter(({ task }) => task.status !== 'Done' && task.owner_user_id === me.user_id)

@@ -62,7 +62,7 @@ export async function createBookProject(input: { workspace_id: string; title: st
 
 export async function updateProject(
   id: string,
-  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at'>>
+  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review'>>
 ) {
   // progress is intentionally not editable here: it's derived server-side
   // (see recalc_project_progress in supabase/schema.sql) from the sum of

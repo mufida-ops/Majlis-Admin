@@ -143,6 +143,29 @@ export default function ProjectDetailScreen() {
     setNextAction('');
   };
 
+  const clearNextAction = () => {
+    Alert.alert('Clear the next action?', '', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: async () => {
+          const updated = await updateProject(project.id, { next_action: null });
+          setData({ ...project, ...updated });
+        }
+      }
+    ]);
+  };
+
+  const toggleProjectNeedsReview = async () => {
+    try {
+      const updated = await updateProject(project.id, { needs_review: !project.needs_review });
+      setData({ ...project, ...updated });
+    } catch (err) {
+      Alert.alert('Could not flag this', err instanceof Error ? err.message : 'Please try again.');
+    }
+  };
+
   const saveProjectDueDate = async () => {
     if (!projectDueDate.trim()) return;
     if (!DATE_RE.test(projectDueDate.trim())) {
@@ -153,6 +176,11 @@ export default function ProjectDetailScreen() {
     const updated = await updateProject(project.id, { due_at: new Date(`${projectDueDate.trim()}T00:00:00`).toISOString() });
     setData({ ...project, ...updated });
     setProjectDueDate('');
+  };
+
+  const clearProjectDueDate = async () => {
+    const updated = await updateProject(project.id, { due_at: null });
+    setData({ ...project, ...updated });
   };
 
   const addTask = async () => {
@@ -430,7 +458,14 @@ export default function ProjectDetailScreen() {
       </Card>
 
       <Card>
-        <Text style={styles.label}>Next action</Text>
+        <View style={styles.titleEditRow}>
+          <Text style={[styles.label, { flex: 1 }]}>Next action</Text>
+          {project.next_action ? (
+            <Pressable hitSlop={8} onPress={clearNextAction}>
+              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.nextAction}>{project.next_action ?? 'Not set yet.'}</Text>
         <TextInput
           value={nextAction}
@@ -446,11 +481,18 @@ export default function ProjectDetailScreen() {
         >
           <Text style={styles.primaryText}>Save next action</Text>
         </Pressable>
-      </Card>
 
-      <Card>
-        <Text style={styles.label}>Due date</Text>
-        <Text style={styles.nextAction}>{project.due_at ? toDateInputValue(project.due_at) : 'Not set yet.'}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Due date</Text>
+        <View style={styles.titleEditRow}>
+          <Text style={[styles.nextAction, { flex: 1, marginTop: 0 }]}>
+            {project.due_at ? toDateInputValue(project.due_at) : 'Not set yet.'}
+          </Text>
+          {project.due_at ? (
+            <Pressable hitSlop={8} onPress={clearProjectDueDate}>
+              <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
         <TextInput
           value={projectDueDate}
           onChangeText={setProjectDueDate}
@@ -465,6 +507,12 @@ export default function ProjectDetailScreen() {
           disabled={!projectDueDate.trim()}
         >
           <Text style={styles.primaryText}>Save due date</Text>
+        </Pressable>
+
+        <Pressable style={styles.reviewToggle} onPress={toggleProjectNeedsReview} hitSlop={8}>
+          <Text style={project.needs_review ? styles.needsReview : styles.fieldLabel}>
+            {project.needs_review ? '🔍 Needs review — tap to clear' : '+ Flag for review'}
+          </Text>
         </Pressable>
       </Card>
 
@@ -628,6 +676,7 @@ const styles = StyleSheet.create({
   newTask: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   taskError: { color: theme.colors.danger, fontSize: 12, marginTop: 8 },
   fieldLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 12 },
+  reviewToggle: { marginTop: 16 },
   ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   discussProject: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },
   deleteProjectButton: { padding: 16, borderRadius: theme.radius.md, alignItems: 'center' },

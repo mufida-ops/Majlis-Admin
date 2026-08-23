@@ -84,12 +84,14 @@ create table if not exists projects (
   priority priority_level not null default 'Medium',
   next_action text,
   due_at timestamptz,
+  needs_review boolean not null default false,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table projects add column if not exists priority priority_level not null default 'Medium';
 alter table projects add column if not exists due_at timestamptz;
+alter table projects add column if not exists needs_review boolean not null default false;
 
 create table if not exists project_tasks (
   id uuid primary key default gen_random_uuid(),

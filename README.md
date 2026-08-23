@@ -74,6 +74,11 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   screen (`app/(tabs)/home.tsx`) — not the flagger's own — since review is for the partner, not a self-reminder.
   Toggling the flag now surfaces a real error (instead of silently doing nothing) if it fails, e.g. before the
   `needs_review` column migration has been run.
+- The project-level "Next action" and "Due date" cards got the same edit/delete/flag treatment as individual
+  tasks, not just a plain text field with a Save button: a trash icon clears the next action or the due date, and
+  a "Flag for review" toggle (`projects.needs_review`, separate from any task's own flag) surfaces the same way
+  on the partner's Home when it's not the flagger's own project. The two cards are merged into one, since they're
+  really one "what's next and when" unit.
 - A project's Gantt timeline is collapsed by default behind a "Show timeline (N tasks)" toggle, on both the
   Projects list and the project detail page — a 59-task book project was rendering a bar per task and making the
   card (and the page) enormous.
