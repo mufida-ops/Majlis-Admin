@@ -35,6 +35,24 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
 
+      # Majlis Media Studio (media-app/) is a separate app with its own
+      # Supabase project, published alongside the Founder OS site at
+      # /Majlis-Admin/media/ rather than as its own GitHub Pages site
+      # (one Pages deployment per repo). Its Supabase URL/publishable key
+      # are safe to keep in plain view here — a "publishable" key is
+      # explicitly meant to ship inside a browser bundle; access control is
+      # enforced by Postgres Row Level Security, not by hiding this value.
+      - run: npm ci
+        working-directory: media-app
+
+      - run: npm run build:web
+        working-directory: media-app
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://yzzugkgrqbjwzcxsldmz.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_X1Seg-zrfhjj67yrsfmLcA_yWmdC41V
+
+      - run: rm -rf dist/media && mkdir -p dist/media && cp -r media-app/dist/. dist/media/
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
