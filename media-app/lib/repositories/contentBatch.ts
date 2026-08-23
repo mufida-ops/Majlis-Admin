@@ -5,6 +5,10 @@ export interface ProposedContentItem {
   title: string;
   due_date: string | null;
   priority: ContentPriority;
+  description: string | null;
+  script: string | null;
+  campaign: string | null;
+  tags: string[];
   notes: string | null;
 }
 
@@ -24,6 +28,10 @@ export async function parseContentBatch(text: string, todayDate: string): Promis
     title: item.title,
     due_date: item.due_date ?? null,
     priority: item.priority ?? 'normal',
+    description: item.description ?? null,
+    script: item.script ?? null,
+    campaign: item.campaign ?? null,
+    tags: item.tags ?? [],
     notes: item.notes ?? null
   }));
 }
