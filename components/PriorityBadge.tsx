@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { PRIORITY_COLOR, nextPriority } from '@/lib/priority';
 import type { PriorityLevel } from '@/types/db';
@@ -10,6 +11,7 @@ export function PriorityBadge({ value, onChange }: { value: PriorityLevel; onCha
     <Pressable style={styles.badge} onPress={() => onChange(nextPriority(value))} hitSlop={8}>
       <View style={[styles.dot, { backgroundColor: PRIORITY_COLOR[value] }]} />
       <Text style={styles.label}>{value}</Text>
+      <Ionicons name="chevron-down" size={12} color={theme.colors.muted} />
     </Pressable>
   );
 }

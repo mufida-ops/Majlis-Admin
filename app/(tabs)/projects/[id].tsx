@@ -49,6 +49,7 @@ export default function ProjectDetailScreen() {
   const [editTaskTitle, setEditTaskTitle] = useState('');
   const [editTaskOwner, setEditTaskOwner] = useState<string | null>(null);
   const [editTaskPriority, setEditTaskPriority] = useState<PriorityLevel>('Medium');
+  const [editTaskStatus, setEditTaskStatus] = useState<TaskStatus>('Not Started');
   const [editTaskDueDate, setEditTaskDueDate] = useState('');
   const [editTaskError, setEditTaskError] = useState('');
   const [savingTaskEdit, setSavingTaskEdit] = useState(false);
@@ -132,7 +133,11 @@ export default function ProjectDetailScreen() {
   };
 
   const addTask = async () => {
-    if (!taskTitle.trim() || !workspaceId || !session) return;
+    if (!workspaceId || !session) return;
+    if (!taskTitle.trim()) {
+      setTaskError('Add a title first.');
+      return;
+    }
     if (!taskOwner) {
       setTaskError('Pick who this is for first.');
       return;
@@ -172,6 +177,7 @@ export default function ProjectDetailScreen() {
     setEditTaskTitle(task.title);
     setEditTaskOwner(task.owner_user_id);
     setEditTaskPriority(task.priority);
+    setEditTaskStatus(task.status);
     setEditTaskDueDate(task.due_at ? toDateInputValue(task.due_at) : '');
     setEditTaskError('');
   };
@@ -203,6 +209,7 @@ export default function ProjectDetailScreen() {
         title: editTaskTitle.trim(),
         owner_user_id: editTaskOwner,
         priority: editTaskPriority,
+        status: editTaskStatus,
         due_at: new Date(`${editTaskDueDate.trim()}T00:00:00`).toISOString()
       });
       setEditingTaskId(null);
@@ -354,6 +361,14 @@ export default function ProjectDetailScreen() {
                           placeholderTextColor={theme.colors.muted}
                           style={styles.input}
                         />
+                        <Text style={styles.fieldLabel}>Progress</Text>
+                        <View style={styles.ownerPicker}>
+                          {TASK_STATUSES.map(status => (
+                            <Pressable key={status} onPress={() => setEditTaskStatus(status)}>
+                              <Pill label={editTaskStatus === status ? `● ${TASK_STATUS_LABEL[status]}` : TASK_STATUS_LABEL[status]} />
+                            </Pressable>
+                          ))}
+                        </View>
                         <Text style={styles.fieldLabel}>Who's this for?</Text>
                         <View style={styles.ownerPicker}>
                           {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
@@ -457,7 +472,11 @@ export default function ProjectDetailScreen() {
             ))}
           </View>
           {taskError ? <Text style={styles.taskError}>{taskError}</Text> : null}
-          <Pressable style={styles.primarySmall} onPress={addTask} disabled={addingTask || !taskTitle.trim()}>
+          <Pressable
+            style={[styles.primarySmall, addingTask && styles.primarySmallDisabled]}
+            onPress={addTask}
+            disabled={addingTask}
+          >
             <Text style={styles.primaryText}>{addingTask ? 'Adding…' : '+ Add task'}</Text>
           </Pressable>
         </View>
@@ -501,6 +520,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 12
   },
+  primarySmallDisabled: { opacity: 0.5 },
   primaryText: { color: '#fff', fontWeight: '600' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   progressTrack: { flex: 1, height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, overflow: 'hidden' },

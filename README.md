@@ -46,8 +46,13 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
 - Owner tags are just the initial — "M"/"V" — everywhere someone or something is labelled by who it belongs to
   (task rows, the owner picker when adding/editing a task, CRM pills, Discussion owner chips), not the full name.
   `memberLabel` in `lib/ownerLabel.ts` is the single place this is decided.
-- A task's edit (pencil icon) opens its title, owner, priority, and due date together as one inline form — not
-  just the title — so reassigning or redating a task never requires opening its thread.
+- A task's edit (pencil icon) opens its title, owner, priority, status/progress, and due date together as one
+  inline form — not just the title — so changing any of them never requires opening the task's own thread. The
+  compact status/priority pills on each task row still work too (tap to cycle), now with a small chevron so it's
+  visibly tappable rather than looking like a static label.
+- "+ Add task" is always tappable, even with an empty title — it validates on tap and shows what's missing (title,
+  owner, or due date) instead of silently doing nothing, which is what a disabled-but-visually-identical button
+  looked like before.
 - Projects can be started from a "Book" template as well as a blank one (a toggle on the "New project" form): pick
   "Book", enter the book's title, and it creates the project pre-loaded with the ~60-item checklist Mufida already
   runs by hand for every book (`lib/bookTemplate.ts`, `createBookProject` in `lib/repositories/projects.ts`) — Book
