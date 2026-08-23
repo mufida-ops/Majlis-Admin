@@ -10,6 +10,7 @@ on:
       - claude/mvp-production-build-j5x1sd
     paths:
       - 'supabase/functions/**'
+      - 'media-app/supabase/functions/**'
   workflow_dispatch: {}
 
 jobs:
@@ -30,5 +31,28 @@ jobs:
       - run: supabase functions deploy ai-chat --project-ref "$SUPABASE_PROJECT_REF"
 
       - run: supabase secrets set "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # Majlis Media Studio (media-app/) has its own, separate Supabase project —
+  # same account/org as the Founder OS one above, so the same access token
+  # and Anthropic key work, just deployed against a different project ref.
+  deploy-media:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: yzzugkgrqbjwzcxsldmz
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - run: supabase functions deploy parse-content-batch --project-ref "$SUPABASE_PROJECT_REF"
+        working-directory: media-app
+
+      - run: supabase secrets set "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" --project-ref "$SUPABASE_PROJECT_REF"
+        working-directory: media-app
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

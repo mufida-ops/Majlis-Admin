@@ -328,6 +328,11 @@ Discussions, to avoid a schema migration for a cosmetic rename.
   `history.replaceState` before expo-router boots — a script now injected into both apps' `index.html`
   (`scripts/inject-pwa-head.js` for the root app, the new `media-app/scripts/inject-spa-redirect.js` for Media
   Studio, since it has no existing PWA-tag injection step to piggyback on).
+- Media Studio's Edge Functions now deploy automatically too: `.github/workflows/deploy-supabase-functions.yml`
+  gained a `deploy-media` job (triggered on `media-app/supabase/functions/**` changes) that deploys against
+  Media Studio's own separate Supabase project ref, using the same `SUPABASE_ACCESS_TOKEN`/`ANTHROPIC_API_KEY`
+  secrets as the Founder OS app's job — one Supabase account, two projects. See `media-app/README.md` for what the
+  new `parse-content-batch` function it deploys actually does.
 
 ## Suggested AI actions
 

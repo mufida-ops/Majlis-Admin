@@ -30,10 +30,16 @@ export default function Home() {
       </View>
 
       {canCreate && (
-        <Pressable style={styles.newButton} onPress={() => router.push('/content/new')}>
-          <Feather name="plus" size={18} color="#FFF" />
-          <Text style={styles.newButtonText}>New content idea</Text>
-        </Pressable>
+        <View style={{ gap: spacing.sm }}>
+          <Pressable style={styles.newButton} onPress={() => router.push('/content/new')}>
+            <Feather name="plus" size={18} color="#FFF" />
+            <Text style={styles.newButtonText}>New content idea</Text>
+          </Pressable>
+          <Pressable style={styles.batchButton} onPress={() => router.push('/content/batch-add')}>
+            <Feather name="message-circle" size={18} color={colors.navy} />
+            <Text style={styles.batchButtonText}>Describe a month's content, get it organized</Text>
+          </Pressable>
+        </View>
       )}
 
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -65,5 +71,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'
   },
   newButtonText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  batchButton: {
+    marginHorizontal: spacing.lg, backgroundColor: colors.goldSoft, borderRadius: radii.md, paddingVertical: 14,
+    flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'
+  },
+  batchButtonText: { color: colors.navy, fontWeight: '700', fontSize: 13, textAlign: 'center', flexShrink: 1 },
   errorText: { color: colors.danger, paddingHorizontal: spacing.lg }
 });

@@ -17,6 +17,7 @@ export default function RootLayout() {
           options={{ headerShown: true, title: '', headerStyle: { backgroundColor: colors.background }, headerTintColor: colors.navy }}
         />
         <Stack.Screen name="content/new" options={{ headerShown: true, title: 'New idea' }} />
+        <Stack.Screen name="content/batch-add" options={{ headerShown: true, title: 'Batch add' }} />
         <Stack.Screen name="bank/[id]" options={{ headerShown: true, headerStyle: { backgroundColor: colors.background }, headerTintColor: colors.navy }} />
         <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Notifications' }} />
         <Stack.Screen name="admin/campaigns-tags" options={{ headerShown: true, title: 'Campaigns & Tags' }} />

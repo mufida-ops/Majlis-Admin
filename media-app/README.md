@@ -41,6 +41,12 @@ state machine, navigation, build-now-vs-needs-API split) and
   centre (grouped, in-app), **Insights** (this month's content mix),
   **Search** (title/campaign/tag/caption/filename), admin screens for
   campaigns/tags/content types and role management.
+- **Batch add** — describe a month's content in your own words (a paragraph or rough list) on the Home tab's
+  "Describe a month's content, get it organized" button, and `parse-content-batch` (Edge Function, Anthropic
+  tool-calling) splits it into separate content items — title, due date, priority — for you to review, edit, untick,
+  or remove before anything is actually created. The function only parses text (no database access, no service
+  role key needed); each confirmed item is then created client-side through the same `createContentItem()` path a
+  manually-created item uses, so ownership/RLS work identically either way.
 - **Publishing architecture** — a real adapter abstraction
   (`lib/publishing/`) and an Edge Function dispatcher
   (`supabase/functions/publish-dispatcher`) that schedules/retries per
