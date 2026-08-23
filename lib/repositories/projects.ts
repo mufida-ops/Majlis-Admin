@@ -60,6 +60,29 @@ export async function createBookProject(input: { workspace_id: string; title: st
   return project;
 }
 
+// Adds the standard book checklist to a project that didn't get it at
+// creation — e.g. one added before the book template existed, or one
+// started as a plain project and turned out to be a book. Only inserts
+// tasks whose titles aren't already present, so re-running this (or running
+// it on a project that already has some of the checklist by hand) never
+// creates duplicates.
+export async function applyBookTemplate(project: ProjectWithTasks, createdBy: string) {
+  const existingTitles = new Set(project.project_tasks.map(t => t.title));
+  const missing = BOOK_TASK_TEMPLATE.filter(({ title }) => !existingTitles.has(title));
+  if (missing.length === 0) return;
+  const supabase = requireSupabase();
+  const result = await supabase.from('project_tasks').insert(
+    missing.map(({ section, title }) => ({
+      workspace_id: project.workspace_id,
+      project_id: project.id,
+      title,
+      section,
+      created_by: createdBy
+    }))
+  );
+  unwrap(result);
+}
+
 export async function updateProject(
   id: string,
   patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review' | 'completed_at'>>

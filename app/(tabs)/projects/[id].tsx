@@ -12,13 +12,22 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { getProject, createTask, updateTask, deleteTask, deleteProject, setProjectStatus, updateProject } from '@/lib/repositories/projects';
+import {
+  getProject,
+  createTask,
+  updateTask,
+  deleteTask,
+  deleteProject,
+  setProjectStatus,
+  updateProject,
+  applyBookTemplate
+} from '@/lib/repositories/projects';
 import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, TASK_STATUS_DISPLAY_ORDER, computeProjectProgress } from '@/lib/taskStatus';
 import { PRIORITY_LEVELS } from '@/lib/priority';
 import { PROJECT_STATUS_TINT } from '@/lib/projectStatus';
-import { BOOK_SECTIONS } from '@/lib/bookTemplate';
+import { BOOK_SECTIONS, BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const BOOK_SECTION_ORDER = BOOK_SECTIONS.map(s => s.section);
@@ -71,6 +80,7 @@ export default function ProjectDetailScreen() {
   const [titleDraft, setTitleDraft] = useState('');
   const [savingTitle, setSavingTitle] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [applyingBookTemplate, setApplyingBookTemplate] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -388,6 +398,37 @@ export default function ProjectDetailScreen() {
       );
     });
 
+  // Projects created before the book template existed (or started as a
+  // plain project and turned out to be a book) can be missing some or all
+  // of the standard ~59-task checklist — this is why a book project's
+  // percentage can look "wrong" when it's actually just working from a
+  // short task list. Counts against titles already present so it's safe
+  // to offer even if some checklist tasks were added by hand already.
+  const missingBookTasks = BOOK_TASK_TEMPLATE.filter(t => !project.project_tasks.some(pt => pt.title === t.title));
+
+  const confirmApplyBookTemplate = () => {
+    Alert.alert(
+      'Add the book checklist?',
+      `This adds the ${missingBookTasks.length} missing task${missingBookTasks.length === 1 ? '' : 's'} from the standard book workflow — book creation, checking, ISBN, and the rest — without touching what's already here.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: async () => {
+            if (!session) return;
+            setApplyingBookTemplate(true);
+            try {
+              await applyBookTemplate(project, session.user.id);
+              refresh();
+            } finally {
+              setApplyingBookTemplate(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const confirmDeleteProject = () => {
     Alert.alert(`Delete "${project.title}"?`, "This removes it and all its tasks. This can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
@@ -486,6 +527,17 @@ export default function ProjectDetailScreen() {
             {unsectionedTasks.length > 0 ? renderTaskGroups(unsectionedTasks) : null}
           </>
         )}
+        {missingBookTasks.length > 0 ? (
+          <Pressable
+            style={[styles.secondarySmall, applyingBookTemplate && styles.primarySmallDisabled]}
+            onPress={confirmApplyBookTemplate}
+            disabled={applyingBookTemplate}
+          >
+            <Text style={styles.secondaryText}>
+              {applyingBookTemplate ? 'Adding…' : `+ Add book checklist (${missingBookTasks.length} missing)`}
+            </Text>
+          </Pressable>
+        ) : null}
         <View style={styles.newTask}>
           <TextInput
             value={taskTitle}
@@ -631,6 +683,16 @@ const styles = StyleSheet.create({
   },
   primarySmallDisabled: { opacity: 0.5 },
   primaryText: { color: '#fff', fontWeight: '600' },
+  secondarySmall: {
+    borderWidth: 1,
+    borderColor: theme.colors.navy,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+    marginTop: 16
+  },
+  secondaryText: { color: theme.colors.navy, fontWeight: '600' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   progressTrack: { flex: 1, height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },

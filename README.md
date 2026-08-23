@@ -115,6 +115,19 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   unordered, non-interactive bar — no section grouping, no owner colors, no edit/delete/flag — sitting right next
   to the real Tasks card, which does all of that. It was reported as confusing rather than useful (mistaken for
   the actual task list) and never served a workflow Mufida or Victoria used, so it's gone rather than fixed.
+- The percentage on a project always comes straight from `computeProjectProgress` — the share of its tasks marked
+  Done — never overridden by the status pill; setting a project to Complete used to force it to a flat 100%
+  regardless of the task list, which could disagree with what was actually shown on screen. A one-line description
+  under the status pills (`STATUS_DESCRIPTION` in `app/(tabs)/projects/[id].tsx`) now also spells out what each of
+  Not Started/Active/Blocked/Complete means in plain language.
+- Blocked projects get their own orange tint (`statusOrangePale` in `constants/theme.ts`), distinct from Not
+  Started's red — the two used to share the same color and were easy to mix up on the Projects list.
+- A book project created before the book checklist existed — or one that started as a plain project and only later
+  turned out to be a book — can be missing some or all of the ~59-task template, which is why its percentage can
+  look low even though nothing's actually wrong: it's accurately reflecting a short task list, not the full
+  checklist. `applyBookTemplate` (`lib/repositories/projects.ts`) backfills the missing checklist tasks onto an
+  existing project, matched and skipped by title so it never duplicates tasks already there. The project detail
+  screen shows a "+ Add book checklist (N missing)" button under Tasks whenever any are missing.
 - Adding a task requires a due date and an owner (Mufida or Victoria — no more "Unassigned" at creation) up front,
   plus an explicit priority pick, so every task row can always show all three at a glance instead of some being
   blank. Each task row has its own edit (title) and delete icons, same confirm-before-delete pattern used
