@@ -34,6 +34,21 @@ const tags = `
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Majlis" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <script>
+    // Other half of public/404.html's redirect trick — undoes the "?/"
+    // path-folding back into a real path via history.replaceState, before
+    // expo-router boots and reads the URL, so a reload or a saved "Add to
+    // Home Screen" link on any in-app page lands back on that same page
+    // instead of 404ing.
+    (function (l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function (s) {
+          return s.replace(/~and~/g, '&');
+        }).join('?');
+        window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+      }
+    })(window.location);
+  </script>
 </head>`;
 
 if (html.includes('rel="manifest"')) {

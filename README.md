@@ -319,6 +319,16 @@ supabase/
 Note: the route/table names (`drop`, `decisions`) stay as-is internally — only the on-screen labels changed to Give /
 Discussions, to avoid a schema migration for a cosmetic rename.
 
+- Reloading either app on any page past its sign-in screen — or saving "Add to Home Screen" from one — used to 404,
+  since GitHub Pages only serves literal static files and has no server-side router to hand a deep client-side route
+  back to the app. Fixed with the standard spa-github-pages redirect trick: `public/404.html` (copied into `dist/`
+  by the export, and since both apps share one Pages deployment its `pathSegmentsToKeep` logic decides whether a
+  path belongs to Media Studio at `/Majlis-Admin/media/` or the Founder OS app at `/Majlis-Admin/`) folds the real
+  path into a `?/`-prefixed query string and bounces to that app's `index.html`, which unfolds it back via
+  `history.replaceState` before expo-router boots — a script now injected into both apps' `index.html`
+  (`scripts/inject-pwa-head.js` for the root app, the new `media-app/scripts/inject-spa-redirect.js` for Media
+  Studio, since it has no existing PWA-tag injection step to piggyback on).
+
 ## Suggested AI actions
 
 - create_task

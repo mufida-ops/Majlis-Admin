@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+    <script>
+      // GitHub Pages serves this whole site as static files, so a direct
+      // load of any client-side route (a reload, a deep link, an "Add to
+      // Home Screen" icon saved mid-navigation) 404s — there's no file at
+      // that path, only index.html knows how to route it. Two SPAs share
+      // this one Pages deployment (Founder OS at /Majlis-Admin/, Media
+      // Studio at /Majlis-Admin/media/), so figure out which app's
+      // index.html owns the path, then bounce there with the real path
+      // folded into the query string — the standard spa-github-pages
+      // redirect trick (github.com/rafgraph/spa-github-pages). Each app's
+      // own index.html unfolds it back via history.replaceState before its
+      // router boots, so the user never sees the bounce.
+      var l = window.location;
+      var pathSegmentsToKeep = l.pathname.indexOf('/Majlis-Admin/media') === 0 ? 2 : 1;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
