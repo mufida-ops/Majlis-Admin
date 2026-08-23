@@ -62,7 +62,7 @@ export async function createBookProject(input: { workspace_id: string; title: st
 
 export async function updateProject(
   id: string,
-  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review'>>
+  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review' | 'completed_at'>>
 ) {
   // progress is intentionally not editable here: it's derived server-side
   // (see recalc_project_progress in supabase/schema.sql) from the sum of
@@ -129,8 +129,11 @@ export async function deleteTask(id: string) {
   unwrap(result);
 }
 
+// completed_at is set the moment a project reaches Complete, and cleared if
+// it's ever moved back off Complete — so "date done" reflects when it
+// actually finished, not the last time any field on it changed.
 export async function setProjectStatus(id: string, status: ProjectStatus) {
-  return updateProject(id, { status });
+  return updateProject(id, { status, completed_at: status === 'Complete' ? new Date().toISOString() : null });
 }
 
 export async function addTaskDependency(taskId: string, dependsOnTaskId: string) {

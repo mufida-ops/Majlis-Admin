@@ -11,7 +11,8 @@ export const theme = {
     success: '#5F7A5A', // muted sage
     danger: '#9C4A3B', // warm brick red
     ownerPink: '#F1D4DE', // Victoria's task box color
-    ownerPurple: '#DCD0EA' // Mufida's task box color
+    ownerPurple: '#DCD0EA', // Mufida's task box color
+    completedGreen: '#DCE6D5' // finished-project row tint
   },
   radius: {
     sm: 10,

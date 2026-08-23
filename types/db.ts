@@ -36,6 +36,7 @@ export type ProjectRow = {
   next_action: string | null;
   due_at: string | null;
   needs_review: boolean;
+  completed_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -6,6 +6,10 @@ export function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
 }
 
+export function formatMonthYear(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { month: 'long', year: 'numeric' });
+}
+
 export function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const diffDay = Math.floor(diffMs / 86400000);

@@ -14,7 +14,7 @@ import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { listProjects, createProject, createBookProject, updateProject, deleteProject } from '@/lib/repositories/projects';
 import { summarizeOwners, memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
-import { toDateInputValue } from '@/lib/format';
+import { toDateInputValue, formatShortDate, formatMonthYear } from '@/lib/format';
 import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
 import { computeProjectProgress } from '@/lib/taskStatus';
@@ -105,6 +105,19 @@ export default function ProjectsScreen() {
     ]);
   };
 
+  // Completed projects, newest finish first, clustered into month groups —
+  // sorting first means walking the list once and starting a new group
+  // whenever the month label changes is enough, no separate re-sort needed.
+  const completedGroups: { month: string; items: NonNullable<typeof projects> }[] = [];
+  for (const p of [...(projects ?? [])]
+    .filter(p => p.status === 'Complete')
+    .sort((a, b) => new Date(b.completed_at ?? b.updated_at).getTime() - new Date(a.completed_at ?? a.updated_at).getTime())) {
+    const month = formatMonthYear(p.completed_at ?? p.updated_at);
+    const lastGroup = completedGroups[completedGroups.length - 1];
+    if (lastGroup && lastGroup.month === month) lastGroup.items.push(p);
+    else completedGroups.push({ month, items: [p] });
+  }
+
   return (
     <Screen>
       <SectionTitle title="Projects" subtitle="Shared work, owners, next actions and dependencies." />
@@ -119,7 +132,10 @@ export default function ProjectsScreen() {
       ) : (
         // Most important first — High priority projects lead the list
         // instead of just being colored the same as everything else.
-        [...projects]
+        // Complete ones move out of this flow entirely, into their own
+        // "Completed" section below, grouped by the month they were done.
+        projects
+          .filter(p => p.status !== 'Complete')
           .sort((a, b) => PRIORITY_LEVELS.indexOf(b.priority) - PRIORITY_LEVELS.indexOf(a.priority))
           .map(project => {
           const ganttTasks: GanttTask[] = project.project_tasks.map(task => ({
@@ -211,6 +227,59 @@ export default function ProjectsScreen() {
         })
       )}
 
+      {completedGroups.length > 0 ? (
+        <View style={{ gap: 10 }}>
+          <SectionTitle title="Completed" subtitle="Finished projects, most recent first." />
+          {completedGroups.map(group => (
+            <View key={group.month} style={styles.monthGroup}>
+              <Text style={styles.monthLabel}>{group.month}</Text>
+              {group.items.map(project => {
+                const isEditing = editingId === project.id;
+                return (
+                  <Pressable key={project.id} onPress={() => !isEditing && router.push(`/(tabs)/projects/${project.id}`)}>
+                    <Card style={{ backgroundColor: theme.colors.completedGreen }}>
+                      <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                          {isEditing ? (
+                            <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.editInput} autoFocus />
+                          ) : (
+                            <Text style={styles.title}>{project.title}</Text>
+                          )}
+                          <Text style={styles.meta}>
+                            ✓ Done {project.completed_at ? formatShortDate(project.completed_at) : formatShortDate(project.updated_at)}
+                          </Text>
+                        </View>
+                        <View style={styles.iconRow}>
+                          {isEditing ? (
+                            <>
+                              <Pressable hitSlop={10} onPress={() => saveEdit(project.id)} disabled={savingEdit}>
+                                <Text style={styles.saveText}>{savingEdit ? '…' : 'Save'}</Text>
+                              </Pressable>
+                              <Pressable hitSlop={10} onPress={cancelEdit} disabled={savingEdit}>
+                                <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+                              </Pressable>
+                            </>
+                          ) : (
+                            <>
+                              <Pressable hitSlop={10} onPress={() => startEdit(project.id, project.title)}>
+                                <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+                              </Pressable>
+                              <Pressable hitSlop={10} onPress={() => confirmDelete(project.id, project.title)}>
+                                <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+                              </Pressable>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    </Card>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {showNew ? (
         <Card>
           <Text style={styles.label}>{newKind === 'book' ? 'New book' : 'New project'}</Text>
@@ -279,6 +348,8 @@ const styles = StyleSheet.create({
   progressTrack: { height: 8, borderRadius: 99, backgroundColor: theme.colors.surfaceMuted, marginTop: 10, overflow: 'hidden' },
   progressBar: { height: 8, borderRadius: 99, backgroundColor: theme.colors.gold },
   timelineToggle: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
+  monthGroup: { gap: 10 },
+  monthLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   kindPicker: { flexDirection: 'row', gap: 8, marginTop: 12 },
   kindChip: {

@@ -83,6 +83,12 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   Projects list, and Home showing stale data — those screens had already fetched their data once and had no way
   to know it changed elsewhere. All three now use `useFocusEffect` to refetch every time they come back into view,
   not just on first load.
+- A project marked Complete moves out of the main Projects list into its own "Completed" section at the bottom,
+  turns green (`theme.colors.completedGreen`), and drops the priority/progress/timeline clutter in favor of just
+  its name and "✓ Done <date>" — grouped by the month it finished (`formatMonthYear` in `lib/format.ts`), newest
+  month first. `projects.completed_at` is set automatically the moment a project reaches Complete (and cleared if
+  it's ever moved back off it) so the date reflects when it actually finished, not the last time any field on it
+  happened to change.
 - A project's Gantt timeline is collapsed by default behind a "Show timeline (N tasks)" toggle, on both the
   Projects list and the project detail page — a 59-task book project was rendering a bar per task and making the
   card (and the page) enormous.
