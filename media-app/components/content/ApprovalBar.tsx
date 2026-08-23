@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { canApprove } from '@/lib/permissions';
@@ -22,7 +23,7 @@ export function ApprovalBar({ item, canEdit, onChanged }: { item: ContentItem; c
       await decide({ contentItemId: item.id, decidedBy: session!.user.id, decision: 'approved' });
       onChanged();
     } catch (err) {
-      Alert.alert('Could not approve', err instanceof Error ? err.message : String(err));
+      showAlert('Could not approve', err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -36,7 +37,7 @@ export function ApprovalBar({ item, canEdit, onChanged }: { item: ContentItem; c
       setNote('');
       onChanged();
     } catch (err) {
-      Alert.alert('Could not submit', err instanceof Error ? err.message : String(err));
+      showAlert('Could not submit', err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Feather } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAsync } from '@/lib/useAsync';
@@ -46,7 +47,7 @@ export function CommentsTab({ contentItemId }: { contentItemId: string }) {
   }
 
   function confirmDelete(c: Comment) {
-    Alert.alert('Delete comment?', undefined, [
+    showAlert('Delete comment?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteComment(c.id).then(reload) }
     ]);
