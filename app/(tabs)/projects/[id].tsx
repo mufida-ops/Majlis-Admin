@@ -18,7 +18,10 @@ import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
 import { TASK_STATUSES, computeProjectProgress } from '@/lib/taskStatus';
 import { PRIORITY_LEVELS } from '@/lib/priority';
+import { BOOK_SECTIONS } from '@/lib/bookTemplate';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
+
+const BOOK_SECTION_ORDER = BOOK_SECTIONS.map(s => s.section);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -57,6 +60,16 @@ export default function ProjectDetailScreen() {
   const [titleDraft, setTitleDraft] = useState('');
   const [savingTitle, setSavingTitle] = useState(false);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   if (loading) return <LoadingState label="Loading project…" />;
   if (error || !project) return <ErrorState message={error ?? 'Project not found.'} onRetry={refresh} />;
@@ -244,6 +257,106 @@ export default function ProjectDetailScreen() {
     ]);
   };
 
+  const renderTaskRow = (task: ProjectTaskRow) => {
+    const accent = ownerAccentColor(task.owner_user_id, me, partner);
+    if (editingTaskId === task.id) {
+      return (
+        <View key={task.id} style={[styles.taskRowEditing, { backgroundColor: accent ?? theme.colors.background }]}>
+          <TextInput value={editTaskTitle} onChangeText={setEditTaskTitle} style={styles.input} autoFocus />
+          <TextInput
+            value={editTaskDueDate}
+            onChangeText={setEditTaskDueDate}
+            placeholder="Due date, e.g. 2026-09-01"
+            placeholderTextColor={theme.colors.muted}
+            style={styles.input}
+          />
+          <Text style={styles.fieldLabel}>Progress</Text>
+          <View style={styles.ownerPicker}>
+            {TASK_STATUSES.map(status => (
+              <Pressable key={status} onPress={() => setEditTaskStatus(status)}>
+                <Pill label={editTaskStatus === status ? `● ${TASK_STATUS_LABEL[status]}` : TASK_STATUS_LABEL[status]} />
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.fieldLabel}>Who's this for?</Text>
+          <View style={styles.ownerPicker}>
+            {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
+              partner ? { label: partner.display_name.charAt(0).toUpperCase(), value: partner.user_id } : null]
+              .filter((o): o is { label: string; value: string } => o !== null)
+              .map(option => (
+                <Pressable key={option.label} onPress={() => setEditTaskOwner(option.value)}>
+                  <Pill label={editTaskOwner === option.value ? `● ${option.label}` : option.label} />
+                </Pressable>
+              ))}
+          </View>
+          <Text style={styles.fieldLabel}>How important?</Text>
+          <View style={styles.ownerPicker}>
+            {PRIORITY_LEVELS.map(level => (
+              <Pressable key={level} onPress={() => setEditTaskPriority(level)}>
+                <Pill label={editTaskPriority === level ? `● ${level}` : level} />
+              </Pressable>
+            ))}
+          </View>
+          {editTaskError ? <Text style={styles.taskError}>{editTaskError}</Text> : null}
+          <View style={styles.taskControls}>
+            <Pressable style={styles.primarySmall} onPress={() => saveEditTask(task.id)} disabled={savingTaskEdit}>
+              <Text style={styles.primaryText}>{savingTaskEdit ? '…' : 'Save'}</Text>
+            </Pressable>
+            <Pressable hitSlop={8} onPress={cancelEditTask}>
+              <Text style={styles.meta}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View
+        key={task.id}
+        style={[styles.taskRow, { backgroundColor: accent ?? theme.colors.background }, task.status === 'Done' && styles.taskRowDone]}
+      >
+        <Pressable onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}>
+          <Text style={styles.taskTitle}>{task.title}</Text>
+          <Text style={styles.meta}>
+            {memberLabel(task.owner_user_id, me, partner)}
+            {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ' · no due date'}
+          </Text>
+          {task.needs_review ? <Text style={styles.needsReview}>🔍 Needs review</Text> : null}
+        </Pressable>
+        <View style={styles.taskControls}>
+          <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
+          <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
+          <Pressable hitSlop={8} onPress={() => toggleNeedsReview(task.id, task.needs_review)}>
+            <Ionicons
+              name={task.needs_review ? 'flag' : 'flag-outline'}
+              size={18}
+              color={task.needs_review ? theme.colors.danger : theme.colors.muted}
+            />
+          </Pressable>
+          <Pressable hitSlop={8} onPress={() => startEditTask(task)}>
+            <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
+          </Pressable>
+          <Pressable hitSlop={8} onPress={() => confirmDeleteTask(task.id, task.title)}>
+            <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const renderTaskGroups = (tasks: ProjectTaskRow[]) =>
+    TASK_STATUSES.map(status => {
+      const tasksInStatus = tasks.filter(t => t.status === status);
+      if (tasksInStatus.length === 0) return null;
+      return (
+        <View key={status} style={styles.statusGroup}>
+          <Text style={styles.statusGroupLabel}>
+            {TASK_STATUS_LABEL[status]} · {tasksInStatus.length}
+          </Text>
+          {tasksInStatus.map(renderTaskRow)}
+        </View>
+      );
+    });
+
   const confirmDeleteProject = () => {
     Alert.alert(`Delete "${project.title}"?`, "This removes it and all its tasks. This can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
@@ -257,6 +370,17 @@ export default function ProjectDetailScreen() {
       }
     ]);
   };
+
+  // Book-template tasks carry a section (Book Creation, ISBN, Props, …) so
+  // they show as named collapsible groups instead of one flat 60-item list.
+  // Ordinary projects have no section on any task and fall back to the
+  // plain status grouping below.
+  const presentSections = Array.from(new Set(project.project_tasks.map(t => t.section).filter((s): s is string => !!s)));
+  const orderedSections = [
+    ...BOOK_SECTION_ORDER.filter(s => presentSections.includes(s)),
+    ...presentSections.filter(s => !BOOK_SECTION_ORDER.includes(s))
+  ];
+  const unsectionedTasks = project.project_tasks.filter(t => !t.section);
 
   return (
     <Screen>
@@ -366,111 +490,27 @@ export default function ProjectDetailScreen() {
         <Text style={styles.label}>Tasks</Text>
         {project.project_tasks.length === 0 ? (
           <Text style={styles.meta}>No tasks yet.</Text>
+        ) : orderedSections.length === 0 ? (
+          renderTaskGroups(project.project_tasks)
         ) : (
-          TASK_STATUSES.map(status => {
-            const tasksInStatus = project.project_tasks.filter((t: ProjectTaskRow) => t.status === status);
-            if (tasksInStatus.length === 0) return null;
-            return (
-              <View key={status} style={styles.statusGroup}>
-                <Text style={styles.statusGroupLabel}>
-                  {TASK_STATUS_LABEL[status]} · {tasksInStatus.length}
-                </Text>
-                {tasksInStatus.map(task => {
-                  const accent = ownerAccentColor(task.owner_user_id, me, partner);
-                  if (editingTaskId === task.id) {
-                    return (
-                      <View key={task.id} style={[styles.taskRowEditing, { backgroundColor: accent ?? theme.colors.background }]}>
-                        <TextInput value={editTaskTitle} onChangeText={setEditTaskTitle} style={styles.input} autoFocus />
-                        <TextInput
-                          value={editTaskDueDate}
-                          onChangeText={setEditTaskDueDate}
-                          placeholder="Due date, e.g. 2026-09-01"
-                          placeholderTextColor={theme.colors.muted}
-                          style={styles.input}
-                        />
-                        <Text style={styles.fieldLabel}>Progress</Text>
-                        <View style={styles.ownerPicker}>
-                          {TASK_STATUSES.map(status => (
-                            <Pressable key={status} onPress={() => setEditTaskStatus(status)}>
-                              <Pill label={editTaskStatus === status ? `● ${TASK_STATUS_LABEL[status]}` : TASK_STATUS_LABEL[status]} />
-                            </Pressable>
-                          ))}
-                        </View>
-                        <Text style={styles.fieldLabel}>Who's this for?</Text>
-                        <View style={styles.ownerPicker}>
-                          {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
-                            partner ? { label: partner.display_name.charAt(0).toUpperCase(), value: partner.user_id } : null]
-                            .filter((o): o is { label: string; value: string } => o !== null)
-                            .map(option => (
-                              <Pressable key={option.label} onPress={() => setEditTaskOwner(option.value)}>
-                                <Pill label={editTaskOwner === option.value ? `● ${option.label}` : option.label} />
-                              </Pressable>
-                            ))}
-                        </View>
-                        <Text style={styles.fieldLabel}>How important?</Text>
-                        <View style={styles.ownerPicker}>
-                          {PRIORITY_LEVELS.map(level => (
-                            <Pressable key={level} onPress={() => setEditTaskPriority(level)}>
-                              <Pill label={editTaskPriority === level ? `● ${level}` : level} />
-                            </Pressable>
-                          ))}
-                        </View>
-                        {editTaskError ? <Text style={styles.taskError}>{editTaskError}</Text> : null}
-                        <View style={styles.taskControls}>
-                          <Pressable style={styles.primarySmall} onPress={() => saveEditTask(task.id)} disabled={savingTaskEdit}>
-                            <Text style={styles.primaryText}>{savingTaskEdit ? '…' : 'Save'}</Text>
-                          </Pressable>
-                          <Pressable hitSlop={8} onPress={cancelEditTask}>
-                            <Text style={styles.meta}>Cancel</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  }
-                  return (
-                    <View
-                      key={task.id}
-                      style={[
-                        styles.taskRow,
-                        { backgroundColor: accent ?? theme.colors.background },
-                        task.status === 'Done' && styles.taskRowDone
-                      ]}
-                    >
-                      <Pressable
-                        onPress={() => router.push({ pathname: '/thread', params: { kind: 'task', id: task.id, title: task.title } })}
-                      >
-                        <Text style={styles.taskTitle}>{task.title}</Text>
-                        <Text style={styles.meta}>
-                          {memberLabel(task.owner_user_id, me, partner)}
-                          {task.due_at ? ` · due ${toDateInputValue(task.due_at)}` : ' · no due date'}
-                        </Text>
-                        {task.needs_review ? <Text style={styles.needsReview}>🔍 Needs review</Text> : null}
-                      </Pressable>
-                      <View style={styles.taskControls}>
-                        <StatusBadge value={task.status} onChange={s => changeTaskStatus(task.id, s)} />
-                        <PriorityBadge value={task.priority} onChange={p => changeTaskPriority(task.id, p)} />
-                        <Pressable hitSlop={8} onPress={() => toggleNeedsReview(task.id, task.needs_review)}>
-                          <Ionicons
-                            name={task.needs_review ? 'flag' : 'flag-outline'}
-                            size={18}
-                            color={task.needs_review ? theme.colors.danger : theme.colors.muted}
-                          />
-                        </Pressable>
-                        <Pressable hitSlop={8} onPress={() => startEditTask(task)}>
-                          <Ionicons name="pencil-outline" size={18} color={theme.colors.muted} />
-                        </Pressable>
-                        <Pressable hitSlop={8} onPress={() => confirmDeleteTask(task.id, task.title)}>
-                          <Ionicons name="trash-outline" size={18} color={theme.colors.muted} />
-                        </Pressable>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            );
-          })
+          <>
+            {orderedSections.map(section => {
+              const tasksInSection = project.project_tasks.filter(t => t.section === section);
+              const isExpanded = expandedSections.has(section);
+              return (
+                <View key={section} style={styles.statusGroup}>
+                  <Pressable onPress={() => toggleSection(section)} hitSlop={8}>
+                    <Text style={styles.sectionHeader}>
+                      {isExpanded ? '▾' : '▸'} {section} · {tasksInSection.length}
+                    </Text>
+                  </Pressable>
+                  {isExpanded ? renderTaskGroups(tasksInSection) : null}
+                </View>
+              );
+            })}
+            {unsectionedTasks.length > 0 ? renderTaskGroups(unsectionedTasks) : null}
+          </>
         )}
-
         <View style={styles.newTask}>
           <TextInput
             value={taskTitle}
@@ -562,6 +602,7 @@ const styles = StyleSheet.create({
   progressValue: { color: theme.colors.navy, fontWeight: '700', width: 44, textAlign: 'right' },
   statusGroup: { marginTop: 16 },
   statusGroupLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  sectionHeader: { color: theme.colors.navy, fontSize: 16, fontWeight: '700' },
   // A slim list row, not a boxed card — rows sit directly one after another
   // (a hairline divider between them, not a gap), and the owner's color
   // fills the whole row rather than just a badge or edge accent.

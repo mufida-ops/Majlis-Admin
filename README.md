@@ -61,7 +61,11 @@ Product loop: **Give → Discuss → Decide → Assign → Track → CRM → Cat
   runs by hand for every book (`lib/bookTemplate.ts`, `createBookProject` in `lib/repositories/projects.ts`) — Book
   Creation, Book Checking, ISBN, Book Box Paper Resources, Hello Chef Guidance, Props, Praveen, and the Cultural
   Box. Those tasks start unassigned and undated (there's no single sensible default across ~60 items) — assign and
-  date each one via the task edit form above as work starts on it.
+  date each one via the task edit form above as work starts on it. Each template task also carries its section
+  (`project_tasks.section`), so the project's Tasks card groups them as named, collapsible sections — Book
+  Creation, Book Checking, ISBN, and so on (`BOOK_SECTIONS` in `lib/bookTemplate.ts`) — collapsed by default,
+  rather than one flat ~60-item list. A task added manually (no section) still falls back to the plain
+  status-only grouping used everywhere else.
 - Handing a task off for the other founder to look over doesn't need reassigning it (that changes who's doing the
   work): tap the flag icon on a task row, or "Flag for review" on its thread screen, and it's marked
   `project_tasks.needs_review` and shows a "🔍 Needs review" line until whoever looks it over taps the flag again to

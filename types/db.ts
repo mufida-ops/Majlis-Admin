@@ -52,6 +52,7 @@ export type ProjectTaskRow = {
   start_at: string | null;
   due_at: string | null;
   needs_review: boolean;
+  section: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -48,10 +48,11 @@ export async function createBookProject(input: { workspace_id: string; title: st
   const project = await createProject({ workspace_id: input.workspace_id, title: input.title, created_by: input.created_by });
   const supabase = requireSupabase();
   const result = await supabase.from('project_tasks').insert(
-    BOOK_TASK_TEMPLATE.map(title => ({
+    BOOK_TASK_TEMPLATE.map(({ section, title }) => ({
       workspace_id: input.workspace_id,
       project_id: project.id,
       title,
+      section,
       created_by: input.created_by
     }))
   );
