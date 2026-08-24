@@ -101,7 +101,7 @@ export default function ContentDetail() {
       </ScrollView>
 
       <View style={{ flex: 1 }}>
-        {tab === 'Overview' && <OverviewTab item={item} updateField={updateField} canEdit={canEdit} />}
+        {tab === 'Overview' && <OverviewTab item={item} updateField={updateField} canEdit={canEdit} onChanged={reload} />}
         {tab === 'Media' && <MediaTab contentItemId={item.id} canEdit={canEdit} />}
         {tab === 'Platforms' && <PlatformsTab item={item} canEdit={canEdit} isAdmin={roles.includes('admin')} />}
         {tab === 'Comments' && <CommentsTab contentItemId={item.id} />}

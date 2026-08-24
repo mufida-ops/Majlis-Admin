@@ -10,16 +10,17 @@ import { listTeam, listAssignments, addAssignment, removeAssignment } from '@/li
 import { PickerSheet, type PickerOption } from '@/components/PickerSheet';
 import { Avatar } from '@/components/Avatar';
 import { PriorityBadge } from '@/components/StatusBadge';
-import { moveStage, ConflictError } from '@/lib/repositories/contentItems';
 import { checkReadyForApproval } from '@/lib/stateMachine';
 import { useAuth } from '@/lib/auth';
+import { SubmitForApprovalModal } from '@/components/content/SubmitForApprovalModal';
 
 const PRIORITIES: ContentItem['priority'][] = ['low', 'normal', 'high', 'urgent'];
 
-export function OverviewTab({ item, updateField, canEdit }: {
+export function OverviewTab({ item, updateField, canEdit, onChanged }: {
   item: ContentItem;
   updateField: <K extends keyof ContentItem>(key: K, value: ContentItem[K]) => void;
   canEdit: boolean;
+  onChanged: () => void;
 }) {
   const { session } = useAuth();
   const { data: team } = useAsync(() => listTeam(), []);
@@ -30,14 +31,14 @@ export function OverviewTab({ item, updateField, canEdit }: {
 
   const [picker, setPicker] = useState<'owner' | 'publisher' | 'campaign' | 'type' | 'contributor' | null>(null);
   const [newTag, setNewTag] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   const teamOptions: PickerOption[] = (team ?? []).map((p) => ({ id: p.id, label: p.full_name }));
   const nameOf = (id: string | null) => (team ?? []).find((p) => p.id === id)?.full_name ?? 'Unassigned';
 
   const contributors = (assignments ?? []).filter((a) => a.role_on_item === 'contributor');
 
-  async function submitForApproval() {
+  function openApprovalModal() {
     // Heuristic readiness check for the UI; the state machine's true gate is
     // Section 20's approver action, this just avoids a doomed submission.
     const readiness = checkReadyForApproval({ hasFinalMedia: true, enabledPlatformsWithCaption: 1 });
@@ -45,14 +46,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
       showAlert('Not ready yet', readiness.reasons.join('\n'));
       return;
     }
-    setSubmitting(true);
-    try {
-      await moveStage(item.id, item.version, 'approval');
-    } catch (err) {
-      showAlert('Could not submit', err instanceof ConflictError ? err.message : String(err));
-    } finally {
-      setSubmitting(false);
-    }
+    setShowApprovalModal(true);
   }
 
   async function addTag() {
@@ -183,7 +177,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
       </Section>
 
       {canEdit && item.stage === 'producing' && (
-        <Pressable style={styles.submitButton} onPress={submitForApproval} disabled={submitting}>
+        <Pressable style={styles.submitButton} onPress={openApprovalModal}>
           <Text style={styles.submitButtonText}>Submit for Approval</Text>
         </Pressable>
       )}
@@ -195,6 +189,14 @@ export function OverviewTab({ item, updateField, canEdit }: {
       <PickerSheet
         visible={picker === 'contributor'} title="Add contributor" options={teamOptions} onClose={() => setPicker(null)}
         onSelect={async (id) => { if (id && session) { await addAssignment(item.id, id, 'contributor', session.user.id); reloadAssignments(); } setPicker(null); }}
+      />
+
+      <SubmitForApprovalModal
+        visible={showApprovalModal}
+        contentItemId={item.id}
+        expectedVersion={item.version}
+        onClose={() => setShowApprovalModal(false)}
+        onSubmitted={onChanged}
       />
     </ScrollView>
   );

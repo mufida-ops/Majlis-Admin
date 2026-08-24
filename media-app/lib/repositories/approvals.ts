@@ -45,6 +45,21 @@ export async function decide(input: {
   return data as Approval;
 }
 
+/**
+ * The only sanctioned way to move a card from Producing into Approval — the
+ * submitter picks which admin(s) get notified (never a blanket "every
+ * admin"). Server-side re-checks edit rights and the version, so a version
+ * mismatch throws rather than silently overwriting a concurrent change.
+ */
+export async function submitForApproval(contentItemId: string, expectedVersion: number, approverIds: string[]): Promise<void> {
+  const { error } = await db().rpc('submit_for_approval', {
+    p_item_id: contentItemId,
+    p_expected_version: expectedVersion,
+    p_approver_ids: approverIds
+  });
+  if (error) throw new Error(error.message);
+}
+
 /** Approval inbox: items whose current stage is 'approval' and where I'm the approver (or I'm admin — pass includeAll). */
 export async function listAwaitingMyApproval(userId: string, includeAll: boolean) {
   let q = db().from('content_items').select('*').eq('stage', 'approval').is('deleted_at', null);
