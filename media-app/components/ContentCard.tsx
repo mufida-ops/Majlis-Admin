@@ -12,19 +12,21 @@ import type { ContentItemSummary } from '@/lib/repositories/contentItems';
 import type { PlatformName } from '@/types/db';
 
 export function ContentCard({
-  item, thumb, showStage = true, onLongPress
+  item, thumb, showStage = true, onLongPress, onPress
 }: {
   item: ContentItemSummary;
   thumb?: { storagePath: string; kind: 'video' | 'image' | 'pdf' | 'other' } | null;
   showStage?: boolean;
   onLongPress?: () => void;
+  /** Overrides the default tap behavior (opening this item's own detail screen). */
+  onPress?: () => void;
 }) {
   const platforms = (item.platform_posts ?? []).filter((p) => p.enabled).map((p) => p.platform as PlatformName);
   const isOverdue = !!item.due_date && item.due_date < todayInOrgTz() && item.stage !== 'published';
 
   return (
     <Pressable
-      onPress={() => router.push(`/content/${item.id}`)}
+      onPress={onPress ?? (() => router.push(`/content/${item.id}`))}
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.card, shadow.card, pressed && { opacity: 0.85 }]}
     >

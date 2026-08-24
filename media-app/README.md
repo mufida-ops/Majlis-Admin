@@ -20,7 +20,10 @@ state machine, navigation, build-now-vs-needs-API split) and
   combination, enforced by Postgres RLS, not just the client.
 - **Home** — My Tasks, Due Today, Overdue, Waiting for Me, Awaiting
   Approval, Scheduled Today, Recently Published, as horizontally-scrolling
-  media card rows.
+  media card rows. Tapping a card here opens the Pipeline board (not the item's own detail screen, which is what
+  `ContentCard` does everywhere else it's used — Pipeline, Search, Published, Approvals) — Home is where you glance
+  at what needs attention, Pipeline is where you actually work on it. `ContentCard` takes an optional `onPress`
+  override for this; `CardRow` (Home's card list) is the only caller that sets it.
 - **Pipeline** — 8-stage Kanban board; long-press a card to move it (only
   through legal state-machine transitions, and only if you're permitted to
   edit that item).

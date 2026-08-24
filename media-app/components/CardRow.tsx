@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
 import { ContentCard } from './ContentCard';
 import type { ContentItemSummary } from '@/lib/repositories/contentItems';
@@ -24,7 +25,7 @@ export function CardRow({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {items.map((item) => (
           <View key={item.id} style={styles.cardWrap}>
-            <ContentCard item={item} thumb={thumbnails.get(item.id)} />
+            <ContentCard item={item} thumb={thumbnails.get(item.id)} onPress={() => router.push('/(tabs)/pipeline')} />
           </View>
         ))}
       </ScrollView>
