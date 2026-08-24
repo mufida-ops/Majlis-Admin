@@ -102,3 +102,9 @@ export async function softDeleteContentItem(id: string, expectedVersion: number)
 export async function moveStage(id: string, expectedVersion: number, stage: ContentStage) {
   return updateContentItem(id, expectedVersion, { stage });
 }
+
+/** Idea -> Producing always goes through here: who'll action it gets picked (or reconfirmed)
+ * in the same move, not left as a silent default — see AssignProducingModal. */
+export async function assignAndMoveToProducing(id: string, expectedVersion: number, ownerId: string) {
+  return updateContentItem(id, expectedVersion, { owner_id: ownerId, stage: 'producing' });
+}

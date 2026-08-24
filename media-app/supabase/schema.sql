@@ -570,6 +570,55 @@ begin
 end;
 $$;
 
+-- The sanctioned way to submit an item for approval: moves stage from
+-- 'producing' to 'approval' and notifies exactly the admin(s) the submitter
+-- picked — never a blanket "every admin", and never a persisted per-item
+-- approver field (Mufida: "the one moving needs to select the approver,
+-- either me or victoria or both"). Optimistic concurrency mirrors the
+-- client's own update path: a version mismatch raises rather than silently
+-- overwriting a concurrent change.
+create or replace function submit_for_approval(
+  p_item_id uuid, p_expected_version int, p_approver_ids uuid[]
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  item content_items%rowtype;
+  approver uuid;
+  updated_rows int;
+begin
+  select * into item from content_items where id = p_item_id and deleted_at is null;
+  if item.id is null then
+    raise exception 'Content item not found';
+  end if;
+  if not (
+    is_admin(actor) or item.owner_id = actor or item.approver_id = actor or item.publisher_id = actor
+    or exists (select 1 from content_assignments ca where ca.content_item_id = p_item_id and ca.user_id = actor)
+  ) then
+    raise exception 'Not allowed to submit this item';
+  end if;
+  if coalesce(array_length(p_approver_ids, 1), 0) = 0 then
+    raise exception 'Pick at least one approver';
+  end if;
+
+  update content_items
+    set stage = 'approval'
+    where id = p_item_id and version = p_expected_version;
+  get diagnostics updated_rows = row_count;
+  if updated_rows = 0 then
+    raise exception 'This item was updated by someone else — reload and try again';
+  end if;
+
+  foreach approver in array p_approver_ids loop
+    perform notify(approver, 'approval_requested', item.title || ' is ready for your approval',
+      'Submitted by the content team.', p_item_id, null, null, actor, 'approval:' || p_item_id);
+  end loop;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Triggers: touch/version bump + activity + notifications
 -- ---------------------------------------------------------------------------
@@ -632,18 +681,17 @@ begin
 
   if new.stage is distinct from old.stage then
     perform log_activity(new.id, actor, 'stage_changed', jsonb_build_object('from', old.stage, 'to', new.stage));
-    if new.stage = 'approval' then
-      -- Approval is an admin-only action, so every admin gets notified —
-      -- not just whoever (if anyone) happens to be set as Approver — and
-      -- any one of them acting on it is enough (see approvals_after_insert).
-      for admin_id in select user_id from user_roles where role = 'admin' loop
-        perform notify(admin_id, 'approval_requested', new.title || ' is ready for your approval',
-          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
-      end loop;
-      if new.approver_id is not null then
-        perform notify(new.approver_id, 'approval_requested', new.title || ' is ready for your approval',
-          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
-      end if;
+    -- Approval-request notifications are sent explicitly by submit_for_approval()
+    -- (the submitter picks which admin(s) to notify), not blanket-fired here.
+    if new.stage = 'producing' and old.stage = 'idea' then
+      -- Whoever's Assigned To gets a queue notification the moment an idea
+      -- moves into Producing — fires even if they were already the owner
+      -- before this move, since this is the "it's in your queue now" moment,
+      -- not an ownership change. (A bounce-back from Approval after changes
+      -- were requested already gets its own, more specific notification —
+      -- see approvals_after_insert — so this is scoped to idea -> producing only.)
+      perform notify(new.owner_id, 'assigned', new.title || ' is in your queue to produce',
+        null, new.id, null, null, actor);
     end if;
   end if;
 
