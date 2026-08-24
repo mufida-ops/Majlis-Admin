@@ -2,12 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { showAlert } from '@/lib/alert';
-import { listContentItemSummaries, moveStage, ConflictError, type ContentItemSummary } from '@/lib/repositories/contentItems';
+import { listContentItemSummaries, moveStage, assignAndMoveToProducing, ConflictError, type ContentItemSummary } from '@/lib/repositories/contentItems';
 import { latestMediaThumbnails } from '@/lib/repositories/media';
+import { listTeam } from '@/lib/repositories/team';
 import { useAsync } from '@/lib/useAsync';
 import { colors, radii, spacing } from '@/constants/theme';
 import { ContentCard } from '@/components/ContentCard';
 import { StageMoveSheet } from '@/components/StageMoveSheet';
+import { PickerSheet, type PickerOption } from '@/components/PickerSheet';
 import { PIPELINE_STAGES, STAGE_LABELS, type ContentStage } from '@/types/db';
 import { canEditContent } from '@/lib/permissions';
 
@@ -29,6 +31,9 @@ export default function Pipeline() {
     [items?.map((i) => i.id).join(',')]
   );
   const [moveTarget, setMoveTarget] = useState<ContentItemSummary | null>(null);
+  const [assignTarget, setAssignTarget] = useState<ContentItemSummary | null>(null);
+  const { data: team } = useAsync(() => listTeam(), []);
+  const teamOptions: PickerOption[] = (team ?? []).map((p) => ({ id: p.id, label: p.full_name }));
 
   const columns = useMemo(() => {
     const map = new Map<ContentStage, ContentItemSummary[]>(PIPELINE_STAGES.map((s) => [s, []]));
@@ -46,9 +51,27 @@ export default function Pipeline() {
       showAlert("Can't move this", "You don't have permission to move this item.");
       return;
     }
+    // Idea -> Producing always picks (or reconfirms) who's actioning it, so
+    // it lands in a real person's queue rather than a silent default.
+    if (moveTarget.stage === 'idea' && stage === 'producing') {
+      setAssignTarget(moveTarget);
+      setMoveTarget(null);
+      return;
+    }
     try {
       await moveStage(moveTarget.id, moveTarget.version, stage);
       setMoveTarget(null);
+      reload();
+    } catch (err) {
+      showAlert('Could not move', err instanceof ConflictError ? err.message : String(err));
+    }
+  }
+
+  async function handleAssignProducing(ownerId: string | null) {
+    if (!assignTarget || !ownerId) return;
+    try {
+      await assignAndMoveToProducing(assignTarget.id, assignTarget.version, ownerId);
+      setAssignTarget(null);
       reload();
     } catch (err) {
       showAlert('Could not move', err instanceof ConflictError ? err.message : String(err));
@@ -111,6 +134,15 @@ export default function Pipeline() {
         title={moveTarget?.title ?? ''}
         onClose={() => setMoveTarget(null)}
         onPick={handlePick}
+      />
+
+      <PickerSheet
+        visible={!!assignTarget}
+        title="Who will produce this?"
+        options={teamOptions}
+        selectedId={assignTarget?.owner_id}
+        onClose={() => setAssignTarget(null)}
+        onSelect={handleAssignProducing}
       />
     </View>
   );
