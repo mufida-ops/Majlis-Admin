@@ -12,7 +12,7 @@ import type { TaskStatus } from '@/types/db';
 export function StatusBadge({ value, onChange }: { value: TaskStatus; onChange: (next: TaskStatus) => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <View>
+    <View style={styles.wrapper}>
       <Pressable style={styles.badge} onPress={() => setOpen(o => !o)} hitSlop={8}>
         <View style={[styles.dot, { backgroundColor: TASK_STATUS_COLOR[value] }]} />
         <Text style={styles.label}>{value}</Text>
@@ -40,6 +40,13 @@ export function StatusBadge({ value, onChange }: { value: TaskStatus; onChange: 
 }
 
 const styles = StyleSheet.create({
+  // Without an explicit position here, the dropdown below (position:
+  // 'absolute') has no positioned ancestor to anchor to on web — it ends up
+  // placed relative to some much larger ancestor instead of this badge,
+  // landing on top of unrelated rows further down the list. Both the
+  // ghost-looking clipped dropdown and taps on it silently hitting whatever
+  // was actually underneath trace back to this one missing style.
+  wrapper: { position: 'relative' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

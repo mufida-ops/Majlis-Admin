@@ -344,6 +344,12 @@ Discussions, to avoid a schema migration for a cosmetic rename.
   `app/_layout.tsx`) instead of delegating to any browser or RN-native alert API, so it behaves identically in the
   native app, a browser tab, and installed to the Home Screen. `showAlert()`'s call signature is unchanged, so no
   call site needed to change again. Media Studio has its own copy at `media-app/lib/alert.tsx` for the same reason.
+- `StatusBadge`/`PriorityBadge`'s dropdown (`components/StatusBadge.tsx`, `components/PriorityBadge.tsx`) had no
+  `position: 'relative'` on the small `View` wrapping the badge+dropdown — on web, `position: 'absolute'` with no
+  positioned ancestor anchors to some much larger ancestor instead, so the dropdown rendered overlapping unrelated
+  rows further down the task list rather than right below its own badge. Taps on an option landed on whatever was
+  actually underneath at that screen position instead, reading as "the dropdown doesn't work." Fixed by giving that
+  wrapper `position: 'relative'` so the dropdown anchors correctly.
 
 ## Suggested AI actions
 

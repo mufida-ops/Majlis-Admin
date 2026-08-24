@@ -11,7 +11,7 @@ import type { PriorityLevel } from '@/types/db';
 export function PriorityBadge({ value, onChange }: { value: PriorityLevel; onChange: (next: PriorityLevel) => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <View>
+    <View style={styles.wrapper}>
       <Pressable style={styles.badge} onPress={() => setOpen(o => !o)} hitSlop={8}>
         <View style={[styles.dot, { backgroundColor: PRIORITY_COLOR[value] }]} />
         <Text style={styles.label}>{value}</Text>
@@ -39,6 +39,9 @@ export function PriorityBadge({ value, onChange }: { value: PriorityLevel; onCha
 }
 
 const styles = StyleSheet.create({
+  // See StatusBadge — same missing positioned ancestor for the dropdown
+  // below to anchor to on web.
+  wrapper: { position: 'relative' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
