@@ -1,5 +1,13 @@
 import { supabase } from '@/lib/supabase';
-import type { ContentPriority } from '@/types/db';
+import type { ContentPriority, PlatformName, PostType } from '@/types/db';
+
+export interface ProposedPlatform {
+  platform: PlatformName;
+  enabled: boolean;
+  caption: string | null;
+  hashtags: string[];
+  post_type: PostType | null;
+}
 
 export interface ProposedContentItem {
   title: string;
@@ -11,6 +19,7 @@ export interface ProposedContentItem {
   campaign: string | null;
   tags: string[];
   notes: string | null;
+  platforms: ProposedPlatform[];
 }
 
 function db() {
@@ -24,7 +33,7 @@ export async function parseContentBatch(text: string, todayDate: string): Promis
     body: { text, today_date: todayDate }
   });
   if (error) throw new Error(error.message);
-  const items = (data as { items?: ProposedContentItem[] })?.items ?? [];
+  const items = (data as { items?: (ProposedContentItem & { platforms?: Partial<ProposedPlatform>[] })[] })?.items ?? [];
   return items.map(item => ({
     title: item.title,
     due_date: item.due_date ?? null,
@@ -34,6 +43,15 @@ export async function parseContentBatch(text: string, todayDate: string): Promis
     script: item.script ?? null,
     campaign: item.campaign ?? null,
     tags: item.tags ?? [],
-    notes: item.notes ?? null
+    notes: item.notes ?? null,
+    platforms: (item.platforms ?? [])
+      .filter(p => !!p.platform)
+      .map(p => ({
+        platform: p.platform as PlatformName,
+        enabled: p.enabled ?? false,
+        caption: p.caption ?? null,
+        hashtags: p.hashtags ?? [],
+        post_type: p.post_type ?? null
+      }))
   }));
 }

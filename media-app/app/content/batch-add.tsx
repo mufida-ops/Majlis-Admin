@@ -3,17 +3,44 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { router, Stack } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
-import { parseContentBatch, type ProposedContentItem } from '@/lib/repositories/contentBatch';
+import { parseContentBatch, type ProposedContentItem, type ProposedPlatform } from '@/lib/repositories/contentBatch';
 import { createContentItem } from '@/lib/repositories/contentItems';
+import { ensurePlatformPost, updatePlatformPost } from '@/lib/repositories/platformPosts';
 import { findOrCreateCampaign, findOrCreateTag, tagContentItem, listContentTypes } from '@/lib/repositories/campaigns';
 import { useAsync } from '@/lib/useAsync';
 import { todayInOrgTz } from '@/lib/timezone';
 import { colors, radii, spacing } from '@/constants/theme';
-import type { ContentPriority } from '@/types/db';
+import type { ContentPriority, PlatformName, PostType } from '@/types/db';
 
-type ReviewItem = ProposedContentItem & { include: boolean; expanded: boolean; tagsText: string };
+interface ReviewPlatform {
+  platform: PlatformName;
+  enabled: boolean;
+  caption: string;
+  hashtagsText: string;
+  post_type: PostType | null;
+}
+
+type ReviewItem = Omit<ProposedContentItem, 'platforms'> & {
+  include: boolean; expanded: boolean; tagsText: string; platforms: ReviewPlatform[];
+};
 
 const PRIORITIES: ContentPriority[] = ['low', 'normal', 'high', 'urgent'];
+const PLATFORM_ORDER: PlatformName[] = ['instagram', 'tiktok', 'linkedin'];
+const PLATFORM_LABEL: Record<PlatformName, string> = { instagram: 'Instagram', tiktok: 'TikTok', linkedin: 'LinkedIn' };
+const POST_TYPES: PostType[] = ['reel', 'image', 'carousel', 'story', 'video', 'post'];
+
+function normalizePlatforms(proposed: ProposedPlatform[]): ReviewPlatform[] {
+  return PLATFORM_ORDER.map(name => {
+    const found = proposed.find(p => p.platform === name);
+    return {
+      platform: name,
+      enabled: found?.enabled ?? false,
+      caption: found?.caption ?? '',
+      hashtagsText: (found?.hashtags ?? []).join(', '),
+      post_type: found?.post_type ?? null
+    };
+  });
+}
 
 export default function BatchAddContent() {
   const { session } = useAuth();
@@ -35,7 +62,9 @@ export default function BatchAddContent() {
         setError("Couldn't find any separate pieces of content in that — try describing each one a bit more.");
         return;
       }
-      setItems(proposed.map(p => ({ ...p, include: true, expanded: false, tagsText: p.tags.join(', ') })));
+      setItems(proposed.map(p => ({
+        ...p, include: true, expanded: false, tagsText: p.tags.join(', '), platforms: normalizePlatforms(p.platforms)
+      })));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -45,6 +74,12 @@ export default function BatchAddContent() {
 
   function updateItem(index: number, patch: Partial<ReviewItem>) {
     setItems(prev => (prev ? prev.map((it, i) => (i === index ? { ...it, ...patch } : it)) : prev));
+  }
+
+  function updateItemPlatform(index: number, platform: PlatformName, patch: Partial<ReviewPlatform>) {
+    setItems(prev => (prev ? prev.map((it, i) => (
+      i === index ? { ...it, platforms: it.platforms.map(p => (p.platform === platform ? { ...p, ...patch } : p)) } : it
+    )) : prev));
   }
 
   function removeItem(index: number) {
@@ -92,6 +127,18 @@ export default function BatchAddContent() {
         for (const tagName of tagNames) {
           const tag = await findOrCreateTag(tagName, session.user.id);
           await tagContentItem(created.id, tag.id);
+        }
+
+        for (const p of item.platforms) {
+          if (!p.enabled) continue;
+          const hashtags = p.hashtagsText.split(',').map(h => h.trim()).filter(Boolean);
+          const post = await ensurePlatformPost(created.id, p.platform);
+          await updatePlatformPost(post.id, post.version, {
+            enabled: true,
+            caption: p.caption.trim() || null,
+            hashtags,
+            post_type: p.post_type
+          });
         }
       }
       router.replace('/(tabs)/pipeline');
@@ -247,6 +294,46 @@ export default function BatchAddContent() {
                       placeholder="Audience, assets needed, people needed, anything else"
                       placeholderTextColor={colors.textSecondary}
                     />
+
+                    <FieldLabel text="Platforms" />
+                    {item.platforms.map(p => (
+                      <View key={p.platform} style={styles.platformBlock}>
+                        <Pressable style={styles.platformHeader} onPress={() => updateItemPlatform(index, p.platform, { enabled: !p.enabled })}>
+                          <Feather name={p.enabled ? 'check-square' : 'square'} size={16} color={p.enabled ? colors.navy : colors.textSecondary} />
+                          <Text style={styles.platformName}>{PLATFORM_LABEL[p.platform]}</Text>
+                        </Pressable>
+                        {p.enabled && (
+                          <View style={{ gap: 6 }}>
+                            <TextInput
+                              style={styles.fieldTextArea}
+                              value={p.caption}
+                              onChangeText={v => updateItemPlatform(index, p.platform, { caption: v })}
+                              multiline
+                              placeholder={`${PLATFORM_LABEL[p.platform]} caption`}
+                              placeholderTextColor={colors.textSecondary}
+                            />
+                            <TextInput
+                              style={styles.fieldInput}
+                              value={p.hashtagsText}
+                              onChangeText={v => updateItemPlatform(index, p.platform, { hashtagsText: v })}
+                              placeholder="Hashtags, comma-separated"
+                              placeholderTextColor={colors.textSecondary}
+                            />
+                            <View style={styles.priorityRow}>
+                              {POST_TYPES.map(pt => (
+                                <Pressable
+                                  key={pt}
+                                  onPress={() => updateItemPlatform(index, p.platform, { post_type: pt })}
+                                  style={[styles.priorityChip, p.post_type === pt && styles.priorityChipActive]}
+                                >
+                                  <Text style={[styles.priorityChipText, p.post_type === pt && styles.priorityChipTextActive]}>{pt[0].toUpperCase() + pt.slice(1)}</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    ))}
                   </View>
                 )}
               </View>
@@ -316,5 +403,8 @@ const styles = StyleSheet.create({
   priorityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: colors.surfaceMuted },
   priorityChipActive: { backgroundColor: colors.navy },
   priorityChipText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
-  priorityChipTextActive: { color: '#FFF' }
+  priorityChipTextActive: { color: '#FFF' },
+  platformBlock: { gap: 6, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  platformHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  platformName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary }
 });
