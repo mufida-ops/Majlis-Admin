@@ -619,6 +619,16 @@ as $$
 declare
   actor uuid := auth.uid();
 begin
+  -- An "assigned" notification is a standing reminder, not a one-off ping:
+  -- it stays unread/badged until the item actually moves (they acted on it)
+  -- or ownership moves off them (no longer their job) — clear any stale
+  -- ones here, before possibly creating a fresh one below.
+  if new.stage is distinct from old.stage or new.owner_id is distinct from old.owner_id then
+    update notifications
+      set read_at = now()
+      where content_item_id = new.id and type = 'assigned' and read_at is null;
+  end if;
+
   if new.stage is distinct from old.stage then
     perform log_activity(new.id, actor, 'stage_changed', jsonb_build_object('from', old.stage, 'to', new.stage));
     if new.stage = 'approval' and new.approver_id is not null then

@@ -32,8 +32,15 @@ export async function markRead(id: string) {
   if (error) throw error;
 }
 
+/** Everything except 'assigned' — those are a standing reminder, not a one-off ping, and only clear
+ * themselves once the assignee actually moves the card or it's handed to someone else (see schema.sql). */
 export async function markAllRead(userId: string) {
-  const { error } = await db().from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', userId).is('read_at', null);
+  const { error } = await db()
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('read_at', null)
+    .neq('type', 'assigned');
   if (error) throw error;
 }
 
