@@ -333,6 +333,14 @@ Discussions, to avoid a schema migration for a cosmetic rename.
   Media Studio's own separate Supabase project ref, using the same `SUPABASE_ACCESS_TOKEN`/`ANTHROPIC_API_KEY`
   secrets as the Founder OS app's job — one Supabase account, two projects. See `media-app/README.md` for what the
   new `parse-content-batch` function it deploys actually does.
+- Every confirm-before-delete dialog and every error message built on `Alert.alert` (delete a project/task/
+  organisation/decision/event/message, "could not flag", clearing a next action, adding the book checklist — 15
+  files across both apps) was a silent no-op on the web build: `react-native-web`'s `Alert.alert` is a bare stub
+  (`static alert() {}`), so tapping "Delete" or hitting an error on web did nothing at all, with no visible failure
+  — this is exactly what looked like "I tried to delete here it didn't work." Fixed with `lib/alert.ts`'s
+  `showAlert()` (same signature as `Alert.alert`, so every call site is a drop-in swap) — on native it still calls
+  `Alert.alert`, on web it falls back to real browser dialogs (`window.confirm`/`window.alert`) instead. Media
+  Studio got its own copy at `media-app/lib/alert.ts` for the same reason.
 
 ## Suggested AI actions
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
@@ -94,7 +95,7 @@ export default function OrganisationDetailScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete organisation?', `This removes "${org.name}" and its notes, contacts, and activity history. This can't be undone.`, [
+    showAlert('Delete organisation?', `This removes "${org.name}" and its notes, contacts, and activity history. This can't be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

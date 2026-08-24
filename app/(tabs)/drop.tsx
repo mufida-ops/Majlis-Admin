@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
@@ -110,7 +111,7 @@ export default function DropScreen() {
   };
 
   const confirmDeleteDrop = (dropId: string) => {
-    Alert.alert('Delete this?', "This removes it from your sent list. It won't undo anything it already created.", [
+    showAlert('Delete this?', "This removes it from your sent list. It won't undo anything it already created.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

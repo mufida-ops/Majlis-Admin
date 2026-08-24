@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import { PlatformIcon } from '@/components/PlatformIcon';
 import { ApprovalBadge, PublicationBadge } from '@/components/StatusBadge';
@@ -74,7 +75,7 @@ export function PlatformCard({ contentItem, platform, canEdit, isAdmin, isConnec
 
   function applySchedule() {
     if (!dateText || !timeText || !session) {
-      Alert.alert('Missing date/time', 'Enter both a date (YYYY-MM-DD) and time (HH:MM) in Asia/Dubai.');
+      showAlert('Missing date/time', 'Enter both a date (YYYY-MM-DD) and time (HH:MM) in Asia/Dubai.');
       return;
     }
     const iso = orgLocalToUtcIso(dateText, timeText);
@@ -90,13 +91,13 @@ export function PlatformCard({ contentItem, platform, canEdit, isAdmin, isConnec
       return;
     }
     await publishNow(post!.id, session.user.id);
-    Alert.alert('Queued', `${PLATFORM_LABELS[platform]} publish has been queued — status updates once the publishing job runs.`);
+    showAlert('Queued', `${PLATFORM_LABELS[platform]} publish has been queued — status updates once the publishing job runs.`);
   }
 
   async function handleRetry() {
     if (!session) return;
     await retryPublish(post!.id, session.user.id);
-    Alert.alert('Retry queued', `A new attempt for ${PLATFORM_LABELS[platform]} has been queued, independent of the other platforms.`);
+    showAlert('Retry queued', `A new attempt for ${PLATFORM_LABELS[platform]} has been queued, independent of the other platforms.`);
   }
 
   const showManualFallback = post.enabled && post.approval_state === 'approved' && !isConnected;

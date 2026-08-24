@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
+import { showAlert } from '@/lib/alert';
 import { listContentItemSummaries, moveStage, ConflictError, type ContentItemSummary } from '@/lib/repositories/contentItems';
 import { latestMediaThumbnails } from '@/lib/repositories/media';
 import { useAsync } from '@/lib/useAsync';
@@ -29,7 +30,7 @@ export default function Pipeline() {
     if (!moveTarget) return;
     const ctx = { userId: session?.user.id ?? null, roles };
     if (!canEditContent(ctx, moveTarget)) {
-      Alert.alert("Can't move this", "You don't have permission to move this item.");
+      showAlert("Can't move this", "You don't have permission to move this item.");
       return;
     }
     try {
@@ -37,7 +38,7 @@ export default function Pipeline() {
       setMoveTarget(null);
       reload();
     } catch (err) {
-      Alert.alert('Could not move', err instanceof ConflictError ? err.message : String(err));
+      showAlert('Could not move', err instanceof ConflictError ? err.message : String(err));
     }
   }
 

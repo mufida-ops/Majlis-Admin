@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { ContentItem } from '@/types/db';
 import { useAsync } from '@/lib/useAsync';
@@ -41,14 +42,14 @@ export function OverviewTab({ item, updateField, canEdit }: {
     // Section 20's approver action, this just avoids a doomed submission.
     const readiness = checkReadyForApproval({ hasFinalMedia: true, enabledPlatformsWithCaption: 1 });
     if (!readiness.ok) {
-      Alert.alert('Not ready yet', readiness.reasons.join('\n'));
+      showAlert('Not ready yet', readiness.reasons.join('\n'));
       return;
     }
     setSubmitting(true);
     try {
       await moveStage(item.id, item.version, 'approval');
     } catch (err) {
-      Alert.alert('Could not submit', err instanceof ConflictError ? err.message : String(err));
+      showAlert('Could not submit', err instanceof ConflictError ? err.message : String(err));
     } finally {
       setSubmitting(false);
     }

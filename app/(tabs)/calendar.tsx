@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -154,7 +155,7 @@ export default function CalendarScreen() {
   };
 
   const confirmDelete = (event: EventRow) => {
-    Alert.alert('Delete event?', `Remove "${event.title}" from the calendar? This can't be undone.`, [
+    showAlert('Delete event?', `Remove "${event.title}" from the calendar? This can't be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

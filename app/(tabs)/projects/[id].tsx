@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
@@ -146,7 +147,7 @@ export default function ProjectDetailScreen() {
       await updateTask(taskId, { needs_review: !current });
       refresh();
     } catch (err) {
-      Alert.alert('Could not flag that task', err instanceof Error ? err.message : 'Please try again.');
+      showAlert('Could not flag that task', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -158,7 +159,7 @@ export default function ProjectDetailScreen() {
   };
 
   const clearNextAction = () => {
-    Alert.alert('Clear the next action?', '', [
+    showAlert('Clear the next action?', '', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear',
@@ -176,7 +177,7 @@ export default function ProjectDetailScreen() {
       const updated = await updateProject(project.id, { needs_review: !project.needs_review });
       setData({ ...project, ...updated });
     } catch (err) {
-      Alert.alert('Could not flag this', err instanceof Error ? err.message : 'Please try again.');
+      showAlert('Could not flag this', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -286,7 +287,7 @@ export default function ProjectDetailScreen() {
   };
 
   const confirmDeleteTask = (taskId: string, title: string) => {
-    Alert.alert(`Delete "${title}"?`, "This can't be undone.", [
+    showAlert(`Delete "${title}"?`, "This can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -407,7 +408,7 @@ export default function ProjectDetailScreen() {
   const missingBookTasks = BOOK_TASK_TEMPLATE.filter(t => !project.project_tasks.some(pt => pt.title === t.title));
 
   const confirmApplyBookTemplate = () => {
-    Alert.alert(
+    showAlert(
       'Add the book checklist?',
       `This adds the ${missingBookTasks.length} missing task${missingBookTasks.length === 1 ? '' : 's'} from the standard book workflow — book creation, checking, ISBN, and the rest — without touching what's already here.`,
       [
@@ -430,7 +431,7 @@ export default function ProjectDetailScreen() {
   };
 
   const confirmDeleteProject = () => {
-    Alert.alert(`Delete "${project.title}"?`, "This removes it and all its tasks. This can't be undone.", [
+    showAlert(`Delete "${project.title}"?`, "This removes it and all its tasks. This can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

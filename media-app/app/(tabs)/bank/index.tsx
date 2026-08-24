@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAsync } from '@/lib/useAsync';
 import { searchBankAssets, uploadMediaVersion } from '@/lib/repositories/media';
@@ -37,7 +38,7 @@ export default function ContentBank() {
       });
       reload();
     } catch (err) {
-      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+      showAlert('Upload failed', err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
     }

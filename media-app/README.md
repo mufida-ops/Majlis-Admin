@@ -47,6 +47,11 @@ state machine, navigation, build-now-vs-needs-API split) and
   or remove before anything is actually created. The function only parses text (no database access, no service
   role key needed); each confirmed item is then created client-side through the same `createContentItem()` path a
   manually-created item uses, so ownership/RLS work identically either way.
+- **`lib/alert.ts`** — every `Alert.alert` call in this app (approve/reject, upload errors, delete confirmations,
+  etc.) goes through `showAlert()` instead of the bare RN API. `react-native-web`'s `Alert.alert` is a total no-op
+  (`static alert() {}`), so on the web build every one of those silently did nothing when tapped — no dialog, no
+  error, no visible failure at all. `showAlert()` has the exact same signature (drop-in swap at every call site) and
+  falls back to `window.confirm`/`window.alert` on web while still calling the real `Alert.alert` on native.
 - **Publishing architecture** — a real adapter abstraction
   (`lib/publishing/`) and an Edge Function dispatcher
   (`supabase/functions/publish-dispatcher`) that schedules/retries per

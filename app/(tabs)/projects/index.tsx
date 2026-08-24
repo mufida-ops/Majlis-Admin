@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -82,7 +83,7 @@ export default function ProjectsScreen() {
   };
 
   const confirmDelete = (id: string, projectTitle: string) => {
-    Alert.alert(`Delete "${projectTitle}"?`, "This removes it and all its tasks. This can't be undone.", [
+    showAlert(`Delete "${projectTitle}"?`, "This removes it and all its tasks. This can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

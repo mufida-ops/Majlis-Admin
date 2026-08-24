@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -68,7 +69,7 @@ export default function CrmScreen() {
   };
 
   const confirmDelete = (id: string, orgName: string) => {
-    Alert.alert('Delete organisation?', `This removes "${orgName}" and its notes, contacts, and activity history. This can't be undone.`, [
+    showAlert('Delete organisation?', `This removes "${orgName}" and its notes, contacts, and activity history. This can't be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

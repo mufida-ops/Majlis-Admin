@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAsync } from '@/lib/useAsync';
 import { listVersions, getTagsForAsset, tagMediaAsset, untagMediaAsset, attachBankAssetToContentItem } from '@/lib/repositories/media';
@@ -45,7 +46,7 @@ export default function BankAssetDetail() {
   async function attach(contentItemId: string | null, section: MediaSection = 'raw') {
     if (!contentItemId) return;
     await attachBankAssetToContentItem(id, contentItemId, section);
-    Alert.alert('Attached', 'This file is now part of that content item.');
+    showAlert('Attached', 'This file is now part of that content item.');
     setAttachPicker(false);
   }
 
