@@ -37,6 +37,16 @@ export async function markAllRead(userId: string) {
   if (error) throw error;
 }
 
+/** Directly flags one or more teammates about a content item — a manual notification, not a comment. */
+export async function notifyTeam(contentItemId: string, userIds: string[], message?: string | null) {
+  const { error } = await db().rpc('notify_team', {
+    p_content_item_id: contentItemId,
+    p_user_ids: userIds,
+    p_message: message?.trim() ? message.trim() : null
+  });
+  if (error) throw error;
+}
+
 /** Groups repetitive events (same type + group_key) so the centre doesn't get noisy — Section 27. */
 export function groupNotifications(items: AppNotification[]): { key: string; items: AppNotification[] }[] {
   const groups = new Map<string, AppNotification[]>();

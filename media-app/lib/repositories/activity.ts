@@ -16,6 +16,24 @@ export async function listActivity(contentItemId: string) {
   return (data ?? []) as ActivityLogEntry[];
 }
 
+export interface RecentActivityEntry extends ActivityLogEntry {
+  actor: { full_name: string } | null;
+  content_item: { title: string; deleted_at: string | null } | null;
+}
+
+/** Team-wide "what's the latest" feed for the shared dashboard — across every content item, newest first. */
+export async function listRecentActivity(limit = 30): Promise<RecentActivityEntry[]> {
+  const { data, error } = await db()
+    .from('activity_log')
+    .select('*, actor:profiles(full_name), content_item:content_items(title, deleted_at)')
+    .order('created_at', { ascending: false })
+    .limit(limit * 2);
+  if (error) throw error;
+  return ((data ?? []) as unknown as RecentActivityEntry[])
+    .filter((e) => e.content_item && !e.content_item.deleted_at)
+    .slice(0, limit);
+}
+
 export function describeActivity(entry: ActivityLogEntry, actorName: string): string {
   const d = entry.detail ?? {};
   switch (entry.action) {
@@ -31,6 +49,10 @@ export function describeActivity(entry: ActivityLogEntry, actorName: string): st
     case 'platform_changes_requested': return `${actorName} requested changes on a platform version`;
     case 'platform_approval_revoked': return `Approval was revoked on ${d.platform} — content changed after approval`;
     case 'publication_status_changed': return `${d.platform} publishing status changed to ${d.to}`;
+    case 'team_notified': {
+      const count = Array.isArray(d.user_ids) ? d.user_ids.length : 0;
+      return `${actorName} notified ${count} team member${count === 1 ? '' : 's'} about this`;
+    }
     default: return `${actorName} ${entry.action.replace(/_/g, ' ')}`;
   }
 }

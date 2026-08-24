@@ -497,6 +497,41 @@ begin
 end;
 $$;
 
+-- Lets any signed-in user directly flag one or more teammates about a
+-- content item — a manual "notify the team" action, distinct from the
+-- automatic notifications above. Reuses the 'mentioned' notification_type
+-- rather than adding a new enum value (adding + using a new enum value in
+-- the same migration transaction is unsafe in Postgres).
+create or replace function notify_team(
+  p_content_item_id uuid, p_user_ids uuid[], p_message text default null
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  actor_name text;
+  item_title text;
+  target uuid;
+begin
+  select title into item_title from content_items where id = p_content_item_id;
+  if item_title is null then
+    raise exception 'Content item not found';
+  end if;
+
+  select full_name into actor_name from profiles where id = actor;
+
+  foreach target in array coalesce(p_user_ids, array[]::uuid[])
+  loop
+    perform notify(target, 'mentioned', coalesce(actor_name, 'A teammate') || ' flagged you on ' || item_title,
+      p_message, p_content_item_id, null, null, actor);
+  end loop;
+
+  perform log_activity(p_content_item_id, actor, 'team_notified', jsonb_build_object('user_ids', p_user_ids, 'message', p_message));
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Triggers: touch/version bump + activity + notifications
 -- ---------------------------------------------------------------------------
