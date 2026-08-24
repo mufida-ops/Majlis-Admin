@@ -18,11 +18,10 @@ export default function NewContentItem() {
 
   const [title, setTitle] = useState('');
   const [ownerId, setOwnerId] = useState<string | null>(session?.user.id ?? null);
-  const [approverId, setApproverId] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [contentTypeId, setContentTypeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
-  const [picker, setPicker] = useState<'owner' | 'approver' | 'campaign' | 'type' | null>(null);
+  const [picker, setPicker] = useState<'owner' | 'campaign' | 'type' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +30,6 @@ export default function NewContentItem() {
   const typeOptions: PickerOption[] = (contentTypes ?? []).map((t) => ({ id: t.id, label: t.label }));
 
   const ownerName = teamOptions.find((o) => o.id === ownerId)?.label ?? 'Select who will action this';
-  const approverName = teamOptions.find((o) => o.id === approverId)?.label ?? 'Select approver (optional)';
   const campaignName = campaignOptions.find((o) => o.id === campaignId)?.label ?? 'No campaign';
   const typeName = typeOptions.find((o) => o.id === contentTypeId)?.label ?? 'Select content type';
 
@@ -45,7 +43,6 @@ export default function NewContentItem() {
       const item = await createContentItem({
         title: title.trim(),
         owner_id: ownerId,
-        approver_id: approverId,
         campaign_id: campaignId,
         content_type_id: contentTypeId,
         due_date: dueDate || null,
@@ -69,7 +66,6 @@ export default function NewContentItem() {
         <Field label="Content type" value={typeName} onPress={() => setPicker('type')} />
         <Field label="Campaign" value={campaignName} onPress={() => setPicker('campaign')} />
         <Field label="Assigned To" value={ownerName} onPress={() => setPicker('owner')} required />
-        <Field label="Approver" value={approverName} onPress={() => setPicker('approver')} />
 
         <Text style={styles.label}>Due date</Text>
         <TextInput style={styles.input} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSecondary} />
@@ -82,7 +78,6 @@ export default function NewContentItem() {
       </ScrollView>
 
       <PickerSheet visible={picker === 'owner'} title="Assigned To" options={teamOptions} selectedId={ownerId} onClose={() => setPicker(null)} onSelect={(id) => { setOwnerId(id); setPicker(null); }} />
-      <PickerSheet visible={picker === 'approver'} title="Approver" options={teamOptions} selectedId={approverId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setApproverId(id); setPicker(null); }} />
       <PickerSheet visible={picker === 'campaign'} title="Campaign" options={campaignOptions} selectedId={campaignId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setCampaignId(id); setPicker(null); }} />
       <PickerSheet visible={picker === 'type'} title="Content type" options={typeOptions} selectedId={contentTypeId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setContentTypeId(id); setPicker(null); }} />
     </View>
