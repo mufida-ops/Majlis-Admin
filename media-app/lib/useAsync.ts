@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
+/** Reloads on mount, when `deps` change, AND every time the screen regains
+ * focus — so a change made on one screen (e.g. deleting a card) is never
+ * left stale on another (e.g. Home's cached list) just from tapping back. */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
     };
   }, deps); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => reload(), [reload]);
+  useFocusEffect(useCallback(() => reload(), [reload]));
 
   return { data, error, loading, reload };
 }

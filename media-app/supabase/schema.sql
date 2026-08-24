@@ -618,6 +618,7 @@ set search_path = public
 as $$
 declare
   actor uuid := auth.uid();
+  admin_id uuid;
 begin
   -- An "assigned" notification is a standing reminder, not a one-off ping:
   -- it stays unread/badged until the item actually moves (they acted on it)
@@ -631,9 +632,18 @@ begin
 
   if new.stage is distinct from old.stage then
     perform log_activity(new.id, actor, 'stage_changed', jsonb_build_object('from', old.stage, 'to', new.stage));
-    if new.stage = 'approval' and new.approver_id is not null then
-      perform notify(new.approver_id, 'approval_requested', new.title || ' is ready for your approval',
-        'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+    if new.stage = 'approval' then
+      -- Approval is an admin-only action, so every admin gets notified —
+      -- not just whoever (if anyone) happens to be set as Approver — and
+      -- any one of them acting on it is enough (see approvals_after_insert).
+      for admin_id in select user_id from user_roles where role = 'admin' loop
+        perform notify(admin_id, 'approval_requested', new.title || ' is ready for your approval',
+          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+      end loop;
+      if new.approver_id is not null then
+        perform notify(new.approver_id, 'approval_requested', new.title || ' is ready for your approval',
+          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+      end if;
     end if;
   end if;
 
@@ -647,8 +657,14 @@ begin
   end if;
 
   if new.needs_reapproval and not old.needs_reapproval then
-    perform notify(new.approver_id, 'approval_requested', new.title || ' changed after approval',
-      'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    for admin_id in select user_id from user_roles where role = 'admin' loop
+      perform notify(admin_id, 'approval_requested', new.title || ' changed after approval',
+        'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    end loop;
+    if new.approver_id is not null then
+      perform notify(new.approver_id, 'approval_requested', new.title || ' changed after approval',
+        'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    end if;
   end if;
 
   return new;
@@ -902,6 +918,10 @@ begin
 
     perform log_activity(item.id, new.decided_by, 'approved', jsonb_build_object('note', new.note));
     perform notify(item.owner_id, 'approved', item.title || ' was approved', new.note, item.id, null, null, new.decided_by);
+    if item.publisher_id is not null then
+      perform notify(item.publisher_id, 'approved', item.title || ' is approved — ready to publish',
+        new.note, item.id, null, null, new.decided_by);
+    end if;
   else
     update content_items
       set approval_state = 'changes_requested',
