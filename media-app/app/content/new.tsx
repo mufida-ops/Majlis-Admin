@@ -30,14 +30,14 @@ export default function NewContentItem() {
   const campaignOptions: PickerOption[] = (campaigns ?? []).map((c) => ({ id: c.id, label: c.name }));
   const typeOptions: PickerOption[] = (contentTypes ?? []).map((t) => ({ id: t.id, label: t.label }));
 
-  const ownerName = teamOptions.find((o) => o.id === ownerId)?.label ?? 'Select owner';
+  const ownerName = teamOptions.find((o) => o.id === ownerId)?.label ?? 'Select who will action this';
   const approverName = teamOptions.find((o) => o.id === approverId)?.label ?? 'Select approver (optional)';
   const campaignName = campaignOptions.find((o) => o.id === campaignId)?.label ?? 'No campaign';
   const typeName = typeOptions.find((o) => o.id === contentTypeId)?.label ?? 'Select content type';
 
   async function submit() {
     if (!title.trim()) return setError('Give this idea a title.');
-    if (!ownerId) return setError('Every content item needs one clear owner.');
+    if (!ownerId) return setError('Every content item needs someone assigned to action it.');
     if (!session) return;
     setBusy(true);
     setError(null);
@@ -68,7 +68,7 @@ export default function NewContentItem() {
 
         <Field label="Content type" value={typeName} onPress={() => setPicker('type')} />
         <Field label="Campaign" value={campaignName} onPress={() => setPicker('campaign')} />
-        <Field label="Owner" value={ownerName} onPress={() => setPicker('owner')} required />
+        <Field label="Assigned To" value={ownerName} onPress={() => setPicker('owner')} required />
         <Field label="Approver" value={approverName} onPress={() => setPicker('approver')} />
 
         <Text style={styles.label}>Due date</Text>
@@ -81,7 +81,7 @@ export default function NewContentItem() {
         </Pressable>
       </ScrollView>
 
-      <PickerSheet visible={picker === 'owner'} title="Owner" options={teamOptions} selectedId={ownerId} onClose={() => setPicker(null)} onSelect={(id) => { setOwnerId(id); setPicker(null); }} />
+      <PickerSheet visible={picker === 'owner'} title="Assigned To" options={teamOptions} selectedId={ownerId} onClose={() => setPicker(null)} onSelect={(id) => { setOwnerId(id); setPicker(null); }} />
       <PickerSheet visible={picker === 'approver'} title="Approver" options={teamOptions} selectedId={approverId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setApproverId(id); setPicker(null); }} />
       <PickerSheet visible={picker === 'campaign'} title="Campaign" options={campaignOptions} selectedId={campaignId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setCampaignId(id); setPicker(null); }} />
       <PickerSheet visible={picker === 'type'} title="Content type" options={typeOptions} selectedId={contentTypeId} allowClear onClose={() => setPicker(null)} onSelect={(id) => { setContentTypeId(id); setPicker(null); }} />
