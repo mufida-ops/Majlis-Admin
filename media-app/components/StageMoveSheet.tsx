@@ -16,13 +16,7 @@ export function StageMoveSheet({
           <Text style={styles.title} numberOfLines={2}>{title}</Text>
           <Text style={styles.hint}>Currently in {STAGE_LABELS[current]}</Text>
           {options.length === 0 ? (
-            <Text style={styles.hint}>
-              {current === 'approval'
-                ? 'Move this forward from the Approvals tab (approve or request changes).'
-                : current === 'scheduled'
-                ? 'This moves to Published automatically once every enabled platform publishes.'
-                : 'No further manual moves from here.'}
-            </Text>
+            <Text style={styles.hint}>No further manual moves from here.</Text>
           ) : (
             options.map((s) => (
               <Pressable key={s} style={styles.option} onPress={() => onPick(s)}>

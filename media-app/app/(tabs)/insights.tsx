@@ -10,8 +10,7 @@ import { timeAgo } from '@/lib/format';
 import { PIPELINE_STAGES, STAGE_LABELS, type ContentStage } from '@/types/db';
 
 const STAGE_COLOR: Record<ContentStage, string> = {
-  idea: colors.stageIdea, script: colors.stageScript, to_film: colors.stageToFilm, editing: colors.stageEditing,
-  approval: colors.stageApproval, approved: colors.stageApproved, scheduled: colors.stageScheduled, published: colors.stagePublished
+  idea: colors.stageIdea, producing: colors.stageToFilm, approval: colors.stageApproval, published: colors.stagePublished
 };
 
 function addDays(dateStr: string, days: number): string {
