@@ -81,7 +81,39 @@ const PROPOSE_ITEMS_TOOL = {
               type: ['string', 'null'],
               description:
                 'Anything else from the text worth keeping that does not fit the fields above — audience, ' +
-                'assets needed, people needed, format/platform, hook, or other detail. Null if nothing is left over.'
+                'objective, hook, talking points, film/shot direction, assets needed, people needed, CTA, ' +
+                'production schedule/deadlines, or other detail. Null if nothing is left over.'
+            },
+            platforms: {
+              type: 'array',
+              description:
+                'One entry per platform (instagram, tiktok, linkedin) the text explicitly addresses for this ' +
+                "item — either turning it ON with its own caption, or explicitly turning it OFF. Skip a platform " +
+                "entirely if the text says nothing about it either way. Each platform's caption is its own " +
+                "voice, not a copy of another platform's — e.g. LinkedIn explains why something matters to " +
+                'professionals rather than reusing the Instagram caption verbatim, if the text gives them separately.',
+              items: {
+                type: 'object',
+                properties: {
+                  platform: { type: 'string', enum: ['instagram', 'tiktok', 'linkedin'] },
+                  enabled: { type: 'boolean', description: 'true if the text says ON for this platform, false if explicitly OFF.' },
+                  caption: {
+                    type: ['string', 'null'],
+                    description: "This platform's own caption, copied in full (not summarized) — null if enabled but no caption was given, or if disabled."
+                  },
+                  hashtags: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'This platform\'s hashtags, without the leading #. Empty array if none given.'
+                  },
+                  post_type: {
+                    type: ['string', 'null'],
+                    enum: ['reel', 'image', 'carousel', 'story', 'video', 'post', null],
+                    description: 'Post type for this platform if stated (e.g. "Reel", "Carousel", "Document Carousel" -> carousel) — null if not given.'
+                  }
+                },
+                required: ['platform', 'enabled']
+              }
             }
           },
           required: ['title', 'priority', 'content_type']
@@ -123,15 +155,18 @@ Deno.serve(async req => {
       },
       body: JSON.stringify({
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
-        max_tokens: 8192,
+        max_tokens: 16000,
         system:
           "You're helping a founder at Majlis Media Studio turn a description of upcoming content, typed or " +
           `pasted in their own words, into a clean, organized list of content items. Today's date is ${todayDate}. ` +
           'Split the text into one item per distinct piece of content — don\'t combine several posts/videos into ' +
-          'one item. The input can be anything from a one-line rough plan to a fully written brief with scripts, ' +
-          'captions and hashtags already in it — when the detail is already there, carry it into the right field ' +
-          "(description/script/campaign/tags/notes) rather than dropping it, and don't add anything not implied " +
-          'by the text. If the text only describes one piece of content, return a list of exactly one item.',
+          'one item, and never split a single item into separate Instagram/TikTok/LinkedIn cards: one card per ' +
+          'idea, with each platform\'s own detail (caption, hashtags, post type, on/off) inside that one item\'s ' +
+          '`platforms` array. The input can be anything from a one-line rough plan to a fully written brief with ' +
+          'scripts, per-platform captions and hashtags already in it — when the detail is already there, carry it ' +
+          "into the right field (description/script/campaign/tags/notes/platforms) rather than dropping it, and " +
+          "don't add anything not implied by the text. If the text only describes one piece of content, return a " +
+          'list of exactly one item.',
         tools: [PROPOSE_ITEMS_TOOL],
         tool_choice: { type: 'tool', name: 'propose_items' },
         messages: [{ role: 'user', content: String(text).trim() }]
@@ -155,6 +190,13 @@ Deno.serve(async req => {
       campaign?: string | null;
       tags?: string[];
       notes?: string | null;
+      platforms?: Array<{
+        platform: string;
+        enabled: boolean;
+        caption?: string | null;
+        hashtags?: string[];
+        post_type?: string | null;
+      }>;
     }> = toolUse?.input?.items ?? [];
 
     return new Response(JSON.stringify({ items }), {
