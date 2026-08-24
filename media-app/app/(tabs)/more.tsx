@@ -33,6 +33,7 @@ export default function More() {
         <Row icon="archive" label="Published" sub="Completed content archive" onPress={() => router.push('/(tabs)/published')} />
         <Row icon="users" label="Team" sub="Members, roles, workload" onPress={() => router.push('/(tabs)/team')} />
         <Row icon="bar-chart-2" label="Dashboard" sub="Pipeline status and latest team activity" onPress={() => router.push('/(tabs)/insights')} />
+        <Row icon="sun" label="Daily Inspiration" sub="A little motivation and happiness" onPress={() => router.push('/quotes')} />
       </View>
 
       {isAdmin && (
