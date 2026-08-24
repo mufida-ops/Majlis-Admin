@@ -659,9 +659,18 @@ set search_path = public
 as $$
 declare
   v_thread threads;
+  v_kind text;
+  v_anchor_id uuid;
 begin
   select * into v_thread from threads where id = new.thread_id;
-  insert into activity_events (workspace_id, actor_user_id, entity_type, entity_id, project_id, organisation_id, action, summary)
+  v_kind := case
+    when v_thread.task_id is not null then 'task'
+    when v_thread.project_id is not null then 'project'
+    when v_thread.organisation_id is not null then 'organisation'
+    when v_thread.decision_id is not null then 'decision'
+  end;
+  v_anchor_id := coalesce(v_thread.task_id, v_thread.project_id, v_thread.organisation_id, v_thread.decision_id);
+  insert into activity_events (workspace_id, actor_user_id, entity_type, entity_id, project_id, organisation_id, action, summary, metadata)
   values (
     new.workspace_id,
     auth.uid(),
@@ -670,7 +679,8 @@ begin
     v_thread.project_id,
     v_thread.organisation_id,
     'message_posted',
-    left(new.body, 140)
+    left(new.body, 140),
+    jsonb_build_object('thread_kind', v_kind, 'anchor_id', v_anchor_id)
   );
   return new;
 end;

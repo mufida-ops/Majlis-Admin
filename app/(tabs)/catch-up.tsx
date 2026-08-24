@@ -72,6 +72,13 @@ export default function CatchUpScreen() {
             needsMe = event.action === 'urgent_drop';
           } else if (event.entity_type === 'event') {
             linkMap[event.id] = '/(tabs)/calendar';
+          } else if (event.entity_type === 'message') {
+            // A message someone else sent you — always worth a look, and it
+            // needs a direct link back to that thread so you can actually reply.
+            needsMe = true;
+            const kind = event.metadata?.thread_kind as string | undefined;
+            const anchorId = event.metadata?.anchor_id as string | undefined;
+            if (kind && anchorId) linkMap[event.id] = `/thread?kind=${kind}&id=${anchorId}`;
           }
 
           (needsMe ? mine : others).push(event);
