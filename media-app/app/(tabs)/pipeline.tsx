@@ -4,12 +4,12 @@ import { useAuth } from '@/lib/auth';
 import { showAlert } from '@/lib/alert';
 import { listContentItemSummaries, moveStage, assignAndMoveToProducing, ConflictError, type ContentItemSummary } from '@/lib/repositories/contentItems';
 import { latestMediaThumbnails } from '@/lib/repositories/media';
-import { listTeam } from '@/lib/repositories/team';
+import { addAssignment } from '@/lib/repositories/team';
 import { useAsync } from '@/lib/useAsync';
 import { colors, radii, spacing } from '@/constants/theme';
 import { ContentCard } from '@/components/ContentCard';
 import { StageMoveSheet } from '@/components/StageMoveSheet';
-import { PickerSheet, type PickerOption } from '@/components/PickerSheet';
+import { AssignProducingModal } from '@/components/content/AssignProducingModal';
 import { PIPELINE_STAGES, STAGE_LABELS, type ContentStage } from '@/types/db';
 import { canEditContent } from '@/lib/permissions';
 
@@ -32,8 +32,6 @@ export default function Pipeline() {
   );
   const [moveTarget, setMoveTarget] = useState<ContentItemSummary | null>(null);
   const [assignTarget, setAssignTarget] = useState<ContentItemSummary | null>(null);
-  const { data: team } = useAsync(() => listTeam(), []);
-  const teamOptions: PickerOption[] = (team ?? []).map((p) => ({ id: p.id, label: p.full_name }));
 
   const columns = useMemo(() => {
     const map = new Map<ContentStage, ContentItemSummary[]>(PIPELINE_STAGES.map((s) => [s, []]));
@@ -67,10 +65,13 @@ export default function Pipeline() {
     }
   }
 
-  async function handleAssignProducing(ownerId: string | null) {
-    if (!assignTarget || !ownerId) return;
+  async function handleAssignProducing(mainOwnerId: string, helperIds: string[]) {
+    if (!assignTarget || !session) return;
     try {
-      await assignAndMoveToProducing(assignTarget.id, assignTarget.version, ownerId);
+      await assignAndMoveToProducing(assignTarget.id, assignTarget.version, mainOwnerId);
+      for (const helperId of helperIds) {
+        await addAssignment(assignTarget.id, helperId, 'contributor', session.user.id);
+      }
       setAssignTarget(null);
       reload();
     } catch (err) {
@@ -136,13 +137,11 @@ export default function Pipeline() {
         onPick={handlePick}
       />
 
-      <PickerSheet
+      <AssignProducingModal
         visible={!!assignTarget}
-        title="Who will produce this?"
-        options={teamOptions}
-        selectedId={assignTarget?.owner_id}
+        defaultOwnerId={assignTarget?.owner_id}
         onClose={() => setAssignTarget(null)}
-        onSelect={handleAssignProducing}
+        onConfirm={handleAssignProducing}
       />
     </View>
   );
