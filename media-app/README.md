@@ -56,6 +56,12 @@ state machine, navigation, build-now-vs-needs-API split) and
   (`AlertHost`, mounted once in `app/_layout.tsx`) instead of delegating to any browser or RN-native alert API, so it
   behaves identically in the native app, a browser tab, and installed to the Home Screen. `showAlert()`'s call
   signature is unchanged, so no call site needed to change.
+- Every repository function used to `throw error;` with the raw Supabase `PostgrestError` object rather than a real
+  `Error`, so any call site checking `err instanceof Error` (the standard pattern used everywhere to pull out
+  `.message` for a `showAlert`) fell through to `String(err)` and rendered the unhelpful `[object Object]` — e.g.
+  moving a card on the Pipeline board failing with "Could not move / [object Object]" instead of the real reason.
+  Every `throw error;` across `lib/repositories/*.ts` now wraps it as `throw new Error(error.message);` at the
+  source, so the real message surfaces everywhere downstream without touching each call site.
 - **Publishing architecture** — a real adapter abstraction
   (`lib/publishing/`) and an Edge Function dispatcher
   (`supabase/functions/publish-dispatcher`) that schedules/retries per

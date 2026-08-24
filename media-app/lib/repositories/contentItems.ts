@@ -17,7 +17,7 @@ export async function listContentItems(filters?: { stage?: ContentStage; campaig
   if (filters?.stage) q = q.eq('stage', filters.stage);
   if (filters?.campaignId) q = q.eq('campaign_id', filters.campaignId);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as ContentItem[];
 }
 
@@ -39,13 +39,13 @@ export async function listContentItemSummaries(filters?: { stage?: ContentStage;
   if (filters?.stage) q = q.eq('stage', filters.stage);
   if (filters?.campaignId) q = q.eq('campaign_id', filters.campaignId);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as unknown as ContentItemSummary[];
 }
 
 export async function getContentItem(id: string) {
   const { data, error } = await db().from('content_items').select('*').eq('id', id).single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as ContentItem;
 }
 
@@ -67,7 +67,7 @@ export async function createContentItem(input: {
     .insert({ stage: 'idea', ...input })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as ContentItem;
 }
 
@@ -88,7 +88,7 @@ export async function updateContentItem(
     .eq('id', id)
     .eq('version', expectedVersion)
     .select('*');
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   if (!data || data.length === 0) {
     throw new ConflictError();
   }

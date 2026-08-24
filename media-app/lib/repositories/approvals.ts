@@ -12,7 +12,7 @@ export async function listApprovalHistory(contentItemId: string) {
     .select('*')
     .eq('content_item_id', contentItemId)
     .order('decided_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as Approval[];
 }
 
@@ -41,7 +41,7 @@ export async function decide(input: {
     })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as Approval;
 }
 
@@ -50,6 +50,6 @@ export async function listAwaitingMyApproval(userId: string, includeAll: boolean
   let q = db().from('content_items').select('*').eq('stage', 'approval').is('deleted_at', null);
   if (!includeAll) q = q.eq('approver_id', userId);
   const { data, error } = await q.order('due_date', { ascending: true, nullsFirst: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data ?? [];
 }

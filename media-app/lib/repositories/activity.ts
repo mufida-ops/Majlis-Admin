@@ -12,7 +12,7 @@ export async function listActivity(contentItemId: string) {
     .select('*')
     .eq('content_item_id', contentItemId)
     .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as ActivityLogEntry[];
 }
 
@@ -28,7 +28,7 @@ export async function listRecentActivity(limit = 30): Promise<RecentActivityEntr
     .select('*, actor:profiles(full_name), content_item:content_items(title, deleted_at)')
     .order('created_at', { ascending: false })
     .limit(limit * 2);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as RecentActivityEntry[])
     .filter((e) => e.content_item && !e.content_item.deleted_at)
     .slice(0, limit);

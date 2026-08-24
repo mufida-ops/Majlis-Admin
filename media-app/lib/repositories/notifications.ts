@@ -13,7 +13,7 @@ export async function listNotifications(userId: string) {
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(100);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as AppNotification[];
 }
 
@@ -23,13 +23,13 @@ export async function unreadCount(userId: string) {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .is('read_at', null);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return count ?? 0;
 }
 
 export async function markRead(id: string) {
   const { error } = await db().from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Everything except 'assigned' — those are a standing reminder, not a one-off ping, and only clear
@@ -41,7 +41,7 @@ export async function markAllRead(userId: string) {
     .eq('user_id', userId)
     .is('read_at', null)
     .neq('type', 'assigned');
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Directly flags one or more teammates about a content item — a manual notification, not a comment. */
@@ -51,7 +51,7 @@ export async function notifyTeam(contentItemId: string, userIds: string[], messa
     p_user_ids: userIds,
     p_message: message?.trim() ? message.trim() : null
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Groups repetitive events (same type + group_key) so the centre doesn't get noisy — Section 27. */

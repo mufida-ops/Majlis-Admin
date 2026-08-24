@@ -8,13 +8,13 @@ function db() {
 
 export async function listTeam(): Promise<Profile[]> {
   const { data, error } = await db().from('profiles').select('*').order('full_name');
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as Profile[];
 }
 
 export async function listRolesByUser(): Promise<Map<string, AppRole[]>> {
   const { data, error } = await db().from('user_roles').select('user_id, role');
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   const map = new Map<string, AppRole[]>();
   for (const row of data ?? []) {
     const arr = map.get(row.user_id) ?? [];
@@ -26,12 +26,12 @@ export async function listRolesByUser(): Promise<Map<string, AppRole[]>> {
 
 export async function grantRole(userId: string, role: AppRole, grantedBy: string) {
   const { error } = await db().from('user_roles').insert({ user_id: userId, role, granted_by: grantedBy });
-  if (error && error.code !== '23505') throw error;
+  if (error && error.code !== '23505') throw new Error(error.message);
 }
 
 export async function revokeRole(userId: string, role: AppRole) {
   const { error } = await db().from('user_roles').delete().eq('user_id', userId).eq('role', role);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Open (not-published, not-deleted) content items assigned to a user in any capacity — drives Team workload + Home. */
@@ -49,16 +49,16 @@ export async function workloadForUser(userId: string) {
 
 export async function listAssignments(contentItemId: string) {
   const { data, error } = await db().from('content_assignments').select('*').eq('content_item_id', contentItemId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as ContentAssignment[];
 }
 
 export async function addAssignment(contentItemId: string, userId: string, role: ContentAssignment['role_on_item'], assignedBy: string) {
   const { error } = await db().from('content_assignments').insert({ content_item_id: contentItemId, user_id: userId, role_on_item: role, assigned_by: assignedBy });
-  if (error && error.code !== '23505') throw error;
+  if (error && error.code !== '23505') throw new Error(error.message);
 }
 
 export async function removeAssignment(id: string) {
   const { error } = await db().from('content_assignments').delete().eq('id', id);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }

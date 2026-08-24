@@ -22,7 +22,7 @@ export async function upsertSchedule(input: {
       .eq('id', existing.id)
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     return data as Schedule;
   }
   const { data, error } = await client
@@ -36,7 +36,7 @@ export async function upsertSchedule(input: {
     })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as Schedule;
 }
 
@@ -44,18 +44,18 @@ export async function listSchedulesBetween(startIso: string, endIso: string, con
   let q = db().from('schedules').select('*').gte('scheduled_at', startIso).lte('scheduled_at', endIso);
   if (contentItemId) q = q.eq('content_item_id', contentItemId);
   const { data, error } = await q.order('scheduled_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as Schedule[];
 }
 
 export async function cancelSchedule(id: string) {
   const { error } = await db().from('schedules').update({ status: 'cancelled' }).eq('id', id);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function listJobsForPost(platformPostId: string) {
   const { data, error } = await db().from('publishing_jobs').select('*').eq('platform_post_id', platformPostId).order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as PublishingJob[];
 }
 
@@ -67,7 +67,7 @@ export async function retryPublish(platformPostId: string, requestedBy: string) 
     requested_by: requestedBy,
     status: 'queued'
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function publishNow(platformPostId: string, requestedBy: string) {
@@ -77,5 +77,5 @@ export async function publishNow(platformPostId: string, requestedBy: string) {
     requested_by: requestedBy,
     status: 'queued'
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }

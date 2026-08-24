@@ -35,7 +35,7 @@ export async function listCalendarEntries(startIso: string, endIso: string): Pro
     .gte('scheduled_at', startIso)
     .lte('scheduled_at', endIso)
     .order('scheduled_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 
   return (data ?? []).map((row: any) => ({
     id: row.id,

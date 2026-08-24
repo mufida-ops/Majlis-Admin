@@ -14,7 +14,7 @@ export async function listAssetsForContentItem(contentItemId: string) {
     .select('*')
     .eq('content_item_id', contentItemId)
     .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as MediaAsset[];
 }
 
@@ -24,7 +24,7 @@ export async function listVersions(assetId: string) {
     .select('*')
     .eq('media_asset_id', assetId)
     .order('version_number', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as MediaVersion[];
 }
 
@@ -36,14 +36,14 @@ export async function listVersionsForContentItem(contentItemId: string) {
     .select('*')
     .in('media_asset_id', assets.map((a) => a.id))
     .order('uploaded_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as MediaVersion[];
 }
 
 /** Signed URL for playback/preview — the bucket is private, so this is the only way to view a file. */
 export async function getMediaUrl(storagePath: string, expiresInSeconds = 3600): Promise<string> {
   const { data, error } = await db().storage.from(BUCKET).createSignedUrl(storagePath, expiresInSeconds);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data.signedUrl;
 }
 
@@ -76,7 +76,7 @@ export async function uploadMediaVersion(input: {
 
   if (input.assetId) {
     const { data, error } = await client.from('media_assets').select('*').eq('id', input.assetId).single();
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     asset = data as MediaAsset;
   } else {
     const { data, error } = await client
@@ -91,7 +91,7 @@ export async function uploadMediaVersion(input: {
       })
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     asset = data as MediaAsset;
   }
 
@@ -176,28 +176,28 @@ export async function searchBankAssets(query: string) {
   let q = client.from('media_assets').select('*').eq('is_bank_item', true).order('created_at', { ascending: false });
   if (query.trim()) q = q.ilike('title', `%${query.trim()}%`);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as MediaAsset[];
 }
 
 export async function attachBankAssetToContentItem(assetId: string, contentItemId: string, section: MediaSection) {
   const { error } = await db().from('media_assets').update({ content_item_id: contentItemId, section }).eq('id', assetId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function tagMediaAsset(assetId: string, tagId: string) {
   const { error } = await db().from('media_asset_tags').insert({ media_asset_id: assetId, tag_id: tagId });
-  if (error && error.code !== '23505') throw error; // ignore duplicate-tag conflicts
+  if (error && error.code !== '23505') throw new Error(error.message); // ignore duplicate-tag conflicts
 }
 
 export async function untagMediaAsset(assetId: string, tagId: string) {
   const { error } = await db().from('media_asset_tags').delete().eq('media_asset_id', assetId).eq('tag_id', tagId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function renameMediaAsset(assetId: string, title: string) {
   const { error } = await db().from('media_assets').update({ title, updated_at: new Date().toISOString() }).eq('id', assetId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Only ever allowed for unattached Content Bank items — see the RLS policy comment in schema.sql. */
@@ -209,11 +209,11 @@ export async function deleteBankAsset(assetId: string) {
     if (storageError) throw storageError;
   }
   const { error } = await client.from('media_assets').delete().eq('id', assetId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function getTagsForAsset(assetId: string) {
   const { data, error } = await db().from('media_asset_tags').select('tag_id, tags(id, name)').eq('media_asset_id', assetId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []).map((r: any) => r.tags);
 }
