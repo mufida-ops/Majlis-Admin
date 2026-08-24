@@ -8,6 +8,7 @@ import { useAsync } from '@/lib/useAsync';
 import { colors, radii, spacing } from '@/constants/theme';
 import { CardRow } from '@/components/CardRow';
 import { canCreateContent } from '@/lib/permissions';
+import { QUOTES, randomQuoteIndex } from '@/lib/quotes';
 
 export default function Home() {
   const { session, profile, roles } = useAuth();
@@ -15,6 +16,8 @@ export default function Home() {
     () => (session ? loadHomeData(session.user.id, roles.includes('admin')) : Promise.resolve(null)),
     [session?.user.id, roles.join(',')]
   );
+  const [quoteIndex] = React.useState(() => randomQuoteIndex());
+  const quote = QUOTES[quoteIndex];
 
   const canCreate = canCreateContent({ userId: session?.user.id ?? null, roles });
 
@@ -28,6 +31,11 @@ export default function Home() {
         <Text style={styles.greeting}>Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'}</Text>
         <Text style={styles.sub}>Here's what needs your attention today.</Text>
       </View>
+
+      <Pressable style={styles.quoteCard} onPress={() => router.push('/quotes')}>
+        <Feather name="sun" size={16} color={colors.gold} />
+        <Text style={styles.quoteText} numberOfLines={2}>"{quote.text}" <Text style={styles.quoteAuthor}>— {quote.author}</Text></Text>
+      </Pressable>
 
       <Pressable style={styles.dashboardButton} onPress={() => router.push('/(tabs)/insights')}>
         <Feather name="bar-chart-2" size={18} color={colors.navy} />
@@ -84,6 +92,12 @@ const styles = StyleSheet.create({
   hero: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: 4 },
   greeting: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
   sub: { fontSize: 14, color: colors.textSecondary },
+  quoteCard: {
+    marginHorizontal: spacing.lg, backgroundColor: colors.goldSoft + '55', borderRadius: radii.md,
+    paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', gap: 8, alignItems: 'flex-start'
+  },
+  quoteText: { flex: 1, fontSize: 12.5, color: colors.textPrimary, fontStyle: 'italic', lineHeight: 17 },
+  quoteAuthor: { fontWeight: '700', fontStyle: 'normal', color: colors.gold },
   newButton: {
     marginHorizontal: spacing.lg, backgroundColor: colors.navy, borderRadius: radii.md, paddingVertical: 14,
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'
