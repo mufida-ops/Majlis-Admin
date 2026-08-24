@@ -337,10 +337,13 @@ Discussions, to avoid a schema migration for a cosmetic rename.
   organisation/decision/event/message, "could not flag", clearing a next action, adding the book checklist — 15
   files across both apps) was a silent no-op on the web build: `react-native-web`'s `Alert.alert` is a bare stub
   (`static alert() {}`), so tapping "Delete" or hitting an error on web did nothing at all, with no visible failure
-  — this is exactly what looked like "I tried to delete here it didn't work." Fixed with `lib/alert.ts`'s
-  `showAlert()` (same signature as `Alert.alert`, so every call site is a drop-in swap) — on native it still calls
-  `Alert.alert`, on web it falls back to real browser dialogs (`window.confirm`/`window.alert`) instead. Media
-  Studio got its own copy at `media-app/lib/alert.ts` for the same reason.
+  — this is exactly what looked like "I tried to delete here it didn't work." First fix was `showAlert()` falling
+  back to `window.confirm`/`window.alert` on web — but those turn out to be silently suppressed by iOS too, once
+  the app is added to the Home Screen (standalone display mode has no Safari chrome to host them), the exact same
+  symptom all over again. `lib/alert.tsx` now draws its own in-app modal (`AlertHost`, mounted once in
+  `app/_layout.tsx`) instead of delegating to any browser or RN-native alert API, so it behaves identically in the
+  native app, a browser tab, and installed to the Home Screen. `showAlert()`'s call signature is unchanged, so no
+  call site needed to change again. Media Studio has its own copy at `media-app/lib/alert.tsx` for the same reason.
 
 ## Suggested AI actions
 
