@@ -145,6 +145,8 @@ export type MessageRow = {
   author_user_id: string;
   body: string;
   image_path: string | null;
+  audio_path: string | null;
+  audio_duration_seconds: number | null;
   created_at: string;
 };
 

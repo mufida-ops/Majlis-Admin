@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
@@ -11,10 +12,18 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { MessageImage } from '@/components/MessageImage';
+import { VoiceMessage, formatClipDuration } from '@/components/VoiceMessage';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
-import { getOrCreateThread, listMessages, postMessage, deleteMessage, uploadMessageImage } from '@/lib/repositories/threads';
+import {
+  getOrCreateThread,
+  listMessages,
+  postMessage,
+  deleteMessage,
+  uploadMessageImage,
+  uploadMessageAudio
+} from '@/lib/repositories/threads';
 import { getTask, updateTask } from '@/lib/repositories/projects';
 import { listActivityForTask } from '@/lib/repositories/activity';
 import { memberLabel } from '@/lib/ownerLabel';
@@ -54,6 +63,13 @@ export default function ThreadScreen() {
   const [pendingImagePath, setPendingImagePath] = useState<string | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [pickingImage, setPickingImage] = useState(false);
+  const [pendingAudioPath, setPendingAudioPath] = useState<string | null>(null);
+  const [pendingAudioDuration, setPendingAudioDuration] = useState<number | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [preparingAudio, setPreparingAudio] = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [task, setTask] = useState<ProjectTaskRow | null>(null);
   const [taskHistory, setTaskHistory] = useState<ActivityEventRow[]>([]);
   const [dueDateDraft, setDueDateDraft] = useState('');
@@ -120,9 +136,58 @@ export default function ThreadScreen() {
     setPendingImagePreview(null);
   };
 
+  const clearPendingAudio = () => {
+    setPendingAudioPath(null);
+    setPendingAudioDuration(null);
+  };
+
+  const startRecording = async () => {
+    const permission = await Audio.requestPermissionsAsync();
+    if (!permission.granted) {
+      setError('Allow microphone access in your phone settings to record a voice message.');
+      return;
+    }
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+    const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+    recordingRef.current = recording;
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+  };
+
+  const stopRecording = async () => {
+    const recording = recordingRef.current;
+    if (!recording || !thread) return;
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    setIsRecording(false);
+    setPreparingAudio(true);
+    try {
+      await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const status = await recording.getStatusAsync();
+      const uri = recording.getURI();
+      recordingRef.current = null;
+      if (!uri) throw new Error('That recording did not save. Try again.');
+      const path = await uploadMessageAudio(thread.id, { uri, mimeType: 'audio/m4a' });
+      setPendingAudioPath(path);
+      setPendingAudioDuration(status.durationMillis ? Math.round(status.durationMillis / 1000) : recordingSeconds);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not attach that voice message.');
+    } finally {
+      setPreparingAudio(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    };
+  }, []);
+
   const send = async () => {
     if (!thread || !session || !workspaceId) return;
-    if (!body.trim() && !pendingImagePath) return;
+    if (!body.trim() && !pendingImagePath && !pendingAudioPath) return;
     setSending(true);
     try {
       const msg = await postMessage({
@@ -130,11 +195,14 @@ export default function ThreadScreen() {
         thread_id: thread.id,
         author_user_id: session.user.id,
         body: body.trim(),
-        image_path: pendingImagePath
+        image_path: pendingImagePath,
+        audio_path: pendingAudioPath,
+        audio_duration_seconds: pendingAudioDuration
       });
       setMessages(prev => [...prev, msg]);
       setBody('');
       clearPendingImage();
+      clearPendingAudio();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send that message.');
     } finally {
@@ -301,6 +369,11 @@ export default function ThreadScreen() {
                       <MessageImage storagePath={msg.image_path} />
                     </View>
                   ) : null}
+                  {msg.audio_path ? (
+                    <View style={msg.body || msg.image_path ? styles.imageWrap : undefined}>
+                      <VoiceMessage storagePath={msg.audio_path} durationSeconds={msg.audio_duration_seconds} />
+                    </View>
+                  ) : null}
                 </Card>
               ))
             )}
@@ -316,9 +389,36 @@ export default function ThreadScreen() {
           </Pressable>
         </View>
       ) : null}
+      {pendingAudioPath ? (
+        <View style={styles.pendingRow}>
+          <Ionicons name="mic" size={22} color={theme.colors.navy} />
+          <Text style={styles.pendingAudioLabel}>Voice message · {formatClipDuration(pendingAudioDuration)}</Text>
+          <Pressable onPress={clearPendingAudio} hitSlop={10} style={styles.pendingRemove}>
+            <Ionicons name="close-circle" size={22} color={theme.colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
+      {isRecording ? (
+        <View style={styles.pendingRow}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.pendingAudioLabel}>Recording… {formatClipDuration(recordingSeconds)}</Text>
+        </View>
+      ) : null}
       <View style={styles.composer}>
-        <Pressable onPress={pickImage} hitSlop={10} style={styles.attachButton} disabled={pickingImage}>
+        <Pressable onPress={pickImage} hitSlop={10} style={styles.attachButton} disabled={pickingImage || isRecording}>
           <Ionicons name="image-outline" size={24} color={theme.colors.navy} />
+        </Pressable>
+        <Pressable
+          onPress={isRecording ? stopRecording : startRecording}
+          hitSlop={10}
+          style={styles.attachButton}
+          disabled={preparingAudio || !!pendingAudioPath}
+        >
+          {preparingAudio ? (
+            <ActivityIndicator color={theme.colors.navy} size="small" />
+          ) : (
+            <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={24} color={isRecording ? theme.colors.danger : theme.colors.navy} />
+          )}
         </Pressable>
         <TextInput
           value={body}
@@ -328,7 +428,11 @@ export default function ThreadScreen() {
           style={styles.input}
           multiline
         />
-        <Pressable style={styles.send} onPress={send} disabled={sending || pickingImage || (!body.trim() && !pendingImagePath)}>
+        <Pressable
+          style={styles.send}
+          onPress={send}
+          disabled={sending || pickingImage || isRecording || (!body.trim() && !pendingImagePath && !pendingAudioPath)}
+        >
           <Text style={styles.sendText}>{sending ? '…' : 'Send'}</Text>
         </Pressable>
       </View>
@@ -364,6 +468,8 @@ const styles = StyleSheet.create({
   },
   pendingThumb: { width: 56, height: 56, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceMuted },
   pendingRemove: { marginLeft: 'auto' },
+  pendingAudioLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600', marginLeft: 8 },
+  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.danger },
   attachButton: { paddingBottom: 12 },
   composer: {
     flexDirection: 'row',

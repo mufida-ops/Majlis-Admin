@@ -2,6 +2,7 @@ import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
 import type { MessageRow, ThreadRow } from '@/types/db';
 
 const MESSAGE_IMAGE_BUCKET = 'message-images';
+const MESSAGE_AUDIO_BUCKET = 'message-audio';
 
 type ThreadAnchor =
   | { project_id: string }
@@ -42,6 +43,8 @@ export async function postMessage(input: {
   author_user_id: string;
   body: string;
   image_path?: string | null;
+  audio_path?: string | null;
+  audio_duration_seconds?: number | null;
 }) {
   const supabase = requireSupabase();
   const result = await supabase.from('messages').insert(input).select('*').single();
@@ -73,6 +76,26 @@ export async function uploadMessageImage(
 export async function getMessageImageUrl(storagePath: string, expiresInSeconds = 3600): Promise<string> {
   const supabase = requireSupabase();
   const { data, error } = await supabase.storage.from(MESSAGE_IMAGE_BUCKET).createSignedUrl(storagePath, expiresInSeconds);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
+/** Uploads a recorded voice clip for a message and returns its storage path (not yet attached to any message). */
+export async function uploadMessageAudio(threadId: string, file: { uri: string; mimeType: string }): Promise<string> {
+  const supabase = requireSupabase();
+  const ext = file.mimeType.includes('mp4') || file.mimeType.includes('m4a') ? 'm4a' : 'webm';
+  const path = `${threadId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const response = await fetch(file.uri);
+  const blob = await response.blob();
+  const { error } = await supabase.storage.from(MESSAGE_AUDIO_BUCKET).upload(path, blob, { contentType: file.mimeType });
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+/** Signed URL for playing a voice message — the bucket is private, so this is the only way to play one. */
+export async function getMessageAudioUrl(storagePath: string, expiresInSeconds = 3600): Promise<string> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.storage.from(MESSAGE_AUDIO_BUCKET).createSignedUrl(storagePath, expiresInSeconds);
   if (error) throw new Error(error.message);
   return data.signedUrl;
 }

@@ -204,6 +204,8 @@ create table if not exists messages (
   author_user_id uuid references auth.users(id) not null,
   body text not null,
   image_path text,
+  audio_path text,
+  audio_duration_seconds integer,
   created_at timestamptz not null default now()
 );
 
@@ -680,8 +682,13 @@ begin
     v_thread.project_id,
     v_thread.organisation_id,
     'message_posted',
-    case when trim(new.body) = '' and new.image_path is not null then '📷 Photo' else left(new.body, 140) end,
-    jsonb_build_object('thread_kind', v_kind, 'anchor_id', v_anchor_id, 'image_path', new.image_path)
+    case
+      when trim(new.body) != '' then left(new.body, 140)
+      when new.image_path is not null then '📷 Photo'
+      when new.audio_path is not null then '🎤 Voice message'
+      else left(new.body, 140)
+    end,
+    jsonb_build_object('thread_kind', v_kind, 'anchor_id', v_anchor_id, 'image_path', new.image_path, 'audio_path', new.audio_path)
   );
   return new;
 end;
@@ -713,3 +720,19 @@ create policy message_images_insert on storage.objects for insert to authenticat
 drop policy if exists message_images_delete on storage.objects;
 create policy message_images_delete on storage.objects for delete to authenticated
   using (bucket_id = 'message-images' and owner = auth.uid());
+
+insert into storage.buckets (id, name, public)
+values ('message-audio', 'message-audio', false)
+on conflict (id) do nothing;
+
+drop policy if exists message_audio_select on storage.objects;
+create policy message_audio_select on storage.objects for select to authenticated
+  using (bucket_id = 'message-audio');
+
+drop policy if exists message_audio_insert on storage.objects;
+create policy message_audio_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'message-audio');
+
+drop policy if exists message_audio_delete on storage.objects;
+create policy message_audio_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'message-audio' and owner = auth.uid());
