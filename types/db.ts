@@ -144,6 +144,7 @@ export type MessageRow = {
   thread_id: string;
   author_user_id: string;
   body: string;
+  image_path: string | null;
   created_at: string;
 };
 

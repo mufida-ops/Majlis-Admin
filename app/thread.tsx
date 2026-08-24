@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -8,10 +10,11 @@ import { Pill } from '@/components/Pill';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
+import { MessageImage } from '@/components/MessageImage';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
-import { getOrCreateThread, listMessages, postMessage, deleteMessage } from '@/lib/repositories/threads';
+import { getOrCreateThread, listMessages, postMessage, deleteMessage, uploadMessageImage } from '@/lib/repositories/threads';
 import { getTask, updateTask } from '@/lib/repositories/projects';
 import { listActivityForTask } from '@/lib/repositories/activity';
 import { memberLabel } from '@/lib/ownerLabel';
@@ -48,6 +51,9 @@ export default function ThreadScreen() {
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [pendingImagePath, setPendingImagePath] = useState<string | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [pickingImage, setPickingImage] = useState(false);
   const [task, setTask] = useState<ProjectTaskRow | null>(null);
   const [taskHistory, setTaskHistory] = useState<ActivityEventRow[]>([]);
   const [dueDateDraft, setDueDateDraft] = useState('');
@@ -83,18 +89,52 @@ export default function ThreadScreen() {
     load();
   }, [load]);
 
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError('Allow photo access in your phone settings to attach a photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+    if (result.canceled || !thread) return;
+    const asset = result.assets[0];
+    setPickingImage(true);
+    setPendingImagePreview(asset.uri);
+    try {
+      const path = await uploadMessageImage(thread.id, {
+        uri: asset.uri,
+        name: asset.fileName ?? 'photo.jpg',
+        mimeType: asset.mimeType ?? 'image/jpeg'
+      });
+      setPendingImagePath(path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not attach that photo.');
+      setPendingImagePreview(null);
+    } finally {
+      setPickingImage(false);
+    }
+  };
+
+  const clearPendingImage = () => {
+    setPendingImagePath(null);
+    setPendingImagePreview(null);
+  };
+
   const send = async () => {
-    if (!thread || !session || !body.trim() || !workspaceId) return;
+    if (!thread || !session || !workspaceId) return;
+    if (!body.trim() && !pendingImagePath) return;
     setSending(true);
     try {
       const msg = await postMessage({
         workspace_id: workspaceId,
         thread_id: thread.id,
         author_user_id: session.user.id,
-        body: body.trim()
+        body: body.trim(),
+        image_path: pendingImagePath
       });
       setMessages(prev => [...prev, msg]);
       setBody('');
+      clearPendingImage();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send that message.');
     } finally {
@@ -255,14 +295,31 @@ export default function ThreadScreen() {
                       </Pressable>
                     ) : null}
                   </View>
-                  <Text style={styles.body}>{msg.body}</Text>
+                  {msg.body ? <Text style={styles.body}>{msg.body}</Text> : null}
+                  {msg.image_path ? (
+                    <View style={msg.body ? styles.imageWrap : undefined}>
+                      <MessageImage storagePath={msg.image_path} />
+                    </View>
+                  ) : null}
                 </Card>
               ))
             )}
           </View>
         )}
       </Screen>
+      {pendingImagePreview ? (
+        <View style={styles.pendingRow}>
+          <Image source={{ uri: pendingImagePreview }} style={styles.pendingThumb} />
+          {pickingImage ? <ActivityIndicator color={theme.colors.navy} style={{ marginLeft: 10 }} /> : null}
+          <Pressable onPress={clearPendingImage} hitSlop={10} style={styles.pendingRemove}>
+            <Ionicons name="close-circle" size={22} color={theme.colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
       <View style={styles.composer}>
+        <Pressable onPress={pickImage} hitSlop={10} style={styles.attachButton} disabled={pickingImage}>
+          <Ionicons name="image-outline" size={24} color={theme.colors.navy} />
+        </Pressable>
         <TextInput
           value={body}
           onChangeText={setBody}
@@ -271,7 +328,7 @@ export default function ThreadScreen() {
           style={styles.input}
           multiline
         />
-        <Pressable style={styles.send} onPress={send} disabled={sending || !body.trim()}>
+        <Pressable style={styles.send} onPress={send} disabled={sending || pickingImage || (!body.trim() && !pendingImagePath)}>
           <Text style={styles.sendText}>{sending ? '…' : 'Send'}</Text>
         </Pressable>
       </View>
@@ -297,6 +354,17 @@ const styles = StyleSheet.create({
   deleteMessage: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },
   body: { color: theme.colors.text, marginTop: 6, lineHeight: 21, fontSize: 15 },
   mine: { backgroundColor: theme.colors.surfaceMuted },
+  imageWrap: { marginTop: 8 },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: theme.colors.surface
+  },
+  pendingThumb: { width: 56, height: 56, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceMuted },
+  pendingRemove: { marginLeft: 'auto' },
+  attachButton: { paddingBottom: 12 },
   composer: {
     flexDirection: 'row',
     gap: 10,

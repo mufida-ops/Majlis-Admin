@@ -5,6 +5,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
+import { MessageImage } from '@/components/MessageImage';
 import { theme } from '@/constants/theme';
 import { useWorkspace } from '@/lib/workspace';
 import { listActivitySince } from '@/lib/repositories/activity';
@@ -141,10 +142,14 @@ export default function CatchUpScreen() {
 }
 
 function ActivityRow({ event, href }: { event: ActivityEventRow; href?: Href }) {
+  const imagePath = event.entity_type === 'message' ? (event.metadata?.image_path as string | undefined) : undefined;
   const content = (
-    <View style={styles.itemRow}>
-      <Text style={styles.item}>{event.summary}</Text>
-      <Text style={styles.itemMeta}>{formatRelative(event.created_at)}</Text>
+    <View style={[styles.itemRow, imagePath && styles.itemRowWithImage]}>
+      {imagePath ? <MessageImage storagePath={imagePath} size={44} /> : null}
+      <View style={styles.itemText}>
+        <Text style={styles.item}>{event.summary}</Text>
+        <Text style={styles.itemMeta}>{formatRelative(event.created_at)}</Text>
+      </View>
     </View>
   );
   if (!href) return content;
@@ -159,6 +164,8 @@ const styles = StyleSheet.create({
   body: { color: theme.colors.text, marginTop: 10, lineHeight: 23, fontSize: 16 },
   label: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   itemRow: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  itemRowWithImage: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  itemText: { flex: 1 },
   item: { color: theme.colors.text, lineHeight: 21 },
   itemMeta: { color: theme.colors.muted, fontSize: 12, marginTop: 4 }
 });

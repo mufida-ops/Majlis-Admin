@@ -203,6 +203,7 @@ create table if not exists messages (
   thread_id uuid references threads(id) on delete cascade not null,
   author_user_id uuid references auth.users(id) not null,
   body text not null,
+  image_path text,
   created_at timestamptz not null default now()
 );
 
@@ -679,8 +680,8 @@ begin
     v_thread.project_id,
     v_thread.organisation_id,
     'message_posted',
-    left(new.body, 140),
-    jsonb_build_object('thread_kind', v_kind, 'anchor_id', v_anchor_id)
+    case when trim(new.body) = '' and new.image_path is not null then '📷 Photo' else left(new.body, 140) end,
+    jsonb_build_object('thread_kind', v_kind, 'anchor_id', v_anchor_id, 'image_path', new.image_path)
   );
   return new;
 end;
@@ -690,3 +691,25 @@ drop trigger if exists trg_log_message_activity on messages;
 create trigger trg_log_message_activity
 after insert on messages
 for each row execute function public.log_message_activity();
+
+-- ---------------------------------------------------------------------------
+-- Storage: one private bucket for photos attached to messages, path-scoped,
+-- readable/writable by any signed-in workspace member (small two-person
+-- team); only the uploader deletes their own.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('message-images', 'message-images', false)
+on conflict (id) do nothing;
+
+drop policy if exists message_images_select on storage.objects;
+create policy message_images_select on storage.objects for select to authenticated
+  using (bucket_id = 'message-images');
+
+drop policy if exists message_images_insert on storage.objects;
+create policy message_images_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'message-images');
+
+drop policy if exists message_images_delete on storage.objects;
+create policy message_images_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'message-images' and owner = auth.uid());
