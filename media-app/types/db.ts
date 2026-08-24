@@ -264,7 +264,7 @@ export const PIPELINE_STAGES: ContentStage[] = [
 export const STAGE_LABELS: Record<ContentStage, string> = {
   idea: 'Ideas',
   script: 'Script',
-  to_film: 'To Film',
+  to_film: 'Producing',
   editing: 'Editing',
   approval: 'Approval',
   approved: 'Approved',
