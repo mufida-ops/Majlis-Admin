@@ -66,7 +66,7 @@ export function ApprovalBar({ item, canEdit, onChanged }: { item: ContentItem; c
               autoFocus
             />
             <Pressable style={styles.submitButton} onPress={requestChanges} disabled={busy}>
-              <Text style={styles.submitText}>Send back to Editing</Text>
+              <Text style={styles.submitText}>Send back to Producing</Text>
             </Pressable>
           </Pressable>
         </Pressable>

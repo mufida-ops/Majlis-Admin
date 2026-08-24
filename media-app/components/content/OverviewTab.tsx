@@ -72,6 +72,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
         onChangeText={(v) => updateField('title', v)}
         multiline
       />
+      <Text style={styles.addedBy}>{item.created_by ? `Added by ${nameOf(item.created_by)}` : 'Added by the team'}</Text>
 
       <Section label="Description">
         <TextInput
@@ -98,7 +99,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
       </Section>
 
       <View style={styles.row}>
-        <FieldButton label="Owner" value={nameOf(item.owner_id)} icon="user" onPress={() => canEdit && setPicker('owner')} avatar />
+        <FieldButton label="Assigned To" value={nameOf(item.owner_id)} icon="user" onPress={() => canEdit && setPicker('owner')} avatar />
         <FieldButton label="Approver" value={nameOf(item.approver_id)} icon="check-circle" onPress={() => canEdit && setPicker('approver')} avatar />
       </View>
       <View style={styles.row}>
@@ -188,7 +189,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
         </Pressable>
       )}
 
-      <PickerSheet visible={picker === 'owner'} title="Owner" options={teamOptions} selectedId={item.owner_id} onClose={() => setPicker(null)} onSelect={(id) => { if (id) updateField('owner_id', id); setPicker(null); }} />
+      <PickerSheet visible={picker === 'owner'} title="Assigned To" options={teamOptions} selectedId={item.owner_id} onClose={() => setPicker(null)} onSelect={(id) => { if (id) updateField('owner_id', id); setPicker(null); }} />
       <PickerSheet visible={picker === 'approver'} title="Approver" options={teamOptions} selectedId={item.approver_id} allowClear onClose={() => setPicker(null)} onSelect={(id) => { updateField('approver_id', id); setPicker(null); }} />
       <PickerSheet visible={picker === 'publisher'} title="Publisher" options={teamOptions} selectedId={item.publisher_id} allowClear onClose={() => setPicker(null)} onSelect={(id) => { updateField('publisher_id', id); setPicker(null); }} />
       <PickerSheet visible={picker === 'campaign'} title="Campaign" options={(campaigns ?? []).map((c) => ({ id: c.id, label: c.name }))} selectedId={item.campaign_id} allowClear onClose={() => setPicker(null)} onSelect={(id) => { updateField('campaign_id', id); setPicker(null); }} />
@@ -236,6 +237,7 @@ function FieldButton({
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
   titleInput: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
+  addedBy: { fontSize: 12, color: colors.textSecondary, marginTop: -4 },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.3 },
   textArea: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md,
