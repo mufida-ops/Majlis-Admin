@@ -29,6 +29,12 @@ export default function Home() {
         <Text style={styles.sub}>Here's what needs your attention today.</Text>
       </View>
 
+      <Pressable style={styles.dashboardButton} onPress={() => router.push('/(tabs)/insights')}>
+        <Feather name="bar-chart-2" size={18} color={colors.navy} />
+        <Text style={styles.dashboardButtonText}>Team Dashboard — see what's happening across the whole pipeline</Text>
+        <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+      </Pressable>
+
       {canCreate && (
         <View style={{ gap: spacing.sm }}>
           <Pressable style={styles.newButton} onPress={() => router.push('/content/new')}>
@@ -71,6 +77,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'
   },
   newButtonText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  dashboardButton: {
+    marginHorizontal: spacing.lg, backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', gap: 8, alignItems: 'center'
+  },
+  dashboardButtonText: { flex: 1, color: colors.navy, fontWeight: '700', fontSize: 12.5 },
   batchButton: {
     marginHorizontal: spacing.lg, backgroundColor: colors.goldSoft, borderRadius: radii.md, paddingVertical: 14,
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'

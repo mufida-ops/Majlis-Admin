@@ -182,7 +182,7 @@ export function OverviewTab({ item, updateField, canEdit }: {
         />
       </Section>
 
-      {canEdit && item.stage === 'editing' && (
+      {canEdit && item.stage === 'producing' && (
         <Pressable style={styles.submitButton} onPress={submitForApproval} disabled={submitting}>
           <Text style={styles.submitButtonText}>Submit for Approval</Text>
         </Pressable>

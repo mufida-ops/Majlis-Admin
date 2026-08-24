@@ -19,8 +19,7 @@ begin
     create type app_role as enum ('admin', 'approver', 'creator', 'publisher');
   end if;
   if not exists (select 1 from pg_type where typname = 'content_stage') then
-    create type content_stage as enum
-      ('idea', 'script', 'to_film', 'editing', 'approval', 'approved', 'scheduled', 'published');
+    create type content_stage as enum ('idea', 'producing', 'approval', 'published');
   end if;
   if not exists (select 1 from pg_type where typname = 'content_priority') then
     create type content_priority as enum ('low', 'normal', 'high', 'urgent');
@@ -216,6 +215,45 @@ create index if not exists idx_content_items_owner on content_items(owner_id) wh
 create index if not exists idx_content_items_approver on content_items(approver_id) where deleted_at is null;
 create index if not exists idx_content_items_campaign on content_items(campaign_id);
 create index if not exists idx_content_items_due on content_items(due_date) where deleted_at is null;
+
+-- One-time migration: collapses the original 8-stage pipeline down to 4
+-- (idea, producing, approval, published) on any project created before this
+-- change. Safe to re-run — a no-op once content_items.stage is already on
+-- the 4-value type. Postgres enums can't drop values in place, so this
+-- swaps in a new type via a mapped column rewrite, then reclaims the name.
+do $$
+begin
+  if exists (
+    select 1 from pg_type t
+    join pg_enum e on e.enumtypid = t.oid
+    where t.typname = 'content_stage' and e.enumlabel = 'script'
+  ) then
+    create type content_stage_v2 as enum ('idea', 'producing', 'approval', 'published');
+
+    alter table content_items alter column stage drop default;
+    alter table content_items
+      alter column stage type content_stage_v2
+      using (
+        case stage::text
+          when 'script' then 'idea'
+          when 'to_film' then 'producing'
+          when 'editing' then 'producing'
+          when 'approved' then 'published'
+          when 'scheduled' then 'published'
+          else stage::text
+        end
+      )::content_stage_v2;
+    alter table content_items alter column stage set default 'idea'::content_stage_v2;
+
+    -- cascade: a handful of trigger functions declare a local variable of
+    -- this type (e.g. maybe_revert_to_approval's `cur_stage`), which are
+    -- all recreated via `create or replace function` further down this
+    -- same file, so dropping them here is safe.
+    drop type content_stage cascade;
+    alter type content_stage_v2 rename to content_stage;
+  end if;
+end
+$$;
 
 create table if not exists content_assignments (
   id uuid primary key default gen_random_uuid(),
@@ -497,6 +535,41 @@ begin
 end;
 $$;
 
+-- Lets any signed-in user directly flag one or more teammates about a
+-- content item — a manual "notify the team" action, distinct from the
+-- automatic notifications above. Reuses the 'mentioned' notification_type
+-- rather than adding a new enum value (adding + using a new enum value in
+-- the same migration transaction is unsafe in Postgres).
+create or replace function notify_team(
+  p_content_item_id uuid, p_user_ids uuid[], p_message text default null
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  actor_name text;
+  item_title text;
+  target uuid;
+begin
+  select title into item_title from content_items where id = p_content_item_id;
+  if item_title is null then
+    raise exception 'Content item not found';
+  end if;
+
+  select full_name into actor_name from profiles where id = actor;
+
+  foreach target in array coalesce(p_user_ids, array[]::uuid[])
+  loop
+    perform notify(target, 'mentioned', coalesce(actor_name, 'A teammate') || ' flagged you on ' || item_title,
+      p_message, p_content_item_id, null, null, actor);
+  end loop;
+
+  perform log_activity(p_content_item_id, actor, 'team_notified', jsonb_build_object('user_ids', p_user_ids, 'message', p_message));
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Triggers: touch/version bump + activity + notifications
 -- ---------------------------------------------------------------------------
@@ -545,12 +618,32 @@ set search_path = public
 as $$
 declare
   actor uuid := auth.uid();
+  admin_id uuid;
 begin
+  -- An "assigned" notification is a standing reminder, not a one-off ping:
+  -- it stays unread/badged until the item actually moves (they acted on it)
+  -- or ownership moves off them (no longer their job) — clear any stale
+  -- ones here, before possibly creating a fresh one below.
+  if new.stage is distinct from old.stage or new.owner_id is distinct from old.owner_id then
+    update notifications
+      set read_at = now()
+      where content_item_id = new.id and type = 'assigned' and read_at is null;
+  end if;
+
   if new.stage is distinct from old.stage then
     perform log_activity(new.id, actor, 'stage_changed', jsonb_build_object('from', old.stage, 'to', new.stage));
-    if new.stage = 'approval' and new.approver_id is not null then
-      perform notify(new.approver_id, 'approval_requested', new.title || ' is ready for your approval',
-        'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+    if new.stage = 'approval' then
+      -- Approval is an admin-only action, so every admin gets notified —
+      -- not just whoever (if anyone) happens to be set as Approver — and
+      -- any one of them acting on it is enough (see approvals_after_insert).
+      for admin_id in select user_id from user_roles where role = 'admin' loop
+        perform notify(admin_id, 'approval_requested', new.title || ' is ready for your approval',
+          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+      end loop;
+      if new.approver_id is not null then
+        perform notify(new.approver_id, 'approval_requested', new.title || ' is ready for your approval',
+          'Submitted by the content team.', new.id, null, null, actor, 'approval:' || new.id);
+      end if;
     end if;
   end if;
 
@@ -564,8 +657,14 @@ begin
   end if;
 
   if new.needs_reapproval and not old.needs_reapproval then
-    perform notify(new.approver_id, 'approval_requested', new.title || ' changed after approval',
-      'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    for admin_id in select user_id from user_roles where role = 'admin' loop
+      perform notify(admin_id, 'approval_requested', new.title || ' changed after approval',
+        'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    end loop;
+    if new.approver_id is not null then
+      perform notify(new.approver_id, 'approval_requested', new.title || ' changed after approval',
+        'Approval required — this content changed after approval.', new.id, null, null, actor, 'reapproval:' || new.id);
+    end if;
   end if;
 
   return new;
@@ -620,12 +719,13 @@ create trigger trg_content_assignments_after_insert
   after insert on content_assignments
   for each row execute function content_assignments_after_insert();
 
--- Shared by every revoke path below: if nothing has published yet, pull the
--- item straight back into the Approval column so it re-enters the inbox;
--- if a platform already published, leave the master stage alone (never
--- un-publish Instagram because the TikTok caption changed) — the
--- needs_reapproval flag and per-platform "Approval required" banner still
--- surface the problem either way.
+-- Shared by every revoke path below: an approved item's stage is 'published'
+-- (Section 6's 4-stage pipeline folds "approved" straight into Published).
+-- If nothing has actually published yet, pull it back into the Approval
+-- column so it re-enters the inbox; if a platform already published, leave
+-- the master stage alone (never un-publish Instagram because the TikTok
+-- caption changed) — the needs_reapproval flag and per-platform "Approval
+-- required" banner still surface the problem either way.
 create or replace function maybe_revert_to_approval(p_item_id uuid)
 returns void
 language plpgsql
@@ -637,7 +737,7 @@ declare
   already_published boolean;
 begin
   select stage into cur_stage from content_items where id = p_item_id;
-  if cur_stage not in ('approved', 'scheduled') then
+  if cur_stage <> 'published' then
     return;
   end if;
   select exists(select 1 from platform_posts where content_item_id = p_item_id and publication_status = 'published')
@@ -806,7 +906,7 @@ begin
           approved_at = new.decided_at,
           approved_final_media_version_id = final_version_id,
           needs_reapproval = false,
-          stage = case when stage = 'approval' then 'approved' else stage end
+          stage = case when stage = 'approval' then 'published' else stage end
       where id = item.id;
 
     update platform_posts
@@ -818,11 +918,15 @@ begin
 
     perform log_activity(item.id, new.decided_by, 'approved', jsonb_build_object('note', new.note));
     perform notify(item.owner_id, 'approved', item.title || ' was approved', new.note, item.id, null, null, new.decided_by);
+    if item.publisher_id is not null then
+      perform notify(item.publisher_id, 'approved', item.title || ' is approved — ready to publish',
+        new.note, item.id, null, null, new.decided_by);
+    end if;
   else
     update content_items
       set approval_state = 'changes_requested',
           needs_reapproval = false,
-          stage = 'editing'
+          stage = 'producing'
       where id = item.id;
 
     perform log_activity(item.id, new.decided_by, 'changes_requested', jsonb_build_object('note', new.note));
@@ -1033,6 +1137,25 @@ drop policy if exists media_versions_select on media_versions;
 create policy media_versions_select on media_versions for select to authenticated using (true);
 drop policy if exists media_versions_insert on media_versions;
 create policy media_versions_insert on media_versions for insert to authenticated with check (true);
+
+-- Deletion is allowed ONLY for unattached Content Bank items (is_bank_item,
+-- never used in a content item's production history yet) — by its uploader
+-- or an admin. A media_versions row that belongs to a real content item has
+-- no delete policy at all, on purpose: Section 10 requires production
+-- version history to never be lost, so there is no path to delete one.
+drop policy if exists media_assets_delete on media_assets;
+create policy media_assets_delete on media_assets for delete to authenticated
+  using (is_bank_item and content_item_id is null and (is_admin(auth.uid()) or created_by = auth.uid()));
+
+drop policy if exists media_versions_delete on media_versions;
+create policy media_versions_delete on media_versions for delete to authenticated
+  using (
+    exists (
+      select 1 from media_assets ma
+      where ma.id = media_asset_id and ma.is_bank_item and ma.content_item_id is null
+        and (is_admin(auth.uid()) or ma.created_by = auth.uid())
+    )
+  );
 
 -- platform_posts / platform_post_media
 drop policy if exists platform_posts_select on platform_posts;

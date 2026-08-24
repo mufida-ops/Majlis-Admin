@@ -4,8 +4,7 @@
 
 export type AppRole = 'admin' | 'approver' | 'creator' | 'publisher';
 
-export type ContentStage =
-  | 'idea' | 'script' | 'to_film' | 'editing' | 'approval' | 'approved' | 'scheduled' | 'published';
+export type ContentStage = 'idea' | 'producing' | 'approval' | 'published';
 
 export type ContentPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -257,18 +256,12 @@ export interface AppNotification {
   created_at: string;
 }
 
-export const PIPELINE_STAGES: ContentStage[] = [
-  'idea', 'script', 'to_film', 'editing', 'approval', 'approved', 'scheduled', 'published'
-];
+export const PIPELINE_STAGES: ContentStage[] = ['idea', 'producing', 'approval', 'published'];
 
 export const STAGE_LABELS: Record<ContentStage, string> = {
   idea: 'Ideas',
-  script: 'Script',
-  to_film: 'To Film',
-  editing: 'Editing',
+  producing: 'Producing',
   approval: 'Approval',
-  approved: 'Approved',
-  scheduled: 'Scheduled',
   published: 'Published'
 };
 

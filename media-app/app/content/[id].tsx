@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { showAlert } from '@/lib/alert';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { useContentEditor } from '@/lib/hooks/useContentEditor';
 import { colors, radii, spacing } from '@/constants/theme';
 import { StageBadge } from '@/components/StatusBadge';
 import { SaveIndicator } from '@/components/SaveIndicator';
-import { canEditContent } from '@/lib/permissions';
+import { canEditContent, canDeleteContent } from '@/lib/permissions';
+import { softDeleteContentItem, ConflictError } from '@/lib/repositories/contentItems';
 import { OverviewTab } from '@/components/content/OverviewTab';
 import { MediaTab } from '@/components/content/MediaTab';
 import { PlatformsTab } from '@/components/content/PlatformsTab';
 import { CommentsTab } from '@/components/content/CommentsTab';
 import { ActivityTab } from '@/components/content/ActivityTab';
 import { ApprovalBar } from '@/components/content/ApprovalBar';
+import { NotifyTeamModal } from '@/components/content/NotifyTeamModal';
 
 const TABS = ['Overview', 'Media', 'Platforms', 'Comments', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
@@ -22,6 +26,7 @@ export default function ContentDetail() {
   const { session, roles } = useAuth();
   const { item, loading, saveState, conflict, updateField, reload } = useContentEditor(id);
   const [tab, setTab] = useState<Tab>('Overview');
+  const [notifyOpen, setNotifyOpen] = useState(false);
 
   if (loading || !item) {
     return (
@@ -33,10 +38,41 @@ export default function ContentDetail() {
 
   const ctx = { userId: session?.user.id ?? null, roles };
   const canEdit = canEditContent(ctx, item);
+  const canDelete = canDeleteContent(ctx);
+
+  function confirmDelete() {
+    showAlert('Delete this content?', `"${item!.title}" will be removed from the pipeline. This can't be undone from the app.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await softDeleteContentItem(item!.id, item!.version);
+            router.back();
+          } catch (err) {
+            showAlert('Could not delete', err instanceof ConflictError ? err.message : String(err));
+          }
+        }
+      }
+    ]);
+  }
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen options={{
+        title: '',
+        headerRight: () => (
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setNotifyOpen(true)} hitSlop={10}>
+              <Feather name="bell" size={19} color={colors.navySoft} />
+            </Pressable>
+            {canDelete && (
+              <Pressable onPress={confirmDelete} hitSlop={10}>
+                <Feather name="trash-2" size={19} color={colors.danger} />
+              </Pressable>
+            )}
+          </View>
+        )
+      }} />
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -73,6 +109,13 @@ export default function ContentDetail() {
       </View>
 
       <ApprovalBar item={item} canEdit={canEdit} onChanged={reload} />
+
+      <NotifyTeamModal
+        visible={notifyOpen}
+        contentItemId={item.id}
+        currentUserId={session?.user.id ?? null}
+        onClose={() => setNotifyOpen(false)}
+      />
     </View>
   );
 }
@@ -82,6 +125,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.lg, gap: spacing.xs },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingRight: spacing.xs },
   warningBanner: { backgroundColor: colors.danger + '18', borderRadius: radii.sm, padding: spacing.sm },
   warningText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   conflictBanner: { backgroundColor: colors.warning + '18', borderRadius: radii.sm, padding: spacing.sm, gap: 4 },

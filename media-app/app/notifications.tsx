@@ -21,7 +21,9 @@ export default function Notifications() {
   const groups = groupNotifications(items ?? []);
 
   async function open(n: AppNotification) {
-    if (!n.read_at) await markRead(n.id);
+    // 'assigned' is a standing reminder — it only clears once the card actually
+    // moves, not just from opening or viewing it (see markAllRead / schema.sql).
+    if (!n.read_at && n.type !== 'assigned') await markRead(n.id);
     if (n.content_item_id) router.push(`/content/${n.content_item_id}`);
     reload();
   }
@@ -43,6 +45,9 @@ export default function Notifications() {
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>{n.title}{group.length > 1 ? ` (+${group.length - 1} more)` : ''}</Text>
               {n.body && <Text style={styles.body} numberOfLines={2}>{n.body}</Text>}
+              {n.type === 'assigned' && !n.read_at && (
+                <Text style={styles.reminder}>Stays here until you move this card forward</Text>
+              )}
               <Text style={styles.time}>{timeAgo(n.created_at)}</Text>
             </View>
             {!n.read_at && <View style={styles.unreadDot} />}
@@ -63,6 +68,7 @@ const styles = StyleSheet.create({
   iconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   body: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  reminder: { fontSize: 11, color: colors.gold, fontWeight: '700', marginTop: 3 },
   time: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold, marginTop: 6 }
 });

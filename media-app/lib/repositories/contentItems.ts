@@ -51,6 +51,9 @@ export async function getContentItem(id: string) {
 
 export async function createContentItem(input: {
   title: string;
+  description?: string | null;
+  script?: string | null;
+  internal_notes?: string | null;
   content_type_id?: string | null;
   campaign_id?: string | null;
   owner_id: string;

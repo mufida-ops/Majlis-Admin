@@ -35,8 +35,7 @@ export async function loadHomeData(userId: string, isAdmin: boolean): Promise<Ho
   const overdue = myTasks.filter((i) => !!i.due_date && i.due_date < today);
   const waitingForMe = all.filter((i) =>
     (i.stage === 'approval' && i.approver_id === userId) ||
-    (i.stage === 'editing' && i.approval_state === 'changes_requested' && i.owner_id === userId) ||
-    (i.stage === 'approved' && i.publisher_id === userId)
+    (i.stage === 'producing' && i.approval_state === 'changes_requested' && i.owner_id === userId)
   );
   const awaitingApproval = isAdmin
     ? all.filter((i) => i.stage === 'approval')

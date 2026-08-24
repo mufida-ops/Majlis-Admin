@@ -195,6 +195,23 @@ export async function untagMediaAsset(assetId: string, tagId: string) {
   if (error) throw error;
 }
 
+export async function renameMediaAsset(assetId: string, title: string) {
+  const { error } = await db().from('media_assets').update({ title, updated_at: new Date().toISOString() }).eq('id', assetId);
+  if (error) throw error;
+}
+
+/** Only ever allowed for unattached Content Bank items — see the RLS policy comment in schema.sql. */
+export async function deleteBankAsset(assetId: string) {
+  const client = db();
+  const versions = await listVersions(assetId);
+  if (versions.length > 0) {
+    const { error: storageError } = await client.storage.from(BUCKET).remove(versions.map((v) => v.storage_path));
+    if (storageError) throw storageError;
+  }
+  const { error } = await client.from('media_assets').delete().eq('id', assetId);
+  if (error) throw error;
+}
+
 export async function getTagsForAsset(assetId: string) {
   const { data, error } = await db().from('media_asset_tags').select('tag_id, tags(id, name)').eq('media_asset_id', assetId);
   if (error) throw error;

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { showAlert } from '@/lib/alert';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAsync } from '@/lib/useAsync';
-import { listVersions, getTagsForAsset, tagMediaAsset, untagMediaAsset, attachBankAssetToContentItem } from '@/lib/repositories/media';
+import { listVersions, getTagsForAsset, tagMediaAsset, untagMediaAsset, attachBankAssetToContentItem, renameMediaAsset, deleteBankAsset } from '@/lib/repositories/media';
 import { findOrCreateTag } from '@/lib/repositories/campaigns';
 import { listContentItemSummaries } from '@/lib/repositories/contentItems';
 import { supabase } from '@/lib/supabase';
@@ -18,20 +18,53 @@ import type { MediaSection } from '@/types/db';
 
 export default function BankAssetDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session } = useAuth();
+  const { session, isAdmin } = useAuth();
   const { data: versions, reload: reloadVersions } = useAsync(() => listVersions(id), [id]);
   const { data: tags, reload: reloadTags } = useAsync(() => getTagsForAsset(id), [id]);
   const { data: contentItems } = useAsync(() => listContentItemSummaries(), []);
   const [newTag, setNewTag] = useState('');
   const [viewer, setViewer] = useState<string | null>(null);
   const [attachPicker, setAttachPicker] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
-  const { data: asset } = useAsync(async () => {
+  const { data: asset, reload: reloadAsset } = useAsync(async () => {
     const client = supabase;
     if (!client) return null;
     const { data } = await client.from('media_assets').select('*').eq('id', id).single();
     return data;
   }, [id]);
+
+  const canManage = isAdmin || asset?.created_by === session?.user.id;
+
+  async function saveTitle() {
+    if (!titleDraft.trim()) {
+      setEditingTitle(false);
+      return;
+    }
+    await renameMediaAsset(id, titleDraft.trim());
+    setEditingTitle(false);
+    reloadAsset();
+  }
+
+  function confirmDelete() {
+    showAlert('Delete this file?', `"${asset?.title}" and all its versions will be permanently removed. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteBankAsset(id);
+            router.back();
+          } catch (err) {
+            showAlert('Could not delete', err instanceof Error ? err.message : String(err));
+            setDeleting(false);
+          }
+        }
+      }
+    ]);
+  }
 
   const latest = versions?.[0];
 
@@ -60,7 +93,21 @@ export default function BankAssetDetail() {
         <MediaThumb storagePath={latest?.storage_path ?? null} kind={asset?.kind} size={220} radius={radii.lg} />
       </Pressable>
 
-      <Text style={styles.title}>{asset?.title}</Text>
+      {editingTitle ? (
+        <View style={styles.titleEditRow}>
+          <TextInput style={styles.titleInput} value={titleDraft} onChangeText={setTitleDraft} autoFocus onSubmitEditing={saveTitle} />
+          <Pressable onPress={saveTitle}><Feather name="check" size={18} color={colors.success} /></Pressable>
+        </View>
+      ) : (
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{asset?.title}</Text>
+          {canManage && (
+            <Pressable onPress={() => { setTitleDraft(asset?.title ?? ''); setEditingTitle(true); }} hitSlop={8}>
+              <Feather name="edit-2" size={16} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <View style={styles.chipWrap}>
         {(tags ?? []).map((t: any) => (
@@ -82,6 +129,13 @@ export default function BankAssetDetail() {
         <Text style={styles.attachText}>Attach to a content item</Text>
       </Pressable>
 
+      {canManage && (
+        <Pressable style={styles.deleteButton} onPress={confirmDelete} disabled={deleting}>
+          {deleting ? <ActivityIndicator size="small" color={colors.danger} /> : <Feather name="trash-2" size={16} color={colors.danger} />}
+          <Text style={styles.deleteText}>Delete this file</Text>
+        </Pressable>
+      )}
+
       <Text style={styles.sectionLabel}>Versions</Text>
       {(versions ?? []).map((v) => (
         <Pressable key={v.id} style={styles.versionRow} onPress={() => setViewer(v.storage_path)}>
@@ -100,6 +154,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, gap: spacing.md, alignItems: 'flex-start' },
   title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  titleEditRow: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  titleInput: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.textPrimary, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 2 },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: 10 },
+  deleteText: { fontSize: 13, fontWeight: '700', color: colors.danger },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.goldSoft, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6 },
   tagChipText: { fontSize: 12, fontWeight: '700', color: colors.gold },

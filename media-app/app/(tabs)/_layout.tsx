@@ -42,7 +42,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: ({ color, size }) => <Feather name="more-horizontal" size={size} color={color} /> }} />
       <Tabs.Screen name="published" options={{ href: null, title: 'Published' }} />
       <Tabs.Screen name="team" options={{ href: null, title: 'Team' }} />
-      <Tabs.Screen name="insights" options={{ href: null, title: 'Insights' }} />
+      <Tabs.Screen name="insights" options={{ href: null, title: 'Dashboard' }} />
     </Tabs>
   );
 }

@@ -1,12 +1,13 @@
 // Supabase Edge Function: parse-content-batch
 //
-// Turns a founder's rough, freeform description of a month's worth of
-// content ("a reel about the summer camp on the 5th, three posts about...")
-// into a list of separate content items. Pure parsing — no database writes
-// here, so no service role key is needed. The client shows the proposed
-// list for review/editing, then creates each one itself via the normal
-// createContentItem() repository call, so ownership/RLS/permissions all
-// go through exactly the same path a manually-created item would.
+// Turns a founder's rough (or fully detailed) description of upcoming
+// content into a list of separate content items — pulling out everything a
+// content card actually has a field for (description, script, campaign,
+// tags), not just a title. Pure parsing — no database writes here, so no
+// service role key is needed. The client shows the proposed list for
+// review/editing, then creates each one itself via the normal
+// createContentItem() repository call, so ownership/RLS/permissions all go
+// through exactly the same path a manually-created item would.
 //
 // Deploy: supabase functions deploy parse-content-batch
 // Secrets required: ANTHROPIC_API_KEY.
@@ -19,9 +20,11 @@ const corsHeaders = {
 const PROPOSE_ITEMS_TOOL = {
   name: 'propose_items',
   description:
-    "Split the founder's freeform description of upcoming content into individual content items — one per " +
-    'distinct piece of content (a single post, video, reel, etc). Never merge more than one piece of content ' +
-    "into a single item, and never invent detail that wasn't in the text.",
+    "Split the founder's description of upcoming content into individual content items — one per distinct " +
+    'piece of content (a single post, video, reel, carousel, etc). Never merge more than one piece of content ' +
+    'into a single item. Preserve real detail from the text rather than summarizing it away — if the text ' +
+    'already contains a full script, caption, or hook, copy it into the item close to verbatim rather than ' +
+    "condensing it, and never invent detail that wasn't in the text.",
   input_schema: {
     type: 'object',
     properties: {
@@ -41,14 +44,47 @@ const PROPOSE_ITEMS_TOOL = {
             priority: {
               type: 'string',
               enum: ['low', 'normal', 'high', 'urgent'],
-              description: "Best guess from the text's tone/urgency — default to normal unless it's clearly implied."
+              description: "Best guess from the text's tone/urgency, or an explicit \"suggested priority\" — default to normal."
+            },
+            content_type: {
+              type: 'string',
+              enum: ['reel', 'image', 'carousel', 'story', 'testimonial', 'founder_video', 'educational', 'product', 'behind_the_scenes', 'long_form', 'other'],
+              description:
+                'The format of this piece of content — pick the closest match from the enum based on what the ' +
+                'text calls it (e.g. "Carousel" -> carousel, "Reel" -> reel, a founder-to-camera video -> ' +
+                'founder_video). Default to "other" only if genuinely nothing in the text implies a format.'
+            },
+            description: {
+              type: ['string', 'null'],
+              description:
+                'What this piece of content is about and why — combine any "Purpose" and "Core message" the ' +
+                'text gives into a couple of clear sentences. Null only if the text truly gives no context beyond the title.'
+            },
+            script: {
+              type: ['string', 'null'],
+              description:
+                'The actual production content for this item, copied in full rather than summarized: a slide-' +
+                'by-slide carousel script, a video script, a hook + caption + CTA, or whatever the text lays out ' +
+                'for this specific item. Keep slide numbers/labels and line breaks so it reads exactly like the ' +
+                'source. Null if the text gives no script/caption content for this item, only a plan.'
+            },
+            campaign: {
+              type: ['string', 'null'],
+              description: 'The named campaign this belongs to, if the text states one (e.g. "Campaign: September 2026 — Back to School") — null if none is named.'
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Suggested tags/hashtags for this item, without the leading #, e.g. ["TheMajlisAcademy", "BackToSchool"]. Empty array if none given.'
             },
             notes: {
               type: ['string', 'null'],
-              description: 'Any extra detail from the text worth keeping (platform, angle, who/what it involves) — null if the title already says it all.'
+              description:
+                'Anything else from the text worth keeping that does not fit the fields above — audience, ' +
+                'assets needed, people needed, format/platform, hook, or other detail. Null if nothing is left over.'
             }
           },
-          required: ['title', 'priority']
+          required: ['title', 'priority', 'content_type']
         }
       }
     },
@@ -87,13 +123,15 @@ Deno.serve(async req => {
       },
       body: JSON.stringify({
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
+        max_tokens: 8192,
         system:
-          "You're helping a founder at Majlis Media Studio turn a rough monthly content plan, typed in their own " +
-          'words, into a clean, organized list of content items. Today\'s date is ' +
-          `${todayDate}. Split the text into one item per distinct piece of content — don\'t combine several ` +
-          "posts/videos into one item, and don't add anything not implied by the text. If the text only " +
-          'describes one piece of content, return a list of exactly one item.',
+          "You're helping a founder at Majlis Media Studio turn a description of upcoming content, typed or " +
+          `pasted in their own words, into a clean, organized list of content items. Today's date is ${todayDate}. ` +
+          'Split the text into one item per distinct piece of content — don\'t combine several posts/videos into ' +
+          'one item. The input can be anything from a one-line rough plan to a fully written brief with scripts, ' +
+          'captions and hashtags already in it — when the detail is already there, carry it into the right field ' +
+          "(description/script/campaign/tags/notes) rather than dropping it, and don't add anything not implied " +
+          'by the text. If the text only describes one piece of content, return a list of exactly one item.',
         tools: [PROPOSE_ITEMS_TOOL],
         tool_choice: { type: 'tool', name: 'propose_items' },
         messages: [{ role: 'user', content: String(text).trim() }]
@@ -107,8 +145,17 @@ Deno.serve(async req => {
 
     const completion = await anthropicResponse.json();
     const toolUse = completion.content?.find((block: { type: string }) => block.type === 'tool_use');
-    const items: Array<{ title: string; due_date?: string | null; priority?: string; notes?: string | null }> =
-      toolUse?.input?.items ?? [];
+    const items: Array<{
+      title: string;
+      due_date?: string | null;
+      priority?: string;
+      content_type?: string;
+      description?: string | null;
+      script?: string | null;
+      campaign?: string | null;
+      tags?: string[];
+      notes?: string | null;
+    }> = toolUse?.input?.items ?? [];
 
     return new Response(JSON.stringify({ items }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

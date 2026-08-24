@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { colors, radii, shadow, spacing } from '@/constants/theme';
 import { Avatar } from './Avatar';
 import { MediaThumb } from './MediaThumb';
@@ -27,7 +28,14 @@ export function ContentCard({
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.card, shadow.card, pressed && { opacity: 0.85 }]}
     >
-      <MediaThumb storagePath={thumb?.storagePath ?? null} kind={thumb?.kind} />
+      <View>
+        <MediaThumb storagePath={thumb?.storagePath ?? null} kind={thumb?.kind} />
+        {item.content_type?.icon && (
+          <View style={styles.formatBadge}>
+            <Feather name={item.content_type.icon as any} size={11} color="#FFF" />
+          </View>
+        )}
+      </View>
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
         <View style={styles.metaRow}>
@@ -40,6 +48,12 @@ export function ContentCard({
           )}
         </View>
         <View style={styles.badgeRow}>
+          {item.content_type?.label && (
+            <View style={styles.formatPill}>
+              {item.content_type.icon && <Feather name={item.content_type.icon as any} size={10} color={colors.navySoft} />}
+              <Text style={styles.formatPillText} numberOfLines={1}>{item.content_type.label}</Text>
+            </View>
+          )}
           {showStage && <StageBadge stage={item.stage} />}
           <PriorityBadge priority={item.priority} />
           <ApprovalBadge state={item.approval_state} />
@@ -65,7 +79,17 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   overdue: { color: colors.danger, fontWeight: '700' },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  formatBadge: {
+    position: 'absolute', bottom: -4, right: -4, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: colors.navySoft, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.surface
+  },
+  formatPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 3
+  },
+  formatPillText: { fontSize: 11, fontWeight: '700', color: colors.navySoft },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
   campaign: { fontSize: 11, color: colors.gold, fontWeight: '700', flexShrink: 1, textAlign: 'right' }
 });
