@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="admin/team" options={{ headerShown: true, title: 'Manage Roles' }} />
         <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
         <Stack.Screen name="search" options={{ headerShown: true, title: 'Search' }} />
+        <Stack.Screen name="quotes" options={{ headerShown: true, title: 'Daily Inspiration' }} />
       </Stack>
     </AuthProvider>
   );

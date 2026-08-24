@@ -51,17 +51,29 @@ export default function Home() {
       {error && <Text style={styles.errorText}>{error}</Text>}
       {loading && !data && <ActivityIndicator color={colors.navy} style={{ marginTop: 40 }} />}
 
-      {data && (
-        <View style={{ gap: spacing.xl }}>
-          <CardRow title="Overdue" items={data.overdue} thumbnails={data.thumbnails} accent={colors.danger} emptyText="Nothing overdue — good work." />
-          <CardRow title="Due Today" items={data.dueToday} thumbnails={data.thumbnails} accent={colors.gold} emptyText="Nothing due today." />
-          <CardRow title="Waiting for Me" items={data.waitingForMe} thumbnails={data.thumbnails} accent={colors.warning} emptyText="Nothing waiting on you." />
-          <CardRow title="Awaiting Approval" items={data.awaitingApproval} thumbnails={data.thumbnails} accent={colors.stageApproval} emptyText="Nothing in the approval queue." />
-          <CardRow title="Scheduled Today" items={data.scheduledToday} thumbnails={data.thumbnails} accent={colors.stageScheduled} emptyText="Nothing scheduled today." />
-          <CardRow title="My Tasks" items={data.myTasks} thumbnails={data.thumbnails} accent={colors.navy} emptyText="You're all caught up." />
-          <CardRow title="Recently Published" items={data.recentlyPublished} thumbnails={data.thumbnails} accent={colors.success} emptyText="Nothing published yet." />
-        </View>
-      )}
+      {data && (() => {
+        const sections = [
+          { title: 'Overdue', items: data.overdue, accent: colors.danger },
+          { title: 'Due Today', items: data.dueToday, accent: colors.gold },
+          { title: 'Waiting for Me', items: data.waitingForMe, accent: colors.warning },
+          { title: 'Awaiting Approval', items: data.awaitingApproval, accent: colors.stageApproval },
+          { title: 'Scheduled Today', items: data.scheduledToday, accent: colors.stageScheduled },
+          { title: 'My Tasks', items: data.myTasks, accent: colors.navy },
+          { title: 'Recently Published', items: data.recentlyPublished, accent: colors.success }
+        ].filter((s) => s.items.length > 0);
+
+        if (sections.length === 0) {
+          return <Text style={styles.allClear}>Nothing needs your attention right now — you're all caught up.</Text>;
+        }
+
+        return (
+          <View style={{ gap: spacing.xl }}>
+            {sections.map((s) => (
+              <CardRow key={s.title} title={s.title} items={s.items} thumbnails={data.thumbnails} accent={s.accent} />
+            ))}
+          </View>
+        );
+      })()}
     </ScrollView>
   );
 }
@@ -87,5 +99,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center'
   },
   batchButtonText: { color: colors.navy, fontWeight: '700', fontSize: 13, textAlign: 'center', flexShrink: 1 },
-  errorText: { color: colors.danger, paddingHorizontal: spacing.lg }
+  errorText: { color: colors.danger, paddingHorizontal: spacing.lg },
+  allClear: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.lg, marginTop: spacing.xl }
 });
