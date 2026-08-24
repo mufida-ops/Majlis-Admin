@@ -19,8 +19,7 @@ begin
     create type app_role as enum ('admin', 'approver', 'creator', 'publisher');
   end if;
   if not exists (select 1 from pg_type where typname = 'content_stage') then
-    create type content_stage as enum
-      ('idea', 'script', 'to_film', 'editing', 'approval', 'approved', 'scheduled', 'published');
+    create type content_stage as enum ('idea', 'producing', 'approval', 'published');
   end if;
   if not exists (select 1 from pg_type where typname = 'content_priority') then
     create type content_priority as enum ('low', 'normal', 'high', 'urgent');
@@ -216,6 +215,45 @@ create index if not exists idx_content_items_owner on content_items(owner_id) wh
 create index if not exists idx_content_items_approver on content_items(approver_id) where deleted_at is null;
 create index if not exists idx_content_items_campaign on content_items(campaign_id);
 create index if not exists idx_content_items_due on content_items(due_date) where deleted_at is null;
+
+-- One-time migration: collapses the original 8-stage pipeline down to 4
+-- (idea, producing, approval, published) on any project created before this
+-- change. Safe to re-run — a no-op once content_items.stage is already on
+-- the 4-value type. Postgres enums can't drop values in place, so this
+-- swaps in a new type via a mapped column rewrite, then reclaims the name.
+do $$
+begin
+  if exists (
+    select 1 from pg_type t
+    join pg_enum e on e.enumtypid = t.oid
+    where t.typname = 'content_stage' and e.enumlabel = 'script'
+  ) then
+    create type content_stage_v2 as enum ('idea', 'producing', 'approval', 'published');
+
+    alter table content_items alter column stage drop default;
+    alter table content_items
+      alter column stage type content_stage_v2
+      using (
+        case stage::text
+          when 'script' then 'idea'
+          when 'to_film' then 'producing'
+          when 'editing' then 'producing'
+          when 'approved' then 'published'
+          when 'scheduled' then 'published'
+          else stage::text
+        end
+      )::content_stage_v2;
+    alter table content_items alter column stage set default 'idea'::content_stage_v2;
+
+    -- cascade: a handful of trigger functions declare a local variable of
+    -- this type (e.g. maybe_revert_to_approval's `cur_stage`), which are
+    -- all recreated via `create or replace function` further down this
+    -- same file, so dropping them here is safe.
+    drop type content_stage cascade;
+    alter type content_stage_v2 rename to content_stage;
+  end if;
+end
+$$;
 
 create table if not exists content_assignments (
   id uuid primary key default gen_random_uuid(),
@@ -655,12 +693,13 @@ create trigger trg_content_assignments_after_insert
   after insert on content_assignments
   for each row execute function content_assignments_after_insert();
 
--- Shared by every revoke path below: if nothing has published yet, pull the
--- item straight back into the Approval column so it re-enters the inbox;
--- if a platform already published, leave the master stage alone (never
--- un-publish Instagram because the TikTok caption changed) — the
--- needs_reapproval flag and per-platform "Approval required" banner still
--- surface the problem either way.
+-- Shared by every revoke path below: an approved item's stage is 'published'
+-- (Section 6's 4-stage pipeline folds "approved" straight into Published).
+-- If nothing has actually published yet, pull it back into the Approval
+-- column so it re-enters the inbox; if a platform already published, leave
+-- the master stage alone (never un-publish Instagram because the TikTok
+-- caption changed) — the needs_reapproval flag and per-platform "Approval
+-- required" banner still surface the problem either way.
 create or replace function maybe_revert_to_approval(p_item_id uuid)
 returns void
 language plpgsql
@@ -672,7 +711,7 @@ declare
   already_published boolean;
 begin
   select stage into cur_stage from content_items where id = p_item_id;
-  if cur_stage not in ('approved', 'scheduled') then
+  if cur_stage <> 'published' then
     return;
   end if;
   select exists(select 1 from platform_posts where content_item_id = p_item_id and publication_status = 'published')
@@ -841,7 +880,7 @@ begin
           approved_at = new.decided_at,
           approved_final_media_version_id = final_version_id,
           needs_reapproval = false,
-          stage = case when stage = 'approval' then 'approved' else stage end
+          stage = case when stage = 'approval' then 'published' else stage end
       where id = item.id;
 
     update platform_posts
@@ -857,7 +896,7 @@ begin
     update content_items
       set approval_state = 'changes_requested',
           needs_reapproval = false,
-          stage = 'editing'
+          stage = 'producing'
       where id = item.id;
 
     perform log_activity(item.id, new.decided_by, 'changes_requested', jsonb_build_object('note', new.note));

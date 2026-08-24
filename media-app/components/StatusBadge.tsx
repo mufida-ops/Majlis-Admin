@@ -6,12 +6,8 @@ import { STAGE_LABELS } from '@/types/db';
 
 const STAGE_COLOR: Record<ContentStage, string> = {
   idea: colors.stageIdea,
-  script: colors.stageScript,
-  to_film: colors.stageToFilm,
-  editing: colors.stageEditing,
+  producing: colors.stageToFilm,
   approval: colors.stageApproval,
-  approved: colors.stageApproved,
-  scheduled: colors.stageScheduled,
   published: colors.stagePublished
 };
 

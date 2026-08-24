@@ -119,12 +119,17 @@ check, redirecting to `(auth)/sign-in` when signed out.
 ## 6. Content state machine
 
 `content_items.stage` (`content_stage` enum) is the single pipeline
-position, driving the Kanban board, Home, and Calendar:
+position, driving the Kanban board, Home, and Calendar. Originally 8 stages,
+collapsed to 4 per Mufida's request ("make it less steps for all items") —
+approving an item now takes it straight to Published; per-platform detail
+(scheduled vs. posted vs. ready-to-post-manually) already lives on
+`platform_posts.publication_status` below, so the master stage doesn't need
+to track it separately:
 
 ```
-idea → script → to_film → editing → approval → approved → scheduled → published
-                              ↑___________________|
-                        (approver requests changes)
+idea → producing → approval → published
+           ↑____________|
+     (approver requests changes)
 ```
 
 Allowed transitions (enforced in `lib/stateMachine.ts`, called before every
@@ -132,26 +137,22 @@ stage-changing write; UI only offers legal moves):
 
 | From        | To (forward)                    | To (backward)                     |
 |-------------|----------------------------------|------------------------------------|
-| idea        | script                            | —                                   |
-| script      | to_film, idea                     | idea                                |
-| to_film     | editing                            | script                              |
-| editing     | approval (requires ≥1 final media + ≥1 enabled platform with caption) | to_film |
-| approval    | approved (**only** via an `approvals` insert with `decision='approved'`) | editing (via `decision='changes_requested'`, automatic) |
-| approved    | scheduled (requires every enabled platform to have `scheduled_at` or explicit "publish now") | approval (automatic, only if **no** platform has published yet — see below) |
-| scheduled   | published (once every enabled platform reaches `published` or `ready_to_post_manually`) | approved (publisher can un-schedule) |
+| idea        | producing                         | —                                   |
+| producing   | approval (requires ≥1 final media + ≥1 enabled platform with caption) | idea |
+| approval    | published (**only** via an `approvals` insert with `decision='approved'`) | producing (via `decision='changes_requested'`, automatic) |
 | published   | — (terminal; content can still be edited for record-keeping by admin, but never silently) | — |
 
-**Approval revocation** (Section 20): the `approved → approval` backward
+**Approval revocation** (Section 20): the `published → approval` backward
 move is never a manual click — it's automatic, fired by triggers
 (`media_versions_after_insert`, `platform_posts_before_update`,
 `platform_post_media_after_change`) the moment an *approved* item's locked
-final video/image, caption, cover, or carousel order changes. If the item's
-stage is still `approved` (nothing published yet), the item moves straight
-back into the `approval` inbox. If one platform has already published,
-the master stage is left alone (you can't un-publish Instagram because
-someone edited the TikTok caption) but `needs_reapproval = true` is set and
-the UI shows **"Approval required — this content changed after approval"**
-on every affected platform tab until that platform is individually
+final video/image, caption, cover, or carousel order changes. If nothing
+has actually published to any platform yet, the item moves straight back
+into the `approval` inbox. If one platform has already published, the
+master stage is left alone (you can't un-publish Instagram because someone
+edited the TikTok caption) but `needs_reapproval = true` is set and the UI
+shows **"Approval required — this content changed after approval"** on
+every affected platform tab until that platform is individually
 re-approved (`approvals` insert with that `platform_post_id` set).
 
 Per-platform **publication status** (`platform_posts.publication_status`) is
@@ -175,7 +176,7 @@ app/
   (auth)/sign-in.tsx
   (tabs)/home.tsx            Home — My Tasks / Due Today / Overdue / Waiting for Me /
                               Awaiting Approval / Scheduled Today / Recently Published
-  (tabs)/pipeline.tsx        Kanban board, 8 stage columns, content cards
+  (tabs)/pipeline.tsx        Kanban board, 4 stage columns, content cards
   (tabs)/calendar.tsx        month/week, filterable, Asia/Dubai
   (tabs)/bank/index.tsx      Content Bank — searchable visual library
   (tabs)/approvals.tsx       Approval inbox — only what's waiting on me
