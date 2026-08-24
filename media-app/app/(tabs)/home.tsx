@@ -77,7 +77,14 @@ export default function Home() {
         return (
           <View style={{ gap: spacing.xl }}>
             {sections.map((s) => (
-              <CardRow key={s.title} title={s.title} items={s.items} thumbnails={data.thumbnails} accent={s.accent} />
+              <CardRow
+                key={s.title}
+                title={s.title}
+                items={s.items}
+                thumbnails={data.thumbnails}
+                accent={s.accent}
+                onCardPress={() => router.push('/(tabs)/pipeline')}
+              />
             ))}
           </View>
         );

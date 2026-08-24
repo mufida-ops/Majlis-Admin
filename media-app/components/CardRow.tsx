@@ -7,12 +7,14 @@ import type { ContentItemSummary } from '@/lib/repositories/contentItems';
 /** Caller is expected to only render this for a non-empty `items` — Home filters
  * out any section with nothing in it rather than showing an empty state here. */
 export function CardRow({
-  title, items, thumbnails, accent
+  title, items, thumbnails, accent, onCardPress
 }: {
   title: string;
   items: ContentItemSummary[];
   thumbnails: Map<string, { storagePath: string; kind: 'video' | 'image' | 'pdf' | 'other' }>;
   accent?: string;
+  /** Overrides what tapping a card does — defaults to opening that item's detail screen. */
+  onCardPress?: (item: ContentItemSummary) => void;
 }) {
   return (
     <View style={styles.wrap}>
@@ -24,7 +26,7 @@ export function CardRow({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {items.map((item) => (
           <View key={item.id} style={styles.cardWrap}>
-            <ContentCard item={item} thumb={thumbnails.get(item.id)} />
+            <ContentCard item={item} thumb={thumbnails.get(item.id)} onPress={onCardPress ? () => onCardPress(item) : undefined} />
           </View>
         ))}
       </ScrollView>
