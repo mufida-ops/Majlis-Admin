@@ -7,7 +7,7 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
-import { BookCoverThumb } from '@/components/BookCoverThumb';
+import { BookCoverLarge } from '@/components/BookCoverLarge';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -94,9 +94,9 @@ export default function Fs2ListScreen() {
           const isEditing = editingId === book.id;
           return (
             <Pressable key={book.id} onPress={() => !isEditing && router.push(`/(tabs)/fs2/${book.id}`)}>
-              <Card>
+              <Card style={{ gap: 10 }}>
+                <BookCoverLarge storagePath={book.cover_image_path} />
                 <View style={styles.row}>
-                  <BookCoverThumb storagePath={book.cover_image_path} />
                   <View style={{ flex: 1 }}>
                     {isEditing ? (
                       <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.editInput} autoFocus />
@@ -151,7 +151,7 @@ export default function Fs2ListScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: theme.colors.text, fontSize: 17, fontWeight: '600' },
+  title: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
   editInput: {
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     padding: 8,
     color: theme.colors.text,
     backgroundColor: theme.colors.background,
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: '600'
   },
   saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
