@@ -1,4 +1,5 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
+import { normalizeImageForWeb } from '@/lib/normalizeImageForWeb';
 import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import type { ProjectRow, ProjectStatus, TaskDependencyRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
 
@@ -179,11 +180,12 @@ export async function setProjectCoverImage(
   file: { uri: string; name: string; mimeType: string }
 ): Promise<ProjectRow> {
   const supabase = requireSupabase();
-  const ext = file.name.split('.').pop() ?? 'jpg';
+  const normalized = await normalizeImageForWeb(file.uri, file.mimeType);
+  const ext = normalized.mimeType === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() ?? 'jpg');
   const path = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const response = await fetch(file.uri);
+  const response = await fetch(normalized.uri);
   const blob = await response.blob();
-  const { error: uploadError } = await supabase.storage.from(PROJECT_COVER_BUCKET).upload(path, blob, { contentType: file.mimeType });
+  const { error: uploadError } = await supabase.storage.from(PROJECT_COVER_BUCKET).upload(path, blob, { contentType: normalized.mimeType });
   if (uploadError) throw new Error(uploadError.message);
   return updateProject(projectId, { cover_image_path: path });
 }

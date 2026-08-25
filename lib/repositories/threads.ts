@@ -1,4 +1,5 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
+import { normalizeImageForWeb } from '@/lib/normalizeImageForWeb';
 import type { MessageRow, ThreadRow } from '@/types/db';
 
 const MESSAGE_IMAGE_BUCKET = 'message-images';
@@ -63,11 +64,12 @@ export async function uploadMessageImage(
   file: { uri: string; name: string; mimeType: string }
 ): Promise<string> {
   const supabase = requireSupabase();
-  const ext = file.name.split('.').pop() ?? 'jpg';
+  const normalized = await normalizeImageForWeb(file.uri, file.mimeType);
+  const ext = normalized.mimeType === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() ?? 'jpg');
   const path = `${threadId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const response = await fetch(file.uri);
+  const response = await fetch(normalized.uri);
   const blob = await response.blob();
-  const { error } = await supabase.storage.from(MESSAGE_IMAGE_BUCKET).upload(path, blob, { contentType: file.mimeType });
+  const { error } = await supabase.storage.from(MESSAGE_IMAGE_BUCKET).upload(path, blob, { contentType: normalized.mimeType });
   if (error) throw new Error(error.message);
   return path;
 }
