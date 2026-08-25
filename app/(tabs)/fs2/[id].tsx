@@ -43,7 +43,7 @@ const ITEM_SECTIONS: { key: BookItemKey; label: string }[] = [
 
 const BOX_SECTIONS: { key: BookBoxType; label: string; withPrice: boolean }[] = [
   { key: 'story', label: 'Story box items', withPrice: true },
-  { key: 'cultural', label: 'Cultural box items', withPrice: false }
+  { key: 'cultural', label: 'Cultural box items', withPrice: true }
 ];
 
 type BoxDraft = { name: string; price: string; photoUri: string | null; photoName: string; photoMime: string };
