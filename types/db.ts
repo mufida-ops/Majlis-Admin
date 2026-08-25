@@ -188,3 +188,12 @@ export type AiChatMessageRow = {
   content: string;
   created_at: string;
 };
+
+export type TodoItemRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  body: string;
+  done: boolean;
+  created_at: string;
+};
