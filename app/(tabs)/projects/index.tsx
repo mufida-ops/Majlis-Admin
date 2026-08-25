@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { SectionTitle } from '@/components/SectionTitle';
 import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
+import { ProjectCoverThumb } from '@/components/ProjectCoverThumb';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -144,6 +145,7 @@ export default function ProjectsScreen() {
                 }}
               >
                 <View style={styles.row}>
+                  <ProjectCoverThumb storagePath={project.cover_image_path} />
                   <View style={{ flex: 1 }}>
                     {isEditing ? (
                       <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.editInput} autoFocus />
@@ -206,6 +208,7 @@ export default function ProjectsScreen() {
                   <Pressable key={project.id} onPress={() => !isEditing && router.push(`/(tabs)/projects/${project.id}`)}>
                     <Card style={{ backgroundColor: theme.colors.completedGreen }}>
                       <View style={styles.row}>
+                        <ProjectCoverThumb storagePath={project.cover_image_path} />
                         <View style={{ flex: 1 }}>
                           {isEditing ? (
                             <TextInput value={editTitle} onChangeText={setEditTitle} style={styles.editInput} autoFocus />
@@ -292,7 +295,7 @@ export default function ProjectsScreen() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   title: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
   editInput: {
     borderWidth: 1,
