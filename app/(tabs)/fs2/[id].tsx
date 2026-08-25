@@ -32,6 +32,8 @@ import type { BookItemKey, BookBoxType, BookLinkRow, BookBoxItemRow } from '@/ty
 const ITEM_SECTIONS: { key: BookItemKey; label: string }[] = [
   { key: 'book', label: 'Book' },
   { key: 'isbn', label: 'ISBN' },
+  { key: 'story_read_english', label: 'Story read in English' },
+  { key: 'story_read_arabic', label: 'Story read in Arabic' },
   { key: 'teacher_toolkit', label: 'Teacher toolkit' },
   { key: 'activity_cards', label: 'Activity cards' },
   { key: 'cultural_game', label: 'Cultural game' },

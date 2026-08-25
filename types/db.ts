@@ -11,6 +11,8 @@ export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
 export type BookItemKey =
   | 'book'
   | 'isbn'
+  | 'story_read_english'
+  | 'story_read_arabic'
   | 'teacher_toolkit'
   | 'activity_cards'
   | 'cultural_game'
