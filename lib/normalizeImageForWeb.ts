@@ -17,6 +17,14 @@ export async function normalizeImageForWeb(uri: string, mimeType: string): Promi
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      // Some formats this browser can't actually decode still fire onload
+      // instead of onerror, just with no real dimensions — without this
+      // check that silently produces a 0x0 image, which uploads "fine" and
+      // only fails later, when something tries to display it.
+      if (!img.naturalWidth || !img.naturalHeight) {
+        reject(new Error("Could not read that photo — it may be in a format this can't open. Try a different one."));
+        return;
+      }
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
@@ -28,7 +36,7 @@ export async function normalizeImageForWeb(uri: string, mimeType: string): Promi
       ctx.drawImage(img, 0, 0);
       canvas.toBlob(
         blob => {
-          if (!blob) {
+          if (!blob || blob.size === 0) {
             reject(new Error('Could not process that image.'));
             return;
           }
