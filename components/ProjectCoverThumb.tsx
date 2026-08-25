@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { theme } from '@/constants/theme';
 import { useProjectCoverImage } from '@/lib/useProjectCoverImage';
 
@@ -8,7 +9,7 @@ export function ProjectCoverThumb({ storagePath, size = 44 }: { storagePath: str
   if (!storagePath) return null;
   return (
     <View style={[styles.box, { width: size, height: size, borderRadius: theme.radius.sm }]}>
-      {url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+      {url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
     </View>
   );
 }

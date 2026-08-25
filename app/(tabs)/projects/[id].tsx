@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -87,7 +88,9 @@ export default function ProjectDetailScreen() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [applyingBookTemplate, setApplyingBookTemplate] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
   const coverImageUrl = useProjectCoverImage(project?.cover_image_path);
+  useEffect(() => setCoverFailed(false), [coverImageUrl]);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -504,12 +507,17 @@ export default function ProjectDetailScreen() {
       <Stack.Screen options={{ title: project.title }} />
 
       <Pressable onPress={pickCoverImage} disabled={uploadingCover} style={styles.coverWrap}>
-        {coverImageUrl ? (
-          <Image source={{ uri: coverImageUrl }} style={styles.cover} resizeMode="cover" />
+        {coverImageUrl && !coverFailed ? (
+          <Image source={{ uri: coverImageUrl }} style={styles.cover} contentFit="cover" onError={() => setCoverFailed(true)} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             {uploadingCover ? (
               <ActivityIndicator color={theme.colors.navy} />
+            ) : coverImageUrl && coverFailed ? (
+              <>
+                <Ionicons name="alert-circle-outline" size={22} color={theme.colors.muted} />
+                <Text style={styles.coverPlaceholderText}>Couldn't load that image — tap to try another</Text>
+              </>
             ) : (
               <>
                 <Ionicons name="image-outline" size={22} color={theme.colors.muted} />
