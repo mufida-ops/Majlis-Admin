@@ -109,6 +109,34 @@ export async function deleteBookLink(id: string): Promise<void> {
   unwrap(await supabase.from('book_links').delete().eq('id', id));
 }
 
+/** Attaches an arbitrary document (PDF, etc.) instead of a link — e.g. an ISBN certificate. Only image files get the HEIC/web-decode fix; everything else uploads as-is. */
+export async function addBookLinkFile(
+  input: { workspace_id: string; book_id: string; item_key: BookItemKey; label?: string; created_by: string },
+  file: { uri: string; name: string; mimeType: string }
+): Promise<BookLinkRow> {
+  const supabase = requireSupabase();
+  const isImage = file.mimeType.startsWith('image/');
+  const normalized = isImage ? await normalizeImageForWeb(file.uri, file.mimeType) : { uri: file.uri, mimeType: file.mimeType };
+  const ext = isImage && normalized.mimeType === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() ?? 'bin');
+  const path = `${input.book_id}/${input.item_key}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const response = await fetch(normalized.uri);
+  const blob = await response.blob();
+  const { error: uploadError } = await supabase.storage.from(BOOK_FILE_BUCKET).upload(path, blob, { contentType: normalized.mimeType });
+  if (uploadError) throw new Error(uploadError.message);
+  const result = await supabase
+    .from('book_links')
+    .insert({
+      workspace_id: input.workspace_id,
+      book_id: input.book_id,
+      item_key: input.item_key,
+      label: input.label ?? file.name,
+      file_path: path
+    })
+    .select('*')
+    .single();
+  return unwrap(result) as BookLinkRow;
+}
+
 export async function getBookFileUrl(storagePath: string, expiresInSeconds = 3600): Promise<string> {
   const supabase = requireSupabase();
   const { data, error } = await supabase.storage.from(BOOK_FILE_BUCKET).createSignedUrl(storagePath, expiresInSeconds);

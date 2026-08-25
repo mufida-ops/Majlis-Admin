@@ -10,6 +10,7 @@ export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
 export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
 export type BookItemKey =
   | 'book'
+  | 'isbn'
   | 'teacher_toolkit'
   | 'activity_cards'
   | 'cultural_game'

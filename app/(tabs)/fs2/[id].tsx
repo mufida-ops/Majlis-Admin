@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -20,6 +21,7 @@ import {
   removeBookCoverImage,
   addBookLink,
   addBookLinkPhoto,
+  addBookLinkFile,
   deleteBookLink,
   getBookFileUrl,
   addBookBoxItem,
@@ -29,6 +31,7 @@ import type { BookItemKey, BookBoxType, BookLinkRow, BookBoxItemRow } from '@/ty
 
 const ITEM_SECTIONS: { key: BookItemKey; label: string }[] = [
   { key: 'book', label: 'Book' },
+  { key: 'isbn', label: 'ISBN' },
   { key: 'teacher_toolkit', label: 'Teacher toolkit' },
   { key: 'activity_cards', label: 'Activity cards' },
   { key: 'cultural_game', label: 'Cultural game' },
@@ -63,6 +66,7 @@ export default function BookDetailScreen() {
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [addingLink, setAddingLink] = useState<Record<string, boolean>>({});
   const [addingPhoto, setAddingPhoto] = useState<Record<string, boolean>>({});
+  const [addingDocument, setAddingDocument] = useState<Record<string, boolean>>({});
   const [boxDrafts, setBoxDrafts] = useState<Record<BookBoxType, BoxDraft>>({ story: emptyBoxDraft, cultural: emptyBoxDraft });
   const [addingBoxItem, setAddingBoxItem] = useState<Record<string, boolean>>({});
 
@@ -144,6 +148,24 @@ export default function BookDetailScreen() {
       showAlert('Could not attach that photo', err instanceof Error ? err.message : 'Try again.');
     } finally {
       setAddingPhoto(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const pickLinkDocument = async (key: BookItemKey) => {
+    const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
+    if (result.canceled || !workspaceId || !session) return;
+    const asset = result.assets[0];
+    setAddingDocument(prev => ({ ...prev, [key]: true }));
+    try {
+      const link = await addBookLinkFile(
+        { workspace_id: workspaceId, book_id: book.id, item_key: key, created_by: session.user.id },
+        { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
+      );
+      setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
+    } catch (err) {
+      showAlert('Could not attach that file', err instanceof Error ? err.message : 'Try again.');
+    } finally {
+      setAddingDocument(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -279,7 +301,12 @@ export default function BookDetailScreen() {
             {links.length === 0 ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
             {links.map(link => (
               <View key={link.id} style={styles.linkRow}>
-                {link.file_path ? (
+                {link.file_path && link.label ? (
+                  <Pressable style={styles.linkTapArea} onPress={() => openLinkFile(link)}>
+                    <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
+                    <Text style={styles.linkText} numberOfLines={1}>{link.label}</Text>
+                  </Pressable>
+                ) : link.file_path ? (
                   <Pressable style={styles.linkTapArea} onPress={() => openLinkFile(link)}>
                     <BookFileThumb storagePath={link.file_path} />
                     <Text style={styles.linkText} numberOfLines={1}>Photo</Text>
@@ -317,6 +344,13 @@ export default function BookDetailScreen() {
                   <ActivityIndicator size="small" color={theme.colors.navy} />
                 ) : (
                   <Ionicons name="image-outline" size={20} color={theme.colors.navy} />
+                )}
+              </Pressable>
+              <Pressable style={styles.photoButton} onPress={() => pickLinkDocument(section.key)} disabled={!!addingDocument[section.key]}>
+                {addingDocument[section.key] ? (
+                  <ActivityIndicator size="small" color={theme.colors.navy} />
+                ) : (
+                  <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
                 )}
               </Pressable>
             </View>

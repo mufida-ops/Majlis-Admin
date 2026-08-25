@@ -24,7 +24,7 @@ begin
   end if;
   if not exists (select 1 from pg_type where typname = 'book_item_key') then
     create type book_item_key as enum (
-      'book', 'teacher_toolkit', 'activity_cards', 'cultural_game',
+      'book', 'isbn', 'teacher_toolkit', 'activity_cards', 'cultural_game',
       'sentence_strips', 'flash_cards', 'activity_sheets', 'cultural_box'
     );
   end if;
@@ -40,6 +40,10 @@ $$;
 -- Active -> Blocked -> Complete) instead of 3, since "Active" alone didn't
 -- distinguish a project that hasn't been picked up yet from one in motion.
 alter type project_status add value if not exists 'Not Started' before 'Active';
+
+-- Covers a database that already ran an earlier version of this file
+-- without 'isbn' in book_item_key's initial definition above.
+alter type book_item_key add value if not exists 'isbn' after 'book';
 
 -- A task's lifecycle was originally Todo/Doing/Waiting/Done; Mufida found
 -- "Waiting" confusing next to a project's own "Blocked" and asked for
