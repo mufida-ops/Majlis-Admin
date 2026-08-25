@@ -8,6 +8,16 @@ export type TaskStatus = 'Not Started' | 'Started' | 'Ongoing' | 'Done';
 export type PriorityLevel = 'Low' | 'Medium' | 'High';
 export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
 export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
+export type BookItemKey =
+  | 'book'
+  | 'teacher_toolkit'
+  | 'activity_cards'
+  | 'cultural_game'
+  | 'sentence_strips'
+  | 'flash_cards'
+  | 'activity_sheets'
+  | 'cultural_box';
+export type BookBoxType = 'story' | 'cultural';
 
 export type Workspace = {
   id: string;
@@ -196,5 +206,40 @@ export type TodoItemRow = {
   user_id: string;
   body: string;
   done: boolean;
+  created_at: string;
+};
+
+export type BookRow = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  cover_image_path: string | null;
+  order_index: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BookLinkRow = {
+  id: string;
+  workspace_id: string;
+  book_id: string;
+  item_key: BookItemKey;
+  label: string | null;
+  url: string | null;
+  file_path: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type BookBoxItemRow = {
+  id: string;
+  workspace_id: string;
+  book_id: string;
+  box_type: BookBoxType;
+  name: string;
+  price: number | null;
+  image_path: string | null;
+  created_by: string | null;
   created_at: string;
 };

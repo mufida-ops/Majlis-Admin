@@ -22,6 +22,15 @@ begin
   if not exists (select 1 from pg_type where typname = 'priority_level') then
     create type priority_level as enum ('Low', 'Medium', 'High');
   end if;
+  if not exists (select 1 from pg_type where typname = 'book_item_key') then
+    create type book_item_key as enum (
+      'book', 'teacher_toolkit', 'activity_cards', 'cultural_game',
+      'sentence_strips', 'flash_cards', 'activity_sheets', 'cultural_box'
+    );
+  end if;
+  if not exists (select 1 from pg_type where typname = 'book_box_type') then
+    create type book_box_type as enum ('story', 'cultural');
+  end if;
 end
 $$;
 
@@ -774,3 +783,103 @@ create policy project_covers_insert on storage.objects for insert to authenticat
 drop policy if exists project_covers_delete on storage.objects;
 create policy project_covers_delete on storage.objects for delete to authenticated
   using (bucket_id = 'project-covers');
+
+-- ---------------------------------------------------------------------------
+-- FS2 Books: a library of completed books, kept separate from the in-progress
+-- Projects work. Each book has a fixed checklist of items (Book, Teacher
+-- toolkit, Activity cards, Cultural game, Sentence strips, Flash cards,
+-- Activity sheets, Cultural box) that can each hold more than one link or
+-- attached photo (mostly Canva links, sometimes a photo instead), plus two
+-- item lists — Story box items and Cultural box items — that are priced,
+-- photographed physical items rather than links.
+-- ---------------------------------------------------------------------------
+
+create table if not exists books (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  title text not null,
+  cover_image_path text,
+  order_index int not null default 0,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists book_links (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  book_id uuid references books(id) on delete cascade not null,
+  item_key book_item_key not null,
+  label text,
+  url text,
+  file_path text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  check (url is not null or file_path is not null)
+);
+
+create table if not exists book_box_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  book_id uuid references books(id) on delete cascade not null,
+  box_type book_box_type not null,
+  name text not null,
+  price numeric,
+  image_path text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_book_links_book on book_links(book_id, item_key);
+create index if not exists idx_book_box_items_book on book_box_items(book_id, box_type);
+
+alter table books enable row level security;
+alter table book_links enable row level security;
+alter table book_box_items enable row level security;
+
+drop policy if exists "members manage books" on books;
+create policy "members manage books" on books
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "members manage book links" on book_links;
+create policy "members manage book links" on book_links
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "members manage book box items" on book_box_items;
+create policy "members manage book box items" on book_box_items
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+insert into storage.buckets (id, name, public)
+values ('book-covers', 'book-covers', false)
+on conflict (id) do nothing;
+
+drop policy if exists book_covers_select on storage.objects;
+create policy book_covers_select on storage.objects for select to authenticated
+  using (bucket_id = 'book-covers');
+
+drop policy if exists book_covers_insert on storage.objects;
+create policy book_covers_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'book-covers');
+
+drop policy if exists book_covers_delete on storage.objects;
+create policy book_covers_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'book-covers');
+
+insert into storage.buckets (id, name, public)
+values ('book-files', 'book-files', false)
+on conflict (id) do nothing;
+
+drop policy if exists book_files_select on storage.objects;
+create policy book_files_select on storage.objects for select to authenticated
+  using (bucket_id = 'book-files');
+
+drop policy if exists book_files_insert on storage.objects;
+create policy book_files_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'book-files');
+
+drop policy if exists book_files_delete on storage.objects;
+create policy book_files_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'book-files');
