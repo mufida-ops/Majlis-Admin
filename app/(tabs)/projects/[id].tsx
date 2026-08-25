@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
@@ -13,6 +14,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
+import { useProjectCoverImage } from '@/lib/useProjectCoverImage';
 import {
   getProject,
   createTask,
@@ -21,7 +23,9 @@ import {
   deleteProject,
   setProjectStatus,
   updateProject,
-  applyBookTemplate
+  applyBookTemplate,
+  setProjectCoverImage,
+  removeProjectCoverImage
 } from '@/lib/repositories/projects';
 import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
 import { toDateInputValue } from '@/lib/format';
@@ -82,6 +86,8 @@ export default function ProjectDetailScreen() {
   const [savingTitle, setSavingTitle] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [applyingBookTemplate, setApplyingBookTemplate] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverImageUrl = useProjectCoverImage(project?.cover_image_path);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -108,6 +114,44 @@ export default function ProjectDetailScreen() {
   const startEditTitle = () => {
     setEditingTitle(true);
     setTitleDraft(project.title);
+  };
+
+  const pickCoverImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showAlert('Photo access needed', 'Allow photo access in your phone settings to set a cover image.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setUploadingCover(true);
+    try {
+      const updated = await setProjectCoverImage(project.id, {
+        uri: asset.uri,
+        name: asset.fileName ?? 'cover.jpg',
+        mimeType: asset.mimeType ?? 'image/jpeg'
+      });
+      setData({ ...project, ...updated });
+    } catch (err) {
+      showAlert('Could not set that cover image', err instanceof Error ? err.message : 'Try again in a moment.');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const removeCoverImage = () => {
+    showAlert('Remove cover image?', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const updated = await removeProjectCoverImage(project.id);
+          setData({ ...project, ...updated });
+        }
+      }
+    ]);
   };
 
   const saveTitle = async () => {
@@ -459,6 +503,33 @@ export default function ProjectDetailScreen() {
     <Screen>
       <Stack.Screen options={{ title: project.title }} />
 
+      <Pressable onPress={pickCoverImage} disabled={uploadingCover} style={styles.coverWrap}>
+        {coverImageUrl ? (
+          <Image source={{ uri: coverImageUrl }} style={styles.cover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cover, styles.coverPlaceholder]}>
+            {uploadingCover ? (
+              <ActivityIndicator color={theme.colors.navy} />
+            ) : (
+              <>
+                <Ionicons name="image-outline" size={22} color={theme.colors.muted} />
+                <Text style={styles.coverPlaceholderText}>Add a cover image</Text>
+              </>
+            )}
+          </View>
+        )}
+        {coverImageUrl && !uploadingCover ? (
+          <Pressable onPress={removeCoverImage} hitSlop={10} style={styles.coverRemove}>
+            <Ionicons name="close-circle" size={22} color="#FFF" />
+          </Pressable>
+        ) : null}
+        {coverImageUrl && uploadingCover ? (
+          <View style={[StyleSheet.absoluteFillObject, styles.coverUploadingOverlay]}>
+            <ActivityIndicator color="#FFF" />
+          </View>
+        ) : null}
+      </Pressable>
+
       <Card style={{ backgroundColor: projectAccent }}>
         {editingTitle ? (
           <View style={styles.titleEditRow}>
@@ -658,6 +729,20 @@ export default function ProjectDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  coverWrap: { borderRadius: theme.radius.md, overflow: 'hidden' },
+  cover: { width: '100%', height: 160 },
+  coverPlaceholder: {
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderStyle: 'dashed',
+    gap: 6
+  },
+  coverPlaceholderText: { color: theme.colors.muted, fontSize: 13, fontWeight: '600' },
+  coverRemove: { position: 'absolute', top: 8, right: 8 },
+  coverUploadingOverlay: { backgroundColor: '#00000055', alignItems: 'center', justifyContent: 'center' },
   statusRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   statusDescription: { color: theme.colors.muted, fontSize: 13, marginTop: 8 },
   titleEditRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

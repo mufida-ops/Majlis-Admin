@@ -94,6 +94,7 @@ alter table projects add column if not exists priority priority_level not null d
 alter table projects add column if not exists due_at timestamptz;
 alter table projects add column if not exists needs_review boolean not null default false;
 alter table projects add column if not exists completed_at timestamptz;
+alter table projects add column if not exists cover_image_path text;
 
 create table if not exists project_tasks (
   id uuid primary key default gen_random_uuid(),
@@ -755,3 +756,21 @@ create policy message_audio_insert on storage.objects for insert to authenticate
 drop policy if exists message_audio_delete on storage.objects;
 create policy message_audio_delete on storage.objects for delete to authenticated
   using (bucket_id = 'message-audio' and owner = auth.uid());
+
+-- Project cover images are shared project data (not personal, unlike
+-- messages) — either workspace member can set/replace/remove one.
+insert into storage.buckets (id, name, public)
+values ('project-covers', 'project-covers', false)
+on conflict (id) do nothing;
+
+drop policy if exists project_covers_select on storage.objects;
+create policy project_covers_select on storage.objects for select to authenticated
+  using (bucket_id = 'project-covers');
+
+drop policy if exists project_covers_insert on storage.objects;
+create policy project_covers_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'project-covers');
+
+drop policy if exists project_covers_delete on storage.objects;
+create policy project_covers_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'project-covers');

@@ -2,6 +2,8 @@ import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
 import { BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import type { ProjectRow, ProjectStatus, TaskDependencyRow, ProjectTaskRow, TaskStatus, PriorityLevel } from '@/types/db';
 
+const PROJECT_COVER_BUCKET = 'project-covers';
+
 export type ProjectWithTasks = ProjectRow & { project_tasks: ProjectTaskRow[] };
 
 export async function listProjects(workspaceId: string): Promise<ProjectWithTasks[]> {
@@ -85,7 +87,9 @@ export async function applyBookTemplate(project: ProjectWithTasks, createdBy: st
 
 export async function updateProject(
   id: string,
-  patch: Partial<Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review' | 'completed_at'>>
+  patch: Partial<
+    Pick<ProjectRow, 'title' | 'status' | 'priority' | 'next_action' | 'due_at' | 'needs_review' | 'completed_at' | 'cover_image_path'>
+  >
 ) {
   // progress is intentionally not editable here: it's derived server-side
   // (see recalc_project_progress in supabase/schema.sql) from the sum of
@@ -167,4 +171,31 @@ export async function addTaskDependency(taskId: string, dependsOnTaskId: string)
     .select('*')
     .single();
   return unwrap(result) as TaskDependencyRow;
+}
+
+/** Uploads a project's cover image and sets it on the project in one step. */
+export async function setProjectCoverImage(
+  projectId: string,
+  file: { uri: string; name: string; mimeType: string }
+): Promise<ProjectRow> {
+  const supabase = requireSupabase();
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const path = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const response = await fetch(file.uri);
+  const blob = await response.blob();
+  const { error: uploadError } = await supabase.storage.from(PROJECT_COVER_BUCKET).upload(path, blob, { contentType: file.mimeType });
+  if (uploadError) throw new Error(uploadError.message);
+  return updateProject(projectId, { cover_image_path: path });
+}
+
+export async function removeProjectCoverImage(projectId: string): Promise<ProjectRow> {
+  return updateProject(projectId, { cover_image_path: null });
+}
+
+/** Signed URL for a project's cover image — the bucket is private, so this is the only way to view one. */
+export async function getProjectCoverImageUrl(storagePath: string, expiresInSeconds = 3600): Promise<string> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.storage.from(PROJECT_COVER_BUCKET).createSignedUrl(storagePath, expiresInSeconds);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
 }
