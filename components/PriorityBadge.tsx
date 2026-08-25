@@ -1,47 +1,47 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
+import { useAnchoredMenu } from '@/lib/useAnchoredMenu';
 import { PRIORITY_COLOR, PRIORITY_LEVELS } from '@/lib/priority';
 import type { PriorityLevel } from '@/types/db';
 
 // A real dropdown, not a cycle-on-tap — see StatusBadge for why that
-// interaction was confusing (a successful tap could silently relocate the
-// row it belonged to). Tapping now opens all three options directly.
+// interaction was confusing, and why this renders via a Modal (useAnchoredMenu)
+// instead of a plain position:absolute sibling.
 export function PriorityBadge({ value, onChange }: { value: PriorityLevel; onChange: (next: PriorityLevel) => void }) {
-  const [open, setOpen] = useState(false);
+  const { anchorRef, open, position, toggle, close } = useAnchoredMenu();
   return (
-    <View style={styles.wrapper}>
-      <Pressable style={styles.badge} onPress={() => setOpen(o => !o)} hitSlop={8}>
+    <View>
+      <Pressable ref={anchorRef} style={styles.badge} onPress={toggle} hitSlop={8}>
         <View style={[styles.dot, { backgroundColor: PRIORITY_COLOR[value] }]} />
         <Text style={styles.label}>{value}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color={theme.colors.muted} />
       </Pressable>
-      {open ? (
-        <View style={styles.dropdown}>
-          {PRIORITY_LEVELS.map(level => (
-            <Pressable
-              key={level}
-              style={styles.option}
-              onPress={() => {
-                setOpen(false);
-                onChange(level);
-              }}
-            >
-              <View style={[styles.dot, { backgroundColor: PRIORITY_COLOR[level] }]} />
-              <Text style={[styles.optionText, level === value && styles.optionTextActive]}>{level}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        {position ? (
+          <View style={[styles.dropdown, { top: position.top, left: position.left }]}>
+            {PRIORITY_LEVELS.map(level => (
+              <Pressable
+                key={level}
+                style={styles.option}
+                onPress={() => {
+                  close();
+                  onChange(level);
+                }}
+              >
+                <View style={[styles.dot, { backgroundColor: PRIORITY_COLOR[level] }]} />
+                <Text style={[styles.optionText, level === value && styles.optionTextActive]}>{level}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // See StatusBadge — same missing positioned ancestor for the dropdown
-  // below to anchor to on web.
-  wrapper: { position: 'relative' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -56,17 +56,17 @@ const styles = StyleSheet.create({
   label: { color: theme.colors.text, fontSize: 12, fontWeight: '600' },
   dropdown: {
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    marginTop: 4,
     minWidth: 130,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
     paddingVertical: 4,
-    zIndex: 20,
-    elevation: 6
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6
   },
   option: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9 },
   optionText: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },
