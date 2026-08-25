@@ -207,6 +207,7 @@ export type TodoItemRow = {
   user_id: string;
   body: string;
   done: boolean;
+  completed_at: string | null;
   created_at: string;
 };
 

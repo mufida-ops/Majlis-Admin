@@ -277,8 +277,10 @@ create table if not exists todo_items (
   user_id uuid references auth.users(id) not null,
   body text not null,
   done boolean not null default false,
+  completed_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table todo_items add column if not exists completed_at timestamptz;
 
 -- Columns added after the initial release; harmless no-ops on a fresh install.
 alter table project_tasks add column if not exists created_by uuid references auth.users(id);

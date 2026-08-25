@@ -15,7 +15,7 @@ import { useAsync } from '@/lib/useAsync';
 import { listProjects, setTaskStatus, type ProjectWithTasks } from '@/lib/repositories/projects';
 import { listDecisions } from '@/lib/repositories/decisions';
 import { listOrganisations } from '@/lib/repositories/organisations';
-import { listTodos, createTodo, setTodoDone, deleteTodo } from '@/lib/repositories/todos';
+import { listTodos, createTodo, updateTodoBody, setTodoDone, deleteTodo } from '@/lib/repositories/todos';
 import { isInQuietHours } from '@/lib/quietHours';
 import { formatShortDate } from '@/lib/format';
 import { quoteOfTheDay } from '@/lib/quotes';
@@ -174,9 +174,14 @@ export default function HomeScreen() {
   };
 
   const toggleTodo = async (item: TodoItemRow) => {
-    setData(prev => (prev ? { ...prev, todos: prev.todos.map(t => (t.id === item.id ? { ...t, done: !t.done } : t)) } : prev));
+    const nowDone = !item.done;
+    setData(prev =>
+      prev
+        ? { ...prev, todos: prev.todos.map(t => (t.id === item.id ? { ...t, done: nowDone, completed_at: nowDone ? new Date().toISOString() : null } : t)) }
+        : prev
+    );
     try {
-      await setTodoDone(item.id, !item.done);
+      await setTodoDone(item.id, nowDone);
     } catch {
       setData(prev => (prev ? { ...prev, todos: prev.todos.map(t => (t.id === item.id ? item : t)) } : prev));
     }
@@ -198,6 +203,33 @@ export default function HomeScreen() {
         }
       }
     ]);
+  };
+
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [editTodoBody, setEditTodoBody] = useState('');
+  const [savingTodoEdit, setSavingTodoEdit] = useState(false);
+
+  const startEditTodo = (item: TodoItemRow) => {
+    setEditingTodoId(item.id);
+    setEditTodoBody(item.body);
+  };
+
+  const cancelEditTodo = () => {
+    setEditingTodoId(null);
+    setEditTodoBody('');
+  };
+
+  const saveTodoEdit = async (id: string) => {
+    if (!editTodoBody.trim()) return;
+    setSavingTodoEdit(true);
+    try {
+      const updated = await updateTodoBody(id, editTodoBody.trim());
+      setData(prev => (prev ? { ...prev, todos: prev.todos.map(t => (t.id === id ? updated : t)) } : prev));
+      setEditingTodoId(null);
+      setEditTodoBody('');
+    } finally {
+      setSavingTodoEdit(false);
+    }
   };
 
   const greeting = useMemo(() => {
@@ -314,30 +346,56 @@ export default function HomeScreen() {
               <Ionicons name="add" size={22} color="#FFF" />
             </Pressable>
           </View>
-          {data?.todos.length ? (
-            <View style={{ gap: 2 }}>
-              {[...data.todos]
-                .sort((a, b) => Number(a.done) - Number(b.done))
-                .map((item, index) => (
+          {(() => {
+            const activeTodos = (data?.todos ?? []).filter(t => !t.done);
+            if (activeTodos.length === 0) {
+              return !loading && <Text style={styles.meta}>Nothing on your list.</Text>;
+            }
+            return (
+              <View style={{ gap: 2 }}>
+                {activeTodos.map((item, index) => (
                   <View key={item.id} style={[styles.checkRow, index > 0 && styles.checkRowDivider]}>
                     <Pressable onPress={() => toggleTodo(item)} hitSlop={10}>
-                      <Ionicons
-                        name={item.done ? 'checkmark-circle' : 'ellipse-outline'}
-                        size={22}
-                        color={item.done ? theme.colors.gold : theme.colors.muted}
-                      />
+                      <Ionicons name="ellipse-outline" size={22} color={theme.colors.muted} />
                     </Pressable>
-                    <Text style={[styles.checkRowTitle, { flex: 1 }, item.done && styles.todoDone]}>{item.body}</Text>
-                    <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
-                      <Ionicons name="close" size={18} color={theme.colors.muted} />
-                    </Pressable>
+                    {editingTodoId === item.id ? (
+                      <>
+                        <TextInput
+                          value={editTodoBody}
+                          onChangeText={setEditTodoBody}
+                          style={[styles.input, { flex: 1 }]}
+                          autoFocus
+                        />
+                        <Pressable hitSlop={10} onPress={() => saveTodoEdit(item.id)} disabled={savingTodoEdit}>
+                          <Text style={styles.saveText}>{savingTodoEdit ? '…' : 'Save'}</Text>
+                        </Pressable>
+                        <Pressable hitSlop={10} onPress={cancelEditTodo} disabled={savingTodoEdit}>
+                          <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.checkRowTitle}>{item.body}</Text>
+                          <Text style={styles.todoDate}>Added {formatShortDate(item.created_at)}</Text>
+                        </View>
+                        <Pressable hitSlop={10} onPress={() => startEditTodo(item)}>
+                          <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
+                        </Pressable>
+                        <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
+                          <Ionicons name="close" size={18} color={theme.colors.muted} />
+                        </Pressable>
+                      </>
+                    )}
                   </View>
                 ))}
-            </View>
-          ) : (
-            !loading && <Text style={styles.meta}>Nothing on your list.</Text>
-          )}
+              </View>
+            );
+          })()}
         </Card>
+        <Pressable onPress={() => router.push('/todo-archive')}>
+          <Text style={styles.todoArchiveLink}>See what you've completed →</Text>
+        </Pressable>
       </View>
 
       <Pressable style={styles.catchUp} onPress={() => router.push('/(tabs)/catch-up')}>
@@ -393,5 +451,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  todoDone: { color: theme.colors.muted, textDecorationLine: 'line-through' }
+  todoDate: { color: theme.colors.muted, fontSize: 12, marginTop: 2 },
+  todoArchiveLink: { color: theme.colors.navy, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
+  input: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: 8,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background
+  }
 });

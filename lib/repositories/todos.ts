@@ -22,9 +22,23 @@ export async function createTodo(workspaceId: string, userId: string, body: stri
   return unwrap(result) as TodoItemRow;
 }
 
+export async function updateTodoBody(id: string, body: string): Promise<TodoItemRow> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('todo_items').update({ body }).eq('id', id).select('*').single();
+  return unwrap(result) as TodoItemRow;
+}
+
+// completed_at is set the moment a to-do is checked off, and cleared if it's
+// ever unchecked — so "date completed" reflects when it actually finished,
+// not the last time it was touched.
 export async function setTodoDone(id: string, done: boolean): Promise<TodoItemRow> {
   const supabase = requireSupabase();
-  const result = await supabase.from('todo_items').update({ done }).eq('id', id).select('*').single();
+  const result = await supabase
+    .from('todo_items')
+    .update({ done, completed_at: done ? new Date().toISOString() : null })
+    .eq('id', id)
+    .select('*')
+    .single();
   return unwrap(result) as TodoItemRow;
 }
 
