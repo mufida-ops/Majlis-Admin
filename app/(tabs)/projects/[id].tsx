@@ -89,6 +89,10 @@ export default function ProjectDetailScreen() {
   const [applyingBookTemplate, setApplyingBookTemplate] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
+  // A4 portrait (1:√2) until the actual image loads and reports its real
+  // shape — keeps the whole cover visible instead of cropping it to a fixed
+  // banner height, which is what "cover" mode was doing before.
+  const [coverAspectRatio, setCoverAspectRatio] = useState(1 / Math.SQRT2);
   const coverImageUrl = useProjectCoverImage(project?.cover_image_path);
   useEffect(() => setCoverFailed(false), [coverImageUrl]);
 
@@ -508,7 +512,16 @@ export default function ProjectDetailScreen() {
 
       <Pressable onPress={pickCoverImage} disabled={uploadingCover} style={styles.coverWrap}>
         {coverImageUrl && !coverFailed ? (
-          <Image source={{ uri: coverImageUrl }} style={styles.cover} contentFit="cover" onError={() => setCoverFailed(true)} />
+          <Image
+            source={{ uri: coverImageUrl }}
+            style={[styles.cover, { height: undefined, aspectRatio: coverAspectRatio }]}
+            contentFit="contain"
+            onError={() => setCoverFailed(true)}
+            onLoad={event => {
+              const { width, height } = event.source;
+              if (width && height) setCoverAspectRatio(width / height);
+            }}
+          />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             {uploadingCover ? (
