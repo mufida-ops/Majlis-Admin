@@ -315,7 +315,11 @@ export default function BookDetailScreen() {
                   </Pressable>
                 ) : (
                   <Pressable style={styles.linkTapArea} onPress={() => openLink(link)}>
-                    <Ionicons name="link-outline" size={18} color={theme.colors.navy} />
+                    {link.preview_image_url ? (
+                      <Image source={{ uri: link.preview_image_url }} style={styles.linkThumb} contentFit="cover" />
+                    ) : (
+                      <Ionicons name="link-outline" size={18} color={theme.colors.navy} />
+                    )}
                     <Text style={styles.linkText} numberOfLines={1}>{link.url}</Text>
                   </Pressable>
                 )}
@@ -449,6 +453,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border
   },
   linkTapArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  linkThumb: { width: 40, height: 40, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surfaceMuted },
   linkText: { color: theme.colors.text, fontSize: 14, fontWeight: '600', flexShrink: 1 },
   addLinkRow: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center' },
   input: {

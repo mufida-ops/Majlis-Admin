@@ -69,6 +69,20 @@ export async function getBookCoverUrl(storagePath: string, expiresInSeconds = 36
   return data.signedUrl;
 }
 
+// Best-effort thumbnail for a pasted link — reads the source page's own
+// og:image, so a failure here (unreachable link, no meta tag) should never
+// block adding the link itself.
+async function fetchLinkPreviewImage(url: string): Promise<string | null> {
+  try {
+    const supabase = requireSupabase();
+    const { data, error } = await supabase.functions.invoke('link-preview', { body: { url } });
+    if (error) return null;
+    return (data as { image_url: string | null } | null)?.image_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Adds a link (usually Canva) to one of a book's 8 fixed item sections — a section can hold several. */
 export async function addBookLink(input: {
   workspace_id: string;
@@ -79,7 +93,8 @@ export async function addBookLink(input: {
   created_by: string;
 }): Promise<BookLinkRow> {
   const supabase = requireSupabase();
-  const result = await supabase.from('book_links').insert(input).select('*').single();
+  const preview_image_url = await fetchLinkPreviewImage(input.url);
+  const result = await supabase.from('book_links').insert({ ...input, preview_image_url }).select('*').single();
   return unwrap(result) as BookLinkRow;
 }
 

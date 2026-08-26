@@ -30,6 +30,8 @@ jobs:
 
       - run: supabase functions deploy ai-chat --project-ref "$SUPABASE_PROJECT_REF"
 
+      - run: supabase functions deploy link-preview --project-ref "$SUPABASE_PROJECT_REF"
+
       - run: supabase secrets set "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" --project-ref "$SUPABASE_PROJECT_REF"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

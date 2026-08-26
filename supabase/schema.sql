@@ -963,10 +963,14 @@ create table if not exists book_links (
   label text,
   url text,
   file_path text,
+  -- Fetched once (via the link-preview Edge Function) when a Canva/website
+  -- link is added — the source page's own og:image, not anything we host.
+  preview_image_url text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   check (url is not null or file_path is not null)
 );
+alter table book_links add column if not exists preview_image_url text;
 
 create table if not exists book_box_items (
   id uuid primary key default gen_random_uuid(),
