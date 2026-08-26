@@ -251,6 +251,18 @@ export type TodoDailyCapacityRow = {
   updated_at: string;
 };
 
+export type AttachmentRow = {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  task_id: string | null;
+  label: string | null;
+  url: string | null;
+  file_path: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type BookRow = {
   id: string;
   workspace_id: string;

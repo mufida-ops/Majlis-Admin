@@ -13,6 +13,7 @@ import { PriorityBadge } from '@/components/PriorityBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { MessageImage } from '@/components/MessageImage';
 import { VoiceMessage, formatClipDuration } from '@/components/VoiceMessage';
+import { AttachmentsSection } from '@/components/AttachmentsSection';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -345,6 +346,9 @@ export default function ThreadScreen() {
                   </View>
                 ) : null}
               </Card>
+            ) : null}
+            {task && workspaceId && session ? (
+              <AttachmentsSection workspaceId={workspaceId} createdBy={session.user.id} scope={{ task_id: task.id }} />
             ) : null}
             {messages.length === 0 ? (
               <Card>

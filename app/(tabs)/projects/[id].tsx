@@ -11,6 +11,7 @@ import { Pill } from '@/components/Pill';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
+import { AttachmentsSection } from '@/components/AttachmentsSection';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -734,6 +735,10 @@ export default function ProjectDetailScreen() {
           </Text>
         </Pressable>
       </Card>
+
+      {workspaceId && session ? (
+        <AttachmentsSection workspaceId={workspaceId} createdBy={session.user.id} scope={{ project_id: project.id }} />
+      ) : null}
 
       <Pressable
         style={styles.discussProject}

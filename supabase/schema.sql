@@ -887,6 +887,52 @@ create policy project_covers_delete on storage.objects for delete to authenticat
   using (bucket_id = 'project-covers');
 
 -- ---------------------------------------------------------------------------
+-- Attachments: links, photos, and documents attached to a project or a task
+-- (never both — exactly one of project_id/task_id is set). Shared workspace
+-- data, same as the project/task it hangs off, not private to one user.
+-- ---------------------------------------------------------------------------
+
+create table if not exists attachments (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  project_id uuid references projects(id) on delete cascade,
+  task_id uuid references project_tasks(id) on delete cascade,
+  label text,
+  url text,
+  file_path text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  check (url is not null or file_path is not null),
+  check ((project_id is not null) <> (task_id is not null))
+);
+
+create index if not exists idx_attachments_project on attachments(project_id);
+create index if not exists idx_attachments_task on attachments(task_id);
+
+alter table attachments enable row level security;
+
+drop policy if exists "members manage attachments" on attachments;
+create policy "members manage attachments" on attachments
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+insert into storage.buckets (id, name, public)
+values ('attachments', 'attachments', false)
+on conflict (id) do nothing;
+
+drop policy if exists attachments_select on storage.objects;
+create policy attachments_select on storage.objects for select to authenticated
+  using (bucket_id = 'attachments');
+
+drop policy if exists attachments_insert on storage.objects;
+create policy attachments_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'attachments');
+
+drop policy if exists attachments_delete on storage.objects;
+create policy attachments_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'attachments');
+
+-- ---------------------------------------------------------------------------
 -- FS2 Books: a library of completed books, kept separate from the in-progress
 -- Projects work. Each book has a fixed checklist of items (Book, Teacher
 -- toolkit, Activity cards, Cultural game, Sentence strips, Flash cards,
