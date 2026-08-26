@@ -7,3 +7,4 @@ web-build/
 .DS_Store
 ios/
 android/
+.claude/settings.local.json
