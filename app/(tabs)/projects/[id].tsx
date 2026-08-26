@@ -12,6 +12,7 @@ import { PriorityBadge } from '@/components/PriorityBadge';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { AttachmentsSection } from '@/components/AttachmentsSection';
+import { DateField } from '@/components/DateField';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -38,8 +39,6 @@ import { BOOK_SECTIONS, BOOK_TASK_TEMPLATE } from '@/lib/bookTemplate';
 import type { ProjectStatus, PriorityLevel, TaskStatus, ProjectTaskRow } from '@/types/db';
 
 const BOOK_SECTION_ORDER = BOOK_SECTIONS.map(s => s.section);
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const STATUSES: ProjectStatus[] = ['Not Started', 'Active', 'Blocked', 'Complete'];
 const STATUS_DESCRIPTION: Record<ProjectStatus, string> = {
@@ -68,7 +67,6 @@ export default function ProjectDetailScreen() {
 
   const [nextAction, setNextAction] = useState('');
   const [projectDueDate, setProjectDueDate] = useState('');
-  const [projectDueDateError, setProjectDueDateError] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
   const [taskPriority, setTaskPriority] = useState<PriorityLevel>('Medium');
@@ -235,11 +233,6 @@ export default function ProjectDetailScreen() {
 
   const saveProjectDueDate = async () => {
     if (!projectDueDate.trim()) return;
-    if (!DATE_RE.test(projectDueDate.trim())) {
-      setProjectDueDateError('Due date should look like YYYY-MM-DD.');
-      return;
-    }
-    setProjectDueDateError('');
     const updated = await updateProject(project.id, { due_at: new Date(`${projectDueDate.trim()}T00:00:00`).toISOString() });
     setData({ ...project, ...updated });
     setProjectDueDate('');
@@ -262,10 +255,6 @@ export default function ProjectDetailScreen() {
     }
     if (!taskDueDate.trim()) {
       setTaskError('Add a due date first.');
-      return;
-    }
-    if (!DATE_RE.test(taskDueDate.trim())) {
-      setTaskError('Due date should look like YYYY-MM-DD.');
       return;
     }
     setAddingTask(true);
@@ -316,10 +305,6 @@ export default function ProjectDetailScreen() {
       setEditTaskError('Add a due date first.');
       return;
     }
-    if (!DATE_RE.test(editTaskDueDate.trim())) {
-      setEditTaskError('Due date should look like YYYY-MM-DD.');
-      return;
-    }
     setSavingTaskEdit(true);
     setEditTaskError('');
     try {
@@ -360,13 +345,7 @@ export default function ProjectDetailScreen() {
       return (
         <View key={task.id} style={[styles.taskRowEditing, { backgroundColor: accent ?? theme.colors.background }]}>
           <TextInput value={editTaskTitle} onChangeText={setEditTaskTitle} style={styles.input} autoFocus />
-          <TextInput
-            value={editTaskDueDate}
-            onChangeText={setEditTaskDueDate}
-            placeholder="Due date, e.g. 2026-09-01"
-            placeholderTextColor={theme.colors.muted}
-            style={styles.input}
-          />
+          <DateField value={editTaskDueDate} onChange={setEditTaskDueDate} placeholder="Due date" style={{ marginTop: 12 }} />
           <Text style={styles.fieldLabel}>Progress</Text>
           <View style={styles.ownerPicker}>
             {TASK_STATUSES.map(status => (
@@ -640,13 +619,7 @@ export default function ProjectDetailScreen() {
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
           />
-          <TextInput
-            value={taskDueDate}
-            onChangeText={setTaskDueDate}
-            placeholder="Due date, e.g. 2026-09-01"
-            placeholderTextColor={theme.colors.muted}
-            style={styles.input}
-          />
+          <DateField value={taskDueDate} onChange={setTaskDueDate} placeholder="Due date" style={{ marginTop: 12 }} />
           <Text style={styles.fieldLabel}>Who's this for?</Text>
           <View style={styles.ownerPicker}>
             {[me ? { label: me.display_name.charAt(0).toUpperCase(), value: me.user_id } : null,
@@ -713,14 +686,7 @@ export default function ProjectDetailScreen() {
             </Pressable>
           ) : null}
         </View>
-        <TextInput
-          value={projectDueDate}
-          onChangeText={setProjectDueDate}
-          placeholder="Due date, e.g. 2026-09-01"
-          placeholderTextColor={theme.colors.muted}
-          style={styles.input}
-        />
-        {projectDueDateError ? <Text style={styles.taskError}>{projectDueDateError}</Text> : null}
+        <DateField value={projectDueDate} onChange={setProjectDueDate} placeholder="Due date" style={{ marginTop: 12 }} />
         <Pressable
           style={[styles.primarySmall, !projectDueDate.trim() && styles.primarySmallDisabled]}
           onPress={saveProjectDueDate}

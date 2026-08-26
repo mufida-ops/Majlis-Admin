@@ -7,6 +7,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { MonthGrid } from '@/components/MonthGrid';
 import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
+import { DateField } from '@/components/DateField';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -17,7 +18,6 @@ import { formatTime, localDateKey } from '@/lib/format';
 import { syncEventReminders } from '@/lib/notifications';
 import type { EventRow } from '@/types/db';
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 function dateHeader(dateKey: string): string {
@@ -115,8 +115,8 @@ export default function CalendarScreen() {
   const save = async () => {
     setFormError('');
     if (!title.trim() || !workspaceId || !session) return;
-    if (!DATE_RE.test(date)) {
-      setFormError('Use YYYY-MM-DD for the date, e.g. 2026-08-25.');
+    if (!date.trim()) {
+      setFormError('Pick a date first.');
       return;
     }
     if (!allDay && !TIME_RE.test(time)) {
@@ -268,13 +268,7 @@ export default function CalendarScreen() {
           style={styles.input}
         />
         <View style={styles.row}>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.colors.muted}
-            style={[styles.input, { flex: 1, marginTop: 0 }]}
-          />
+          <DateField value={date} onChange={setDate} style={{ flex: 1 }} />
           {!allDay ? (
             <TextInput
               value={time}

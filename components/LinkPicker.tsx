@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { DateField } from '@/components/DateField';
 import { theme } from '@/constants/theme';
 import { localDateKey } from '@/lib/format';
 import type { OwnerType } from '@/types/db';
@@ -100,13 +101,7 @@ export function LinkPicker({
       />
       {target === 'calendar' ? (
         <View style={styles.row}>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.colors.muted}
-            style={[styles.input, { flex: 1 }]}
-          />
+          <DateField value={date} onChange={setDate} style={{ flex: 1, marginTop: 10 }} />
           <TextInput
             value={time}
             onChangeText={setTime}

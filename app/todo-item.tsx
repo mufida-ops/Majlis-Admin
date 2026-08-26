@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
+import { DateField } from '@/components/DateField';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { theme } from '@/constants/theme';
 import { showAlert } from '@/lib/alert';
@@ -25,8 +26,6 @@ import {
 } from '@/lib/repositories/todos';
 import { formatShortDate, formatRelative } from '@/lib/format';
 import type { TodoItemRow, TodoProgressUpdateRow, TodoLinkRow, TodoLinkType } from '@/types/db';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const LINK_TYPES: { value: TodoLinkType; label: string }[] = [
   { value: 'chatgpt', label: 'ChatGPT' },
@@ -139,10 +138,6 @@ export default function TodoItemScreen() {
 
   const confirmPark = async () => {
     if (!todo) return;
-    if (returnDateDraft.trim() && !DATE_RE.test(returnDateDraft.trim())) {
-      setParkError('Return date should look like YYYY-MM-DD.');
-      return;
-    }
     setSavingPark(true);
     try {
       const updated = await parkTodo(todo.id, {
@@ -344,13 +339,7 @@ export default function TodoItemScreen() {
               multiline
             />
             <Text style={styles.label}>Return date</Text>
-            <TextInput
-              value={returnDateDraft}
-              onChangeText={setReturnDateDraft}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={theme.colors.muted}
-              style={styles.input}
-            />
+            <DateField value={returnDateDraft} onChange={setReturnDateDraft} />
             {parkError ? <Text style={styles.errorText}>{parkError}</Text> : null}
             <View style={styles.row}>
               <Pressable style={styles.smallButton} onPress={confirmPark} disabled={savingPark}>

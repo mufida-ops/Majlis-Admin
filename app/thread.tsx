@@ -14,6 +14,7 @@ import { LoadingState, ErrorState } from '@/components/AsyncState';
 import { MessageImage } from '@/components/MessageImage';
 import { VoiceMessage, formatClipDuration } from '@/components/VoiceMessage';
 import { AttachmentsSection } from '@/components/AttachmentsSection';
+import { DateField } from '@/components/DateField';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -47,8 +48,6 @@ const anchorColumn: Record<ThreadKind, 'project_id' | 'task_id' | 'organisation_
   organisation: 'organisation_id',
   decision: 'decision_id'
 };
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function ThreadScreen() {
   const params = useLocalSearchParams<{ kind: ThreadKind; id: string; title?: string }>();
@@ -244,10 +243,6 @@ export default function ThreadScreen() {
 
   const saveDueDate = async () => {
     if (!task) return;
-    if (dueDateDraft.trim() && !DATE_RE.test(dueDateDraft.trim())) {
-      setDueDateError('Due date should look like YYYY-MM-DD.');
-      return;
-    }
     setSavingDueDate(true);
     setDueDateError('');
     try {
@@ -317,13 +312,7 @@ export default function ThreadScreen() {
                 </View>
                 <Text style={styles.dueLabel}>Due date</Text>
                 <View style={styles.dueRow}>
-                  <TextInput
-                    value={dueDateDraft}
-                    onChangeText={setDueDateDraft}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={theme.colors.muted}
-                    style={[styles.input, { flex: 1, marginTop: 0 }]}
-                  />
+                  <DateField value={dueDateDraft} onChange={setDueDateDraft} style={{ flex: 1 }} />
                   <Pressable style={styles.dueSave} onPress={saveDueDate} disabled={savingDueDate}>
                     <Text style={styles.sendText}>{savingDueDate ? '…' : 'Save'}</Text>
                   </Pressable>
