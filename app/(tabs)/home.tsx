@@ -493,9 +493,16 @@ export default function HomeScreen() {
                         disabled={!me?.enhanced_todo_enabled}
                         onPress={() => router.push(`/todo-item?id=${item.id}` as never)}
                       >
-                        <Text style={styles.checkRowTitle}>{item.body}</Text>
-                        <Text style={styles.todoDate}>
-                          Added {formatShortDate(item.created_at)}
+                        <View style={styles.todoTitleRow}>
+                          <Text style={styles.checkRowTitle}>{item.body}</Text>
+                          {me?.enhanced_todo_enabled && item.progress_note ? (
+                            <Ionicons name="chatbubble-ellipses" size={13} color={theme.colors.gold} />
+                          ) : null}
+                        </View>
+                        <Text style={styles.todoDate} numberOfLines={2}>
+                          {me?.enhanced_todo_enabled && item.progress_note
+                            ? item.progress_note
+                            : `Added ${formatShortDate(item.created_at)}`}
                           {me?.enhanced_todo_enabled && item.estimated_minutes_remaining
                             ? ` · ${formatMinutes(item.estimated_minutes_remaining)} left`
                             : ''}
@@ -619,6 +626,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  todoTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   todoDate: { color: theme.colors.muted, fontSize: 12, marginTop: 2 },
   capacityRow: { gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   capacityInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
