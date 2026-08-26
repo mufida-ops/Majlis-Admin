@@ -431,6 +431,7 @@ export default function HomeScreen() {
                 {data?.capacity && workloadMinutes > data.capacity.capacity_minutes ? ' — more than you set' : ''}
               </Text>
               <View style={styles.capacityInputRow}>
+                <Text style={styles.meta}>Your capacity today:</Text>
                 <TextInput
                   value={capacityDraft}
                   onChangeText={text => {
@@ -438,12 +439,12 @@ export default function HomeScreen() {
                     setCapacityDraft(text);
                   }}
                   onBlur={saveCapacity}
-                  placeholder="Capacity"
+                  placeholder="0"
                   placeholderTextColor={theme.colors.muted}
                   keyboardType="decimal-pad"
                   style={styles.capacityInput}
                 />
-                <Text style={styles.meta}>{savingCapacity ? 'saving…' : 'hrs today'}</Text>
+                <Text style={styles.meta}>{savingCapacity ? 'saving…' : 'hrs'}</Text>
               </View>
             </View>
           ) : null}
@@ -620,7 +621,7 @@ const styles = StyleSheet.create({
   },
   todoDate: { color: theme.colors.muted, fontSize: 12, marginTop: 2 },
   capacityRow: { gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  capacityInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  capacityInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
   capacityInput: {
     width: 64,
     borderWidth: 1,
