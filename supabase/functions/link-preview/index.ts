@@ -1,20 +1,25 @@
 // Supabase Edge Function: link-preview
 //
 // A pasted Canva/website link shows up in the app as a bare URL — this
-// fetches that URL server-side (a browser can't, due to CORS) and pulls
-// its og:image (falling back to twitter:image) meta tag, so the app can
-// show a real thumbnail instead. Canva's own share pages set og:image to
-// a render of the design specifically so links unfurl nicely when pasted
-// into WhatsApp/Slack/Facebook — which is also the key to fetching it
-// here: most sites only server-render those tags for a request that
-// looks like one of those known "social preview" bots, and serve a bare
-// client-rendered shell (no meta tags at all) to anything else. So this
-// tries as Facebook's crawler first, then falls back to a normal browser
-// UA for sites that do the opposite (block bots, serve real browsers).
+// fetches a preview for it server-side (a browser can't, due to CORS) so
+// the app can show a real thumbnail instead.
 //
-// Best-effort only: any failure (unreachable URL, no meta tags, timeout)
-// returns image_url: null rather than an error — a missing thumbnail
-// should never block adding the link itself.
+// Primary path: microlink.io's public API (no key required for this
+// volume). A direct fetch from here was tried first and consistently came
+// back empty for Canva links even while spoofing a known bot's user
+// agent — confirmed (via a WhatsApp preview of the same link, which does
+// show an image) that Canva does serve one, just not to this function's
+// own request. The likely reason: bot-protection on Canva's side keyed to
+// source IP reputation, not just the user-agent string — Supabase's
+// infra doesn't have the standing WhatsApp/Facebook's crawler IPs do, and
+// no amount of header-spoofing fixes that. Routing through a dedicated
+// unfurling service sidesteps it, since that's exactly what it's built
+// to get past. A direct og:image scrape is kept as a fallback for the
+// rare case microlink itself can't reach something.
+//
+// Best-effort only: any failure (unreachable URL, no meta tags, rate
+// limit, timeout) returns image_url: null rather than an error — a
+// missing thumbnail should never block adding the link itself.
 //
 // Deploy: supabase functions deploy link-preview
 
@@ -23,10 +28,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-const USER_AGENTS = [
-  'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-];
+async function fetchViaMicrolink(url: string): Promise<{ image_url: string | null; title: string | null }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { signal: controller.signal });
+    if (!response.ok) return { image_url: null, title: null };
+    const json = await response.json();
+    if (json.status !== 'success') return { image_url: null, title: null };
+    const imageUrl = json.data?.image?.url ?? json.data?.logo?.url ?? null;
+    const title = json.data?.title ?? null;
+    return { image_url: imageUrl, title };
+  } catch {
+    return { image_url: null, title: null };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function extractMetaContent(html: string, property: string): string | null {
   const patterns = [
@@ -42,33 +60,38 @@ function extractMetaContent(html: string, property: string): string | null {
   return null;
 }
 
-async function fetchHead(url: string, userAgent: string): Promise<string> {
+async function fetchViaDirectScrape(url: string): Promise<{ image_url: string | null; title: string | null }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
-  let response: Response;
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': userAgent, Accept: 'text/html,application/xhtml+xml' }
+      headers: {
+        'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+        Accept: 'text/html,application/xhtml+xml'
+      }
     });
+    if (!response.ok || !response.body) return { image_url: null, title: null };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let html = '';
+    while (html.length < 60000) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+    }
+    reader.cancel().catch(() => {});
+
+    return {
+      image_url: extractMetaContent(html, 'og:image') ?? extractMetaContent(html, 'twitter:image'),
+      title: extractMetaContent(html, 'og:title')
+    };
+  } catch {
+    return { image_url: null, title: null };
   } finally {
     clearTimeout(timeout);
   }
-
-  if (!response.ok || !response.body) return '';
-
-  // Meta tags are always near the top of <head> — read a bounded chunk
-  // instead of the whole page, which can be much larger than needed.
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let html = '';
-  while (html.length < 60000) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    html += decoder.decode(value, { stream: true });
-  }
-  reader.cancel().catch(() => {});
-  return html;
 }
 
 Deno.serve(async req => {
@@ -82,21 +105,10 @@ Deno.serve(async req => {
       return new Response(JSON.stringify({ error: 'url is required' }), { status: 400, headers: jsonHeaders });
     }
 
-    let imageUrl: string | null = null;
-    let title: string | null = null;
+    let result = await fetchViaMicrolink(url);
+    if (!result.image_url) result = await fetchViaDirectScrape(url);
 
-    for (const userAgent of USER_AGENTS) {
-      try {
-        const html = await fetchHead(url, userAgent);
-        imageUrl = extractMetaContent(html, 'og:image') ?? extractMetaContent(html, 'twitter:image');
-        title = extractMetaContent(html, 'og:title');
-        if (imageUrl) break;
-      } catch {
-        // try the next user agent
-      }
-    }
-
-    return new Response(JSON.stringify({ image_url: imageUrl, title }), { headers: jsonHeaders });
+    return new Response(JSON.stringify(result), { headers: jsonHeaders });
   } catch (err) {
     return new Response(JSON.stringify({ image_url: null, error: err instanceof Error ? err.message : 'fetch failed' }), {
       headers: jsonHeaders
