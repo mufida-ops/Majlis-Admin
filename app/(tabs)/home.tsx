@@ -16,13 +16,22 @@ import { useAsync } from '@/lib/useAsync';
 import { listProjects, setTaskStatus, type ProjectWithTasks } from '@/lib/repositories/projects';
 import { listDecisions } from '@/lib/repositories/decisions';
 import { listOrganisations } from '@/lib/repositories/organisations';
-import { listTodos, createTodo, updateTodoBody, setTodoDone, deleteTodo } from '@/lib/repositories/todos';
+import {
+  listTodos,
+  createTodo,
+  updateTodoBody,
+  setTodoDone,
+  deleteTodo,
+  resumeTodo,
+  getTodayCapacity,
+  setTodayCapacity
+} from '@/lib/repositories/todos';
 import { listActivitySince } from '@/lib/repositories/activity';
 import { classifyActivity, type ActivityHref } from '@/lib/catchUp';
 import { isInQuietHours } from '@/lib/quietHours';
-import { formatShortDate } from '@/lib/format';
+import { formatShortDate, formatMinutes } from '@/lib/format';
 import { quoteOfTheDay } from '@/lib/quotes';
-import type { ActivityEventRow, DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow } from '@/types/db';
+import type { ActivityEventRow, DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow, TodoDailyCapacityRow } from '@/types/db';
 
 type FocusItem = {
   key: string;
@@ -42,17 +51,19 @@ export default function HomeScreen() {
         projects: [] as ProjectWithTasks[],
         decisions: [] as DecisionRow[],
         organisations: [] as OrganisationRow[],
-        todos: [] as TodoItemRow[]
+        todos: [] as TodoItemRow[],
+        capacity: null as TodoDailyCapacityRow | null
       };
     }
-    const [projects, decisions, organisations, todos] = await Promise.all([
+    const [projects, decisions, organisations, todos, capacity] = await Promise.all([
       listProjects(workspaceId),
       listDecisions(workspaceId),
       listOrganisations(workspaceId),
-      listTodos(workspaceId, me.user_id)
+      listTodos(workspaceId, me.user_id),
+      me.enhanced_todo_enabled ? getTodayCapacity(workspaceId, me.user_id) : Promise.resolve(null)
     ]);
-    return { projects, decisions, organisations, todos };
-  }, [workspaceId, me?.user_id]);
+    return { projects, decisions, organisations, todos, capacity };
+  }, [workspaceId, me?.user_id, me?.enhanced_todo_enabled]);
 
   // "Right now" reads task/project state that can change from screens
   // reached deeper in the app (a task's thread, a project's own page) —
@@ -206,6 +217,48 @@ export default function HomeScreen() {
         }
       }
     ]);
+  };
+
+  // "Parked" (safely set aside) items are excluded from the active list for
+  // everyone, but only the enhanced UI ever creates a parked item — a
+  // non-enhanced account's items always stay 'active', so this filter is a
+  // no-op for Victoria rather than something that needs its own branch.
+  const activeTodos = useMemo(() => (data?.todos ?? []).filter(t => !t.done && t.status !== 'parked'), [data]);
+  const parkedTodos = useMemo(() => (data?.todos ?? []).filter(t => !t.done && t.status === 'parked'), [data]);
+  const workloadMinutes = useMemo(
+    () => activeTodos.reduce((sum, t) => sum + (t.estimated_minutes_remaining ?? 0), 0),
+    [activeTodos]
+  );
+
+  const resumeParkedTodo = async (item: TodoItemRow) => {
+    setData(prev => (prev ? { ...prev, todos: prev.todos.map(t => (t.id === item.id ? { ...t, status: 'active' } : t)) } : prev));
+    try {
+      await resumeTodo(item.id);
+    } catch {
+      refresh();
+    }
+  };
+
+  const [capacityDraft, setCapacityDraft] = useState('');
+  const [savingCapacity, setSavingCapacity] = useState(false);
+  const capacityTouchedRef = useRef(false);
+
+  useEffect(() => {
+    if (capacityTouchedRef.current) return;
+    setCapacityDraft(data?.capacity ? String(data.capacity.capacity_minutes / 60) : '');
+  }, [data?.capacity]);
+
+  const saveCapacity = async () => {
+    if (!workspaceId || !me) return;
+    const hours = parseFloat(capacityDraft);
+    if (isNaN(hours) || hours < 0) return;
+    setSavingCapacity(true);
+    try {
+      const row = await setTodayCapacity(workspaceId, me.user_id, Math.round(hours * 60));
+      setData(prev => (prev ? { ...prev, capacity: row } : prev));
+    } finally {
+      setSavingCapacity(false);
+    }
   };
 
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
@@ -370,6 +423,30 @@ export default function HomeScreen() {
       <View style={{ gap: 10 }}>
         <SectionTitle title="To-do" subtitle="Quick things for you only — not tied to a project." />
         <Card style={{ gap: 10 }}>
+          {me?.enhanced_todo_enabled ? (
+            <View style={styles.capacityRow}>
+              <Text style={styles.meta}>
+                Today: {formatMinutes(workloadMinutes)} of work
+                {data?.capacity ? ` · capacity ${formatMinutes(data.capacity.capacity_minutes)}` : ''}
+                {data?.capacity && workloadMinutes > data.capacity.capacity_minutes ? ' — more than you set' : ''}
+              </Text>
+              <View style={styles.capacityInputRow}>
+                <TextInput
+                  value={capacityDraft}
+                  onChangeText={text => {
+                    capacityTouchedRef.current = true;
+                    setCapacityDraft(text);
+                  }}
+                  onBlur={saveCapacity}
+                  placeholder="Capacity"
+                  placeholderTextColor={theme.colors.muted}
+                  keyboardType="decimal-pad"
+                  style={styles.capacityInput}
+                />
+                <Text style={styles.meta}>{savingCapacity ? 'saving…' : 'hrs today'}</Text>
+              </View>
+            </View>
+          ) : null}
           <View style={styles.todoInputRow}>
             <TextInput
               value={todoDraft}
@@ -384,52 +461,78 @@ export default function HomeScreen() {
               <Ionicons name="add" size={22} color="#FFF" />
             </Pressable>
           </View>
-          {(() => {
-            const activeTodos = (data?.todos ?? []).filter(t => !t.done);
-            if (activeTodos.length === 0) {
-              return !loading && <Text style={styles.meta}>Nothing on your list.</Text>;
-            }
-            return (
-              <View style={{ gap: 2 }}>
-                {activeTodos.map((item, index) => (
+          {activeTodos.length === 0 ? (
+            !loading && <Text style={styles.meta}>Nothing on your list.</Text>
+          ) : (
+            <View style={{ gap: 2 }}>
+              {activeTodos.map((item, index) => (
+                <View key={item.id} style={[styles.checkRow, index > 0 && styles.checkRowDivider]}>
+                  <Pressable onPress={() => toggleTodo(item)} hitSlop={10}>
+                    <Ionicons name="ellipse-outline" size={22} color={theme.colors.muted} />
+                  </Pressable>
+                  {editingTodoId === item.id ? (
+                    <>
+                      <TextInput
+                        value={editTodoBody}
+                        onChangeText={setEditTodoBody}
+                        style={[styles.input, { flex: 1 }]}
+                        autoFocus
+                      />
+                      <Pressable hitSlop={10} onPress={() => saveTodoEdit(item.id)} disabled={savingTodoEdit}>
+                        <Text style={styles.saveText}>{savingTodoEdit ? '…' : 'Save'}</Text>
+                      </Pressable>
+                      <Pressable hitSlop={10} onPress={cancelEditTodo} disabled={savingTodoEdit}>
+                        <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable
+                        style={{ flex: 1 }}
+                        disabled={!me?.enhanced_todo_enabled}
+                        onPress={() => router.push(`/todo-item?id=${item.id}` as never)}
+                      >
+                        <Text style={styles.checkRowTitle}>{item.body}</Text>
+                        <Text style={styles.todoDate}>
+                          Added {formatShortDate(item.created_at)}
+                          {me?.enhanced_todo_enabled && item.estimated_minutes_remaining
+                            ? ` · ${formatMinutes(item.estimated_minutes_remaining)} left`
+                            : ''}
+                        </Text>
+                      </Pressable>
+                      <Pressable hitSlop={10} onPress={() => startEditTodo(item)}>
+                        <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
+                      </Pressable>
+                      <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
+                        <Ionicons name="close" size={18} color={theme.colors.muted} />
+                      </Pressable>
+                    </>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          {me?.enhanced_todo_enabled && parkedTodos.length > 0 ? (
+            <View>
+              <Text style={styles.parkedLabel}>Parked</Text>
+              {parkedTodos.map((item, index) => {
+                const readyToPickUp = !!item.return_at && new Date(item.return_at) <= new Date();
+                return (
                   <View key={item.id} style={[styles.checkRow, index > 0 && styles.checkRowDivider]}>
-                    <Pressable onPress={() => toggleTodo(item)} hitSlop={10}>
-                      <Ionicons name="ellipse-outline" size={22} color={theme.colors.muted} />
+                    <Pressable style={{ flex: 1 }} onPress={() => router.push(`/todo-item?id=${item.id}` as never)}>
+                      <Text style={styles.checkRowTitle}>{item.body}</Text>
+                      <Text style={styles.todoDate}>
+                        {readyToPickUp ? 'Ready to pick up' : item.return_at ? `Back around ${formatShortDate(item.return_at)}` : 'Parked'}
+                      </Text>
                     </Pressable>
-                    {editingTodoId === item.id ? (
-                      <>
-                        <TextInput
-                          value={editTodoBody}
-                          onChangeText={setEditTodoBody}
-                          style={[styles.input, { flex: 1 }]}
-                          autoFocus
-                        />
-                        <Pressable hitSlop={10} onPress={() => saveTodoEdit(item.id)} disabled={savingTodoEdit}>
-                          <Text style={styles.saveText}>{savingTodoEdit ? '…' : 'Save'}</Text>
-                        </Pressable>
-                        <Pressable hitSlop={10} onPress={cancelEditTodo} disabled={savingTodoEdit}>
-                          <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.checkRowTitle}>{item.body}</Text>
-                          <Text style={styles.todoDate}>Added {formatShortDate(item.created_at)}</Text>
-                        </View>
-                        <Pressable hitSlop={10} onPress={() => startEditTodo(item)}>
-                          <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
-                        </Pressable>
-                        <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
-                          <Ionicons name="close" size={18} color={theme.colors.muted} />
-                        </Pressable>
-                      </>
-                    )}
+                    <Pressable style={styles.resumeButton} onPress={() => resumeParkedTodo(item)}>
+                      <Text style={styles.resumeButtonText}>Resume</Text>
+                    </Pressable>
                   </View>
-                ))}
-              </View>
-            );
-          })()}
+                );
+              })}
+            </View>
+          ) : null}
         </Card>
         <Pressable onPress={() => router.push('/todo-archive')}>
           <Text style={styles.todoArchiveLink}>See what you've completed →</Text>
@@ -516,6 +619,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   todoDate: { color: theme.colors.muted, fontSize: 12, marginTop: 2 },
+  capacityRow: { gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  capacityInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  capacityInput: {
+    width: 64,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background
+  },
+  parkedLabel: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 10 },
+  resumeButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.navy,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 6
+  },
+  resumeButtonText: { color: theme.colors.navy, fontSize: 12, fontWeight: '600' },
   todoArchiveLink: { color: theme.colors.navy, fontSize: 13, fontWeight: '600', textAlign: 'right' },
   saveText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   input: {

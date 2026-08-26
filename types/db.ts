@@ -21,6 +21,8 @@ export type BookItemKey =
   | 'activity_sheets'
   | 'cultural_box';
 export type BookBoxType = 'story' | 'cultural';
+export type TodoStatus = 'active' | 'parked';
+export type TodoLinkType = 'chatgpt' | 'claude' | 'document' | 'canva' | 'website' | 'email' | 'other';
 
 export type Workspace = {
   id: string;
@@ -37,6 +39,7 @@ export type WorkspaceMember = {
   quiet_hours_end: string | null;
   timezone: string;
   last_seen_at: string | null;
+  enhanced_todo_enabled: boolean;
 };
 
 export type ProjectRow = {
@@ -210,7 +213,42 @@ export type TodoItemRow = {
   body: string;
   done: boolean;
   completed_at: string | null;
+  status: TodoStatus;
+  progress_note: string | null;
+  estimated_minutes_remaining: number | null;
+  parked_at: string | null;
+  return_at: string | null;
+  restart_point: string | null;
+  why_it_matters: string | null;
   created_at: string;
+};
+
+export type TodoProgressUpdateRow = {
+  id: string;
+  workspace_id: string;
+  todo_item_id: string;
+  user_id: string;
+  note: string;
+  created_at: string;
+};
+
+export type TodoLinkRow = {
+  id: string;
+  workspace_id: string;
+  todo_item_id: string;
+  user_id: string;
+  link_type: TodoLinkType;
+  label: string | null;
+  url: string;
+  created_at: string;
+};
+
+export type TodoDailyCapacityRow = {
+  workspace_id: string;
+  user_id: string;
+  day: string;
+  capacity_minutes: number;
+  updated_at: string;
 };
 
 export type BookRow = {

@@ -82,6 +82,11 @@ create table if not exists workspace_members (
   quiet_hours_end time,
   timezone text not null default 'Asia/Dubai',
   last_seen_at timestamptz,
+  -- Per-user opt-in to the advanced personal To-do experience (safely park,
+  -- progress history, links, capacity planning). Off by default for
+  -- everyone; flipped on for one account at a time via a one-off SQL update,
+  -- never hard-coded in the app — the UI just reads this column.
+  enhanced_todo_enabled boolean not null default false,
   primary key (workspace_id, user_id)
 );
 
@@ -89,6 +94,7 @@ create table if not exists workspace_members (
 -- databases created from an earlier version of this script pick them up here.
 alter table workspace_members add column if not exists last_seen_at timestamptz;
 alter table workspace_members add column if not exists avatar_emoji text;
+alter table workspace_members add column if not exists enhanced_todo_enabled boolean not null default false;
 
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
@@ -280,9 +286,77 @@ create table if not exists todo_items (
   body text not null,
   done boolean not null default false,
   completed_at timestamptz,
+  -- Advanced fields, only surfaced in the UI when the owning user has
+  -- enhanced_todo_enabled — but always stored and always private to that
+  -- user, same as the rest of this table.
+  status text not null default 'active',
+  progress_note text,
+  estimated_minutes_remaining integer,
+  parked_at timestamptz,
+  return_at date,
+  restart_point text,
+  why_it_matters text,
   created_at timestamptz not null default now()
 );
 alter table todo_items add column if not exists completed_at timestamptz;
+alter table todo_items add column if not exists status text not null default 'active';
+alter table todo_items add column if not exists progress_note text;
+alter table todo_items add column if not exists estimated_minutes_remaining integer;
+alter table todo_items add column if not exists parked_at timestamptz;
+alter table todo_items add column if not exists return_at date;
+alter table todo_items add column if not exists restart_point text;
+alter table todo_items add column if not exists why_it_matters text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'todo_items_status_check') then
+    alter table todo_items add constraint todo_items_status_check check (status in ('active', 'parked'));
+  end if;
+end $$;
+
+-- One entry per "update progress" — a running log, never edited or
+-- overwritten, so a parked-and-resumed item still shows its full history.
+create table if not exists todo_progress_updates (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  todo_item_id uuid references todo_items(id) on delete cascade not null,
+  user_id uuid references auth.users(id) not null,
+  note text not null,
+  created_at timestamptz not null default now()
+);
+
+-- Links to Canva, ChatGPT/Claude conversations, documents, websites, emails
+-- — whatever context a to-do needs, kept with the item instead of scattered.
+create table if not exists todo_links (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  todo_item_id uuid references todo_items(id) on delete cascade not null,
+  user_id uuid references auth.users(id) not null,
+  link_type text not null default 'other',
+  label text,
+  url text not null,
+  created_at timestamptz not null default now()
+);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'todo_links_type_check') then
+    alter table todo_links add constraint todo_links_type_check
+      check (link_type in ('chatgpt', 'claude', 'document', 'canva', 'website', 'email', 'other'));
+  end if;
+end $$;
+
+-- One row per user per day: what they've told the app they have capacity
+-- for today. Workload (the other side of the comparison shown on Home) is
+-- computed on the fly from estimated_minutes_remaining, not stored here.
+create table if not exists todo_daily_capacity (
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  user_id uuid references auth.users(id) not null,
+  day date not null,
+  capacity_minutes integer not null,
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, user_id, day)
+);
 
 -- Columns added after the initial release; harmless no-ops on a fresh install.
 alter table project_tasks add column if not exists created_by uuid references auth.users(id);
@@ -299,6 +373,8 @@ create index if not exists idx_ai_actions_drop on ai_actions(drop_id);
 create index if not exists idx_ai_actions_chat_message on ai_actions(chat_message_id);
 create index if not exists idx_ai_chat_messages_user on ai_chat_messages(workspace_id, user_id, created_at);
 create index if not exists idx_todo_items_user on todo_items(workspace_id, user_id, created_at);
+create index if not exists idx_todo_progress_updates_item on todo_progress_updates(todo_item_id, created_at desc);
+create index if not exists idx_todo_links_item on todo_links(todo_item_id);
 create index if not exists idx_threads_project on threads(project_id);
 create index if not exists idx_threads_task on threads(task_id);
 create index if not exists idx_threads_organisation on threads(organisation_id);
@@ -321,6 +397,9 @@ alter table activity_events enable row level security;
 alter table ai_actions enable row level security;
 alter table ai_chat_messages enable row level security;
 alter table todo_items enable row level security;
+alter table todo_progress_updates enable row level security;
+alter table todo_links enable row level security;
+alter table todo_daily_capacity enable row level security;
 
 create or replace function public.is_workspace_member(target_workspace uuid)
 returns boolean
@@ -427,6 +506,21 @@ with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
 
 drop policy if exists "members manage own todo items" on todo_items;
 create policy "members manage own todo items" on todo_items
+for all using (public.is_workspace_member(workspace_id) and user_id = auth.uid())
+with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
+
+drop policy if exists "members manage own todo progress updates" on todo_progress_updates;
+create policy "members manage own todo progress updates" on todo_progress_updates
+for all using (public.is_workspace_member(workspace_id) and user_id = auth.uid())
+with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
+
+drop policy if exists "members manage own todo links" on todo_links;
+create policy "members manage own todo links" on todo_links
+for all using (public.is_workspace_member(workspace_id) and user_id = auth.uid())
+with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
+
+drop policy if exists "members manage own todo capacity" on todo_daily_capacity;
+create policy "members manage own todo capacity" on todo_daily_capacity
 for all using (public.is_workspace_member(workspace_id) and user_id = auth.uid())
 with check (public.is_workspace_member(workspace_id) and user_id = auth.uid());
 

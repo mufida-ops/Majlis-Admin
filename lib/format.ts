@@ -22,6 +22,15 @@ export function formatRelative(iso: string): string {
   return formatShortDate(iso);
 }
 
+export function formatMinutes(minutes: number): string {
+  if (minutes <= 0) return '0h';
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 export function toDateInputValue(iso: string | null): string {
   if (!iso) return '';
   return iso.slice(0, 10);
