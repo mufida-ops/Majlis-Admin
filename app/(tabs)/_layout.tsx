@@ -33,7 +33,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="crm" options={{ title: 'CRM', tabBarIcon: ({color, size}) => <Ionicons name="people-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: ({color, size}) => <Ionicons name="calendar-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="ai" options={{ title: 'AI', tabBarIcon: ({color, size}) => <Ionicons name="sparkles-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="catch-up" options={{ href: null }} />
     </Tabs>
   );
 }

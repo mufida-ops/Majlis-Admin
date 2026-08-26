@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
 import { SectionTitle } from '@/components/SectionTitle';
 import { LoadingState, ErrorState } from '@/components/AsyncState';
+import { ActivityRow } from '@/components/ActivityRow';
 import { theme } from '@/constants/theme';
 import { showAlert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
@@ -16,10 +17,12 @@ import { listProjects, setTaskStatus, type ProjectWithTasks } from '@/lib/reposi
 import { listDecisions } from '@/lib/repositories/decisions';
 import { listOrganisations } from '@/lib/repositories/organisations';
 import { listTodos, createTodo, updateTodoBody, setTodoDone, deleteTodo } from '@/lib/repositories/todos';
+import { listActivitySince } from '@/lib/repositories/activity';
+import { classifyActivity, type ActivityHref } from '@/lib/catchUp';
 import { isInQuietHours } from '@/lib/quietHours';
 import { formatShortDate } from '@/lib/format';
 import { quoteOfTheDay } from '@/lib/quotes';
-import type { DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow } from '@/types/db';
+import type { ActivityEventRow, DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow } from '@/types/db';
 
 type FocusItem = {
   key: string;
@@ -31,7 +34,7 @@ type FocusItem = {
 
 export default function HomeScreen() {
   const { session } = useAuth();
-  const { me, partner, loading: workspaceLoading, workspaceId } = useWorkspace();
+  const { me, partner, loading: workspaceLoading, workspaceId, updateMyMembership } = useWorkspace();
 
   const { data, loading, error, refresh, setData } = useAsync(async () => {
     if (!workspaceId || !me) {
@@ -232,6 +235,41 @@ export default function HomeScreen() {
     }
   };
 
+  const [catchUp, setCatchUp] = useState<{
+    needsYou: ActivityEventRow[];
+    fyi: ActivityEventRow[];
+    hrefs: Record<string, ActivityHref>;
+    loading: boolean;
+    error: string | null;
+  }>({ needsYou: [], fyi: [], hrefs: {}, loading: true, error: null });
+
+  // Runs once per app session (guarded below), not on every focus — each
+  // run is "what changed since last_seen_at", and that cursor gets bumped
+  // right after, so re-running on every tab switch would erase the "since
+  // you were away" window almost as soon as it opened.
+  const catchUpStartedRef = useRef(false);
+  useEffect(() => {
+    if (catchUpStartedRef.current || !workspaceId || !me) return;
+    catchUpStartedRef.current = true;
+    const since = me.last_seen_at;
+
+    (async () => {
+      try {
+        const [activity, decisions, projects, organisations] = await Promise.all([
+          listActivitySince(workspaceId, since),
+          listDecisions(workspaceId),
+          listProjects(workspaceId),
+          listOrganisations(workspaceId)
+        ]);
+        const { needsYou, fyi, hrefs } = classifyActivity(activity, { me, decisions, projects, organisations });
+        setCatchUp({ needsYou, fyi, hrefs, loading: false, error: null });
+        updateMyMembership({ last_seen_at: new Date().toISOString() }).catch(() => {});
+      } catch (err) {
+        setCatchUp(prev => ({ ...prev, loading: false, error: err instanceof Error ? err.message : 'Could not load your catch-up.' }));
+      }
+    })();
+  }, [workspaceId, me, updateMyMembership]);
+
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -286,7 +324,7 @@ export default function HomeScreen() {
         ) : focus.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Image source={require('@/assets/images/reading-together.jpg')} style={styles.emptyImage} resizeMode="cover" />
-            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Give a thought in, or check Catch-up.</Text>
+            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Give a thought in, or see Catch-up below.</Text>
           </Card>
         ) : (
           focus.map(item => (
@@ -398,12 +436,40 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.catchUp} onPress={() => router.push('/(tabs)/catch-up')}>
-        <Text style={styles.catchUpTitle}>Catch me up</Text>
-        <Text style={styles.catchUpText}>
-          See what {partner?.display_name ?? 'your partner'} changed while you were away →
-        </Text>
-      </Pressable>
+      <View style={{ gap: 10 }}>
+        <SectionTitle title="Catch-up" subtitle={`What ${partner?.display_name ?? 'your partner'} changed while you were away.`} />
+        {catchUp.loading ? (
+          <LoadingState />
+        ) : catchUp.error ? (
+          <ErrorState message={catchUp.error} />
+        ) : catchUp.needsYou.length === 0 && catchUp.fyi.length === 0 ? (
+          <Card>
+            <Text style={styles.meta}>You're fully caught up. Nothing changed since your last visit.</Text>
+          </Card>
+        ) : (
+          <>
+            {catchUp.needsYou.length > 0 ? (
+              <Card>
+                <Text style={styles.catchUpLabel}>Needs you</Text>
+                {catchUp.needsYou.map(event => (
+                  <ActivityRow key={event.id} event={event} href={catchUp.hrefs[event.id]} />
+                ))}
+              </Card>
+            ) : null}
+            {catchUp.fyi.length > 0 ? (
+              <Card>
+                <Text style={styles.catchUpLabel}>FYI</Text>
+                {catchUp.fyi.map(event => (
+                  <ActivityRow key={event.id} event={event} href={catchUp.hrefs[event.id]} />
+                ))}
+              </Card>
+            ) : null}
+          </>
+        )}
+        <Pressable onPress={() => router.push('/catch-up-archive')}>
+          <Text style={styles.todoArchiveLink}>See past →</Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }
@@ -426,9 +492,7 @@ const styles = StyleSheet.create({
   emptyCard: { padding: 0, overflow: 'hidden' },
   emptyImage: { width: '100%', height: 140 },
   emptyText: { padding: 16, marginTop: 0 },
-  catchUp: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md },
-  catchUpTitle: { color: theme.colors.navy, fontSize: 18, fontWeight: '600' },
-  catchUpText: { color: theme.colors.muted, marginTop: 4 },
+  catchUpLabel: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   checkRowDivider: { borderTopWidth: 1, borderTopColor: theme.colors.border },
   checkRowTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
