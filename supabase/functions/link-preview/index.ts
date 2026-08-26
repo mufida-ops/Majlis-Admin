@@ -36,7 +36,10 @@ async function fetchViaMicrolink(url: string): Promise<{ image_url: string | nul
     if (!response.ok) return { image_url: null, title: null };
     const json = await response.json();
     if (json.status !== 'success') return { image_url: null, title: null };
-    const imageUrl = json.data?.image?.url ?? json.data?.logo?.url ?? null;
+    // logo is deliberately excluded — it's the site's generic branding
+    // image (Canva's logo, not the design), which showed up as a
+    // misleading "thumbnail" that had nothing to do with the actual link.
+    const imageUrl = json.data?.image?.url ?? null;
     const title = json.data?.title ?? null;
     return { image_url: imageUrl, title };
   } catch {
