@@ -163,7 +163,7 @@ export default function AiChatScreen() {
 
   const applyLink = async (result: LinkPickerResult, userId: string, wsId: string) => {
     if (result.target === 'calendar') {
-      await createEvent({ workspace_id: wsId, title: result.title, start_at: result.startAt, all_day: result.allDay, created_by: userId });
+      await createEvent({ workspace_id: wsId, title: result.title, start_at: result.startAt, all_day: result.allDay, owner: result.owner, created_by: userId });
     } else if (result.target === 'discussion') {
       await createDecision({ workspace_id: wsId, title: result.title, owner: result.owner, created_by: userId });
     } else if (result.target === 'task') {

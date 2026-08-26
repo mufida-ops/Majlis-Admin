@@ -47,6 +47,16 @@ export function memberLabel(
   return 'Team member';
 }
 
+// Does a plain 'Mufida' | 'Victoria' | 'Both' owner refer to this member?
+// Matches by name substring, same as colorForName above, so it still works
+// if a display name is customized (an emoji added, etc.) rather than
+// requiring it to equal the owner literal exactly.
+export function ownerTypeMatchesMember(owner: OwnerType, member: WorkspaceMember | null): boolean {
+  if (owner === 'Both') return true;
+  if (!member) return false;
+  return member.display_name.toLowerCase().includes(owner.toLowerCase());
+}
+
 export function summarizeOwners(
   ownerIds: (string | null | undefined)[],
   me: WorkspaceMember | null,

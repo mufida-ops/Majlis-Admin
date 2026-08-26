@@ -95,6 +95,7 @@ export default function DropScreen() {
           title: result.title,
           start_at: result.startAt,
           all_day: result.allDay,
+          owner: result.owner,
           created_by: session.user.id
         });
       } else if (result.target === 'crm') {

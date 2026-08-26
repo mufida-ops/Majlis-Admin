@@ -13,12 +13,15 @@ import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
 import { listEvents, createEvent, updateEvent, deleteEvent } from '@/lib/repositories/events';
-import { memberLabel, ownerAccentColor } from '@/lib/ownerLabel';
+import { ownerTypeAccentColor, ownerTypeMatchesMember } from '@/lib/ownerLabel';
 import { formatTime, localDateKey } from '@/lib/format';
 import { syncEventReminders } from '@/lib/notifications';
-import type { EventRow } from '@/types/db';
+import type { EventRow, OwnerType } from '@/types/db';
 
 const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+const OWNERS: OwnerType[] = ['Both', 'Mufida', 'Victoria'];
+const OWNER_CHIP_LABEL: Record<OwnerType, string> = { Mufida: 'M', Victoria: 'V', Both: 'Both' };
+const OWNER_FULL_LABEL: Record<OwnerType, string> = { Mufida: 'Mufida', Victoria: 'Victoria', Both: 'Both of you' };
 
 function dateHeader(dateKey: string): string {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
@@ -33,7 +36,7 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat([], { month: 'long', year: 'nume
 
 export default function CalendarScreen() {
   const { session } = useAuth();
-  const { workspaceId, me, partner } = useWorkspace();
+  const { workspaceId, me } = useWorkspace();
   const { data: events, loading, error, refresh } = useAsync(
     () => (workspaceId ? listEvents(workspaceId) : Promise.resolve([])),
     [workspaceId]
@@ -50,6 +53,7 @@ export default function CalendarScreen() {
   const [date, setDate] = useState(localDateKey());
   const [time, setTime] = useState('');
   const [allDay, setAllDay] = useState(false);
+  const [owner, setOwner] = useState<OwnerType>('Both');
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -59,8 +63,12 @@ export default function CalendarScreen() {
     // The website build doesn't get reliable reminder buzzes (a browser
     // can't schedule these while closed the way the phone app can) — skip
     // asking for notification permission there rather than pretending it works.
-    if (events && Platform.OS !== 'web') syncEventReminders(events).catch(() => {});
-  }, [events]);
+    // Only reminds about events for this person (or "Both") — an event
+    // set for just the other founder shouldn't buzz this phone.
+    if (events && Platform.OS !== 'web') {
+      syncEventReminders(events.filter(e => ownerTypeMatchesMember(e.owner, me))).catch(() => {});
+    }
+  }, [events, me]);
 
   const upcoming = useMemo(() => {
     if (!events) return [];
@@ -98,6 +106,7 @@ export default function CalendarScreen() {
     setTime('');
     setDescription('');
     setAllDay(false);
+    setOwner('Both');
     setDate(localDateKey());
     setEditingEventId(null);
   };
@@ -108,6 +117,7 @@ export default function CalendarScreen() {
     setDate(localDateKey(new Date(event.start_at)));
     setTime(event.all_day ? '' : toTimeInputValue(event.start_at));
     setAllDay(event.all_day);
+    setOwner(event.owner);
     setDescription(event.description ?? '');
     setFormError('');
   };
@@ -135,7 +145,8 @@ export default function CalendarScreen() {
           title: title.trim(),
           description: description.trim() || null,
           start_at: startAt.toISOString(),
-          all_day: allDay
+          all_day: allDay,
+          owner
         });
       } else {
         await createEvent({
@@ -144,6 +155,7 @@ export default function CalendarScreen() {
           description: description.trim() || null,
           start_at: startAt.toISOString(),
           all_day: allDay,
+          owner,
           created_by: session.user.id
         });
       }
@@ -169,14 +181,14 @@ export default function CalendarScreen() {
   };
 
   const eventCard = (event: EventRow) => {
-    const accent = ownerAccentColor(event.created_by, me, partner);
+    const accent = ownerTypeAccentColor(event.owner);
     return (
       <Card key={event.id} style={accent ? { backgroundColor: accent } : undefined}>
         <View style={styles.eventRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.eventTitle}>{event.title}</Text>
             <Text style={styles.meta}>
-              {event.all_day ? 'All day' : formatTime(event.start_at)} · {memberLabel(event.created_by, me, partner)}
+              {event.all_day ? 'All day' : formatTime(event.start_at)} · {OWNER_FULL_LABEL[event.owner]}
             </Text>
             {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
           </View>
@@ -283,6 +295,14 @@ export default function CalendarScreen() {
           <Text style={styles.fieldLabel}>All day</Text>
           <Switch value={allDay} onValueChange={setAllDay} />
         </View>
+        <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Who's this for?</Text>
+        <View style={styles.ownerPicker}>
+          {OWNERS.map(o => (
+            <Pressable key={o} onPress={() => setOwner(o)}>
+              <Text style={[styles.ownerChip, owner === o && styles.ownerChipActive]}>{OWNER_CHIP_LABEL[o]}</Text>
+            </Pressable>
+          ))}
+        </View>
         <TextInput
           value={description}
           onChangeText={setDescription}
@@ -331,6 +351,17 @@ const styles = StyleSheet.create({
   fieldLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
   row: { flexDirection: 'row', gap: 10, marginTop: 12 },
   allDayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  ownerChip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    color: theme.colors.text,
+    fontSize: 13
+  },
+  ownerChipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, color: '#fff' },
   input: {
     marginTop: 12,
     padding: 12,

@@ -193,10 +193,12 @@ create table if not exists events (
   start_at timestamptz not null,
   end_at timestamptz,
   all_day boolean not null default false,
+  owner owner_type not null default 'Both',
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table events add column if not exists owner owner_type not null default 'Both';
 
 create table if not exists contacts (
   id uuid primary key default gen_random_uuid(),

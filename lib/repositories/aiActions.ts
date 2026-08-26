@@ -86,6 +86,7 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
         description: p.description ?? null,
         start_at: startAt.toISOString(),
         all_day: allDay,
+        owner: p.owner ?? 'Both',
         created_by: actorUserId
       });
     }

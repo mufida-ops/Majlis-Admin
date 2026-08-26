@@ -1,5 +1,5 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
-import type { EventRow } from '@/types/db';
+import type { EventRow, OwnerType } from '@/types/db';
 
 export async function listEvents(workspaceId: string): Promise<EventRow[]> {
   const supabase = requireSupabase();
@@ -18,6 +18,7 @@ export async function createEvent(input: {
   start_at: string;
   end_at?: string | null;
   all_day?: boolean;
+  owner: OwnerType;
   created_by: string;
 }) {
   const supabase = requireSupabase();
@@ -27,7 +28,7 @@ export async function createEvent(input: {
 
 export async function updateEvent(
   id: string,
-  patch: Partial<Pick<EventRow, 'title' | 'description' | 'start_at' | 'end_at' | 'all_day'>>
+  patch: Partial<Pick<EventRow, 'title' | 'description' | 'start_at' | 'end_at' | 'all_day' | 'owner'>>
 ) {
   const supabase = requireSupabase();
   const result = await supabase

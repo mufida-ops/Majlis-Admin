@@ -129,6 +129,7 @@ export type EventRow = {
   start_at: string;
   end_at: string | null;
   all_day: boolean;
+  owner: OwnerType;
   created_by: string | null;
   created_at: string;
   updated_at: string;

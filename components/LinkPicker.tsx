@@ -27,7 +27,7 @@ export const AI_LINK_TARGETS: LinkTargetChoice[] = [
 ];
 
 export type LinkPickerResult =
-  | { target: 'calendar'; title: string; startAt: string; allDay: boolean }
+  | { target: 'calendar'; title: string; startAt: string; allDay: boolean; owner: OwnerType }
   | { target: 'crm'; organisationId: string; note: string }
   | { target: 'discussion'; title: string; owner: OwnerType }
   | { target: 'task'; projectId: string; title: string };
@@ -68,7 +68,7 @@ export function LinkPicker({
       if (!title.trim()) return setLocalError('Add a title first.');
       const allDay = !time.trim();
       const startAt = new Date(`${date}T${allDay ? '00:00' : time}:00`).toISOString();
-      onSave({ target: 'calendar', title: title.trim(), startAt, allDay });
+      onSave({ target: 'calendar', title: title.trim(), startAt, allDay, owner });
     } else if (target === 'crm') {
       if (!orgId) return setLocalError('Pick an organisation first.');
       if (!title.trim()) return setLocalError('Add a note first.');
@@ -129,7 +129,7 @@ export function LinkPicker({
           ))}
         </View>
       ) : null}
-      {target === 'discussion' ? (
+      {target === 'calendar' || target === 'discussion' ? (
         <View style={styles.chipRow}>
           {(['Both', 'Mufida', 'Victoria'] as OwnerType[]).map(o => (
             <Pressable key={o} style={[styles.chip, owner === o && styles.chipActive]} onPress={() => setOwner(o)}>
