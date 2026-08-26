@@ -7,6 +7,12 @@ pre-vetted content library, never freely generated from the model's general
 knowledge. Independent of The Majlis Academy -- no shared brand, content, or
 crossover.
 
+**Deployment**: this app lives in the `tarbiya-app/` subfolder of the
+`mufida-ops/Majlis-Admin` repo and deploys to Vercel from there (Root
+Directory `tarbiya-app`, Production branch
+`claude/grade3-islamic-assessments-pl817h`) -- it has no separate repo of its
+own.
+
 **Current scope**: all 18 Grade 3, Volume 1 lessons (Units 1-3), each built
 end-to-end through all 7 steps of the Learning Journey, on real production
 architecture, plus lesson-plan (.docx) and presentation (.pptx) export. See
