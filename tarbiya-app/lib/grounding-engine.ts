@@ -156,10 +156,10 @@ export function buildImageProvocationRequest(lesson: LessonContent): GroundedPro
   return {
     systemPrompt: systemPromptFor(
       "image-provocation",
-      `${JSON_ONLY}\nShape: {"sceneDescription": string, "visualElements": string[]}`,
+      `${JSON_ONLY}\nShape: {"sceneDescription": string, "visualElements": string[] (2 to 6 items)}`,
       IMAGE_VISUAL_CONSTRAINTS,
     ),
-    userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Describe an age-appropriate "Connection" provocation image for Grade 3 students that will emotionally hook them into this lesson's concept (a scene, metaphor, or everyday classroom situation -- not the Hellfire imagery itself, keep it warm and relatable, e.g. a scene about kind vs. unkind words). List its key visual elements as an array a template illustrator can render.`,
+    userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Describe an age-appropriate "Connection" provocation image for Grade 3 students that will emotionally hook them into this lesson's concept (a scene, metaphor, or everyday classroom situation -- not the Hellfire imagery itself, keep it warm and relatable, e.g. a scene about kind vs. unkind words). List its key visual elements as an array of 2 to 6 items (a template illustrator can only render up to 6) -- pick the most essential ones if you have more ideas.`,
     sourceTag: baseSourceTag(lesson),
   };
 }
