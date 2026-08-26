@@ -1,0 +1,26 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* Keep in sync with lib/theme.ts fonts.body / colors.paper / colors.textPrimary --
+     this file can't import the TS token module directly. */
+  font-family: var(--font-body), Georgia, serif;
+  background: #f7f3ea;
+  color: #2a2620;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
