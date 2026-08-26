@@ -4,6 +4,7 @@ import type {
   ConsolidationResult,
   LearningIntentionsResult,
   QuizResult,
+  VocabularyResult,
 } from "@/lib/schemas";
 
 export interface ConnectionArtifact {
@@ -31,6 +32,7 @@ export interface LessonSession {
   lessonId: string;
   classSize: number | null;
   connection: ConnectionArtifact | null;
+  vocabulary: VocabularyResult | null;
   activatingPriorKnowledge: { prompt: string; followUpQuestions: string[] } | null;
   preAssessment: QuizResult | null;
   preAssessmentResults: AssessmentResults | null;
@@ -58,6 +60,7 @@ function emptySession(id: string, lessonId: string): LessonSession {
     lessonId,
     classSize: null,
     connection: null,
+    vocabulary: null,
     activatingPriorKnowledge: null,
     preAssessment: null,
     preAssessmentResults: null,
@@ -144,6 +147,7 @@ function fromRow(row: any): LessonSession {
     lessonId: row.lesson_id,
     classSize: row.class_size,
     connection: row.connection,
+    vocabulary: row.vocabulary,
     activatingPriorKnowledge: row.activating_prior_knowledge,
     preAssessment: row.pre_assessment,
     preAssessmentResults: row.pre_assessment_results,
@@ -162,6 +166,7 @@ function toRow(patch: SessionPatch): Record<string, any> {
   const row: Record<string, unknown> = {};
   if ("classSize" in patch) row.class_size = patch.classSize;
   if ("connection" in patch) row.connection = patch.connection;
+  if ("vocabulary" in patch) row.vocabulary = patch.vocabulary;
   if ("activatingPriorKnowledge" in patch) row.activating_prior_knowledge = patch.activatingPriorKnowledge;
   if ("preAssessment" in patch) row.pre_assessment = patch.preAssessment;
   if ("preAssessmentResults" in patch) row.pre_assessment_results = patch.preAssessmentResults;

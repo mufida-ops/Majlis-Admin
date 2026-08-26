@@ -29,6 +29,7 @@ const TEXT_TASK_PROVIDER: Record<GenerationTask, TextProviderKey> = {
   "image-provocation": "anthropic", // scene description only; rendering is a separate image adapter
   consolidation: "anthropic",
   "growth-insight": "anthropic",
+  vocabulary: "anthropic",
 };
 
 function getTextAdapter(task: GenerationTask): TextGenerationAdapter {

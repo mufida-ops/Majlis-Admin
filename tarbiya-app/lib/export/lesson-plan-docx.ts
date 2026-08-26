@@ -46,6 +46,14 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
     new Paragraph({
       children: [new TextRun({ text: `Source: ${lesson.layer3.sourceRef}`, size: 18, color: "666666" })],
     }),
+    new Paragraph({
+      children: [new TextRun({ text: `"${lesson.layer1.translation}"`, italics: true })],
+      spacing: { before: 160, after: 40 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: lesson.layer1.reference, size: 18, color: "666666" })],
+      spacing: { after: 200 },
+    }),
   ];
 
   if (lesson.layer2.reviewStatus === "draft") {
@@ -80,16 +88,23 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
     children.push(notGenerated("2"));
   }
 
-  children.push(heading("3. Pre-Assessment (also used as the Post-Assessment)"));
+  children.push(heading("3. Vocabulary"));
+  if (session.vocabulary) {
+    children.push(...session.vocabulary.words.map((w) => bullet(`${w.term} -- ${w.definition}`)));
+  } else {
+    children.push(notGenerated("3"));
+  }
+
+  children.push(heading("4. Pre-Assessment (also used as the Post-Assessment)"));
   if (session.preAssessment) {
     for (const q of session.preAssessment.questions) {
       children.push(body(`${q.q} (${q.answer}) -- ${dimensionLabels[q.dimension]}`));
     }
   } else {
-    children.push(notGenerated("3"));
+    children.push(notGenerated("4"));
   }
 
-  children.push(heading("4. Learning Intentions & Success Criteria"));
+  children.push(heading("5. Learning Intentions & Success Criteria"));
   if (session.learningIntentions) {
     const li = session.learningIntentions;
     children.push(body(`Understanding: ${li.understanding}`));
@@ -99,28 +114,28 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
     children.push(new Paragraph({ text: "Success Criteria:", spacing: { before: 80 } }));
     children.push(...li.successCriteria.map((c) => bullet(c)));
   } else {
-    children.push(notGenerated("4"));
+    children.push(notGenerated("5"));
   }
 
-  children.push(heading("5. Active Learning"));
+  children.push(heading("6. Active Learning"));
   if (session.activeLearning) {
     const al = session.activeLearning;
     children.push(body(`${al.title} (${al.mode})`));
     children.push(body(al.instructions));
     if (al.materials.length > 0) children.push(body(`Materials: ${al.materials.join(", ")}`));
   } else {
-    children.push(notGenerated("5"));
+    children.push(notGenerated("6"));
   }
 
-  children.push(heading("6. Consolidation"));
+  children.push(heading("7. Consolidation"));
   if (session.consolidation) {
     children.push(body(session.consolidation.summary));
     children.push(body(session.consolidation.discussionPrompt));
   } else {
-    children.push(notGenerated("6"));
+    children.push(notGenerated("7"));
   }
 
-  children.push(heading("7. Post-Assessment Results"));
+  children.push(heading("8. Post-Assessment Results"));
   if (session.insight) {
     children.push(body(`Before: ${session.insight.beforePct}% → After: ${session.insight.afterPct}%`));
     children.push(new Paragraph({ children: [new TextRun({ text: session.insight.narrative, italics: true })], spacing: { after: 120 } }));
@@ -129,7 +144,7 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
       children.push(bullet(`${dimensionLabels[dim]}: ${d.beforePct}% → ${d.afterPct}%`));
     }
   } else {
-    children.push(notGenerated("7"));
+    children.push(notGenerated("8"));
   }
 
   const doc = new Document({ sections: [{ children }] });

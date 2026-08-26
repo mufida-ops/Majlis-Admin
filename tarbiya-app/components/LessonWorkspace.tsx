@@ -8,6 +8,7 @@ import type { ActiveLearningMode } from "@/lib/schemas";
 import { activeLearningModes, fourDDimensions } from "@/lib/schemas";
 import type { LessonSession } from "@/lib/db";
 import type { SourceTag as SourceTagShape } from "@/lib/grounding-engine";
+import type { RawSource } from "@/content/lessons/types";
 import { colors, fonts, shadows } from "@/lib/theme";
 import { starPatternBackground } from "@/lib/patterns";
 
@@ -16,6 +17,7 @@ interface LessonMeta {
   title: string;
   unit: string;
   unitTitle: string;
+  layer1: RawSource;
 }
 
 const dimensionLabels: Record<string, string> = {
@@ -116,6 +118,16 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
     }>("/api/generate/activating-prior-knowledge", { sessionId: session.id });
     setSession((s) => (s ? { ...s, activatingPriorKnowledge: data.activatingPriorKnowledge } : s));
     setMeta((m) => ({ ...m, apk: { sourceTag: data.sourceTag, provider: data.provider } }));
+  });
+
+  const generateVocabulary = withLoading("vocabulary", async () => {
+    if (!session) return;
+    const data = await postJSON<{ vocabulary: LessonSession["vocabulary"]; sourceTag: SourceTagShape; provider: string }>(
+      "/api/generate/vocabulary",
+      { sessionId: session.id },
+    );
+    setSession((s) => (s ? { ...s, vocabulary: data.vocabulary } : s));
+    setMeta((m) => ({ ...m, vocabulary: { sourceTag: data.sourceTag, provider: data.provider } }));
   });
 
   const generateQuiz = withLoading("quiz", async () => {
@@ -231,6 +243,17 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
             Grade 3 &middot; {meta.unit}: {meta.unitTitle}
           </p>
           <h1 style={{ margin: "6px 0 0", fontSize: 32, fontWeight: 600, fontFamily: fonts.display }}>{meta.title}</h1>
+          <div style={{ marginTop: 14, fontFamily: fonts.body }}>
+            {meta.layer1.arabic && (
+              <p dir="rtl" style={{ fontSize: 20, margin: "0 0 6px", color: colors.onInk }}>
+                {meta.layer1.arabic}
+              </p>
+            )}
+            <p style={{ fontSize: 14.5, fontStyle: "italic", color: colors.onInkMuted, margin: "0 0 4px" }}>
+              &ldquo;{meta.layer1.translation}&rdquo;
+            </p>
+            <p style={{ fontFamily: fonts.ui, fontSize: 11.5, color: colors.onInkMuted, margin: 0 }}>{meta.layer1.reference}</p>
+          </div>
           <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
             <a
               href={`/api/lesson-session/${session.id}/export/lesson-plan`}
@@ -286,7 +309,29 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={3} title="Pre-Assessment">
+        <StepCard step={3} title="Vocabulary">
+          <button style={btnStyle} onClick={generateVocabulary} disabled={loading.vocabulary}>
+            {loading.vocabulary ? "Generating…" : "Generate key vocabulary"}
+          </button>
+          {errors.vocabulary && <p style={errorStyle}>{errors.vocabulary}</p>}
+          {session.vocabulary && (
+            <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {session.vocabulary.words.map((w, i) => (
+                <div key={i} style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 10 }}>
+                  <strong style={{ fontSize: 14, color: colors.goldText }}>{w.term}</strong>
+                  <p style={{ fontSize: 13, margin: "4px 0 0" }}>{w.definition}</p>
+                </div>
+              ))}
+              {meta_.vocabulary && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <SourceTag tag={meta_.vocabulary.sourceTag} provider={meta_.vocabulary.provider} />
+                </div>
+              )}
+            </div>
+          )}
+        </StepCard>
+
+        <StepCard step={4} title="Pre-Assessment">
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontFamily: fonts.ui, fontSize: 13.5, marginRight: 8 }}>Number of questions</label>
             <input
@@ -350,7 +395,7 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={4} title="Learning Intentions & Success Criteria">
+        <StepCard step={5} title="Learning Intentions & Success Criteria">
           <button style={btnStyle} onClick={generateLI} disabled={loading.li}>
             {loading.li ? "Generating…" : "Draft learning intentions"}
           </button>
@@ -384,7 +429,7 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={5} title="Active Learning">
+        <StepCard step={6} title="Active Learning">
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
             {activeLearningModes.map((mode) => (
               <button key={mode} onClick={() => setActiveMode(mode)} style={mode === activeMode ? btnStyle : btnGhostStyle}>
@@ -408,7 +453,7 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={6} title="Consolidation">
+        <StepCard step={7} title="Consolidation">
           <button style={btnStyle} onClick={generateConsolidation} disabled={loading.consolidation}>
             {loading.consolidation ? "Generating…" : "Generate consolidation"}
           </button>
@@ -422,7 +467,7 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={7} title="Post-Assessment">
+        <StepCard step={8} title="Post-Assessment">
           {!session.preAssessment ? (
             <p style={{ fontStyle: "italic", color: colors.rust, fontFamily: fonts.ui, fontSize: 13.5 }}>
               Generate the pre-assessment quiz in Step 3 first -- the same questions are reused here.

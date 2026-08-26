@@ -20,6 +20,7 @@ create table if not exists tarbiya.lesson_sessions (
   class_size integer,
 
   connection jsonb,
+  vocabulary jsonb,
   activating_prior_knowledge jsonb,
   pre_assessment jsonb,
   pre_assessment_results jsonb,
@@ -34,6 +35,12 @@ create table if not exists tarbiya.lesson_sessions (
 );
 
 create index if not exists lesson_sessions_lesson_id_idx on tarbiya.lesson_sessions (lesson_id);
+
+-- Additive migration for a table created before the `vocabulary` column
+-- existed -- `create table if not exists` above is a no-op against an
+-- already-existing table, so this covers re-running the file against a live
+-- database that predates this column.
+alter table tarbiya.lesson_sessions add column if not exists vocabulary jsonb;
 
 -- A human reviewer's edit to a lesson's Layer 2 grounding text, layered on
 -- top of the seed data in content/lessons/*.ts (see lib/lesson-content-store.ts).

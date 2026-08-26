@@ -42,7 +42,8 @@ export type GenerationTask =
   | "active-learning-activity"
   | "image-provocation"
   | "consolidation"
-  | "growth-insight";
+  | "growth-insight"
+  | "vocabulary";
 
 export interface GroundedPrompt {
   systemPrompt: string;
@@ -148,6 +149,21 @@ export function buildConsolidationRequest(lesson: LessonContent): GroundedPrompt
       `${JSON_ONLY}\nShape: {"summary": string, "discussionPrompt": string}`,
     ),
     userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Write a short Consolidation summary (2-3 sentences) that brings the lesson's ideas together for Grade 3 students, plus one closing discussion prompt to wrap up the class.`,
+    sourceTag: baseSourceTag(lesson),
+  };
+}
+
+export function buildVocabularyRequest(lesson: LessonContent): GroundedPrompt {
+  return {
+    systemPrompt: systemPromptFor(
+      "vocabulary",
+      `${JSON_ONLY}\nShape: {"words": [{"term": string, "definition": string}]}`,
+      [
+        "Each term must be a single word or short phrase that actually appears in, or is a direct plain-English name for, a concept in the approved content -- never a word unrelated to this lesson.",
+        "Each definition must be one short sentence a Grade 3 student can read aloud and understand, not a dictionary definition.",
+      ],
+    ),
+    userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Pick 3-6 key vocabulary words from this lesson that a Grade 3 student needs to know to understand it (e.g. a term from the Qur'an/hadith content, or a concept word), each with one short, simple definition suitable for display on its own presentation slide.`,
     sourceTag: baseSourceTag(lesson),
   };
 }

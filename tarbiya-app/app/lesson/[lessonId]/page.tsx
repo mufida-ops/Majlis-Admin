@@ -8,7 +8,7 @@ export default async function LessonPage({ params }: { params: Promise<{ lessonI
   let meta;
   try {
     const lesson = getLessonContent(lessonId);
-    meta = { id: lesson.id, title: lesson.title, unit: lesson.layer3.unit, unitTitle: lesson.layer3.unitTitle };
+    meta = { id: lesson.id, title: lesson.title, unit: lesson.layer3.unit, unitTitle: lesson.layer3.unitTitle, layer1: lesson.layer1 };
   } catch {
     notFound();
   }

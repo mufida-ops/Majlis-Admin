@@ -47,6 +47,18 @@ export async function buildLessonPlanPptx(lesson: LessonContent, session: Lesson
     });
   }
 
+  // Citation -- the actual Qur'an/hadith text and reference, shown directly
+  // to students (previously only the source citation string appeared, on the
+  // closing slide, never the text itself).
+  const citation = pres.addSlide();
+  citation.background = { color: PAPER };
+  citation.addText(`"${lesson.layer1.translation}"`, {
+    x: 0.7, y: 1.3, w: 8.6, h: 2.6, fontSize: 24, italic: true, color: TEXT_PRIMARY, fontFace: "Georgia", align: "center", valign: "middle",
+  });
+  citation.addText(lesson.layer1.reference, {
+    x: 0.5, y: 4.6, w: 9, h: 0.4, fontSize: 13, color: GOLD, fontFace: "Arial", bold: true, align: "center",
+  });
+
   /** One big, short idea, centered, in as few words as the content allows -- not a bullet list. */
   const addBigIdeaSlide = (eyebrow: string, lines: string[]) => {
     const slide = pres.addSlide();
@@ -67,6 +79,13 @@ export async function buildLessonPlanPptx(lesson: LessonContent, session: Lesson
   // 2. Activating Prior Knowledge -- one question to talk about, not a list
   // of teacher follow-ups.
   addBigIdeaSlide("Think about this", [session.activatingPriorKnowledge?.prompt ?? NOT_READY]);
+
+  // 3. Vocabulary -- one word per slide, term + one plain-language definition.
+  if (session.vocabulary) {
+    session.vocabulary.words.forEach((w) => {
+      addBigIdeaSlide("New word", [w.term, w.definition]);
+    });
+  }
 
   // 3. Pre-Assessment -- one question per slide, answer never shown: students
   // answer out loud, they don't read the answer off the screen.

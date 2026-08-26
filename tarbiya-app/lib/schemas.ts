@@ -64,6 +64,11 @@ export const imageProvocationSchema = z.object({
 });
 export type ImageProvocationResult = z.infer<typeof imageProvocationSchema>;
 
+export const vocabularySchema = z.object({
+  words: z.array(z.object({ term: z.string().min(1), definition: z.string().min(1) })).min(2).max(6),
+});
+export type VocabularyResult = z.infer<typeof vocabularySchema>;
+
 export const insightSchema = z.object({
   narrative: z.string().min(1),
   strongestDimension: z.enum(fourDDimensions),
