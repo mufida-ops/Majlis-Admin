@@ -10,7 +10,11 @@
 
 create extension if not exists "pgcrypto";
 
-create table if not exists lesson_sessions (
+-- Namespaced under its own schema rather than "public" so this can share a
+-- Supabase project with unrelated apps without any table-name collisions.
+create schema if not exists tarbiya;
+
+create table if not exists tarbiya.lesson_sessions (
   id uuid primary key default gen_random_uuid(),
   lesson_id text not null,
   class_size integer,
@@ -29,13 +33,13 @@ create table if not exists lesson_sessions (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists lesson_sessions_lesson_id_idx on lesson_sessions (lesson_id);
+create index if not exists lesson_sessions_lesson_id_idx on tarbiya.lesson_sessions (lesson_id);
 
 -- A human reviewer's edit to a lesson's Layer 2 grounding text, layered on
 -- top of the seed data in content/lessons/*.ts (see lib/lesson-content-store.ts).
 -- lesson_id is not a foreign key since the seed lessons aren't a DB table --
 -- they're the static content library checked into the repo.
-create table if not exists lesson_content_overrides (
+create table if not exists tarbiya.lesson_content_overrides (
   lesson_id text primary key,
   grounding text not null,
   review_status text not null check (review_status in ('draft', 'approved')),

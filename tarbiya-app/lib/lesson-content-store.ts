@@ -51,7 +51,9 @@ class SupabaseOverrideStore implements OverrideStore {
   private client;
 
   constructor(url: string, serviceRoleKey: string) {
-    this.client = createClient(url, serviceRoleKey);
+    // Namespaced schema so this project's tables can share a Supabase
+    // instance with unrelated apps (see supabase/schema.sql).
+    this.client = createClient(url, serviceRoleKey, { db: { schema: "tarbiya" } });
   }
 
   async get(lessonId: string): Promise<LessonContentOverride | null> {
