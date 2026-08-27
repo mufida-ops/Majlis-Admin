@@ -8,18 +8,6 @@ export type TaskStatus = 'Not Started' | 'Started' | 'Ongoing' | 'Done';
 export type PriorityLevel = 'Low' | 'Medium' | 'High';
 export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
 export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
-export type BookItemKey =
-  | 'book'
-  | 'isbn'
-  | 'story_read_english'
-  | 'story_read_arabic'
-  | 'teacher_toolkit'
-  | 'activity_cards'
-  | 'cultural_game'
-  | 'sentence_strips'
-  | 'flash_cards'
-  | 'activity_sheets'
-  | 'cultural_box';
 export type BookBoxType = 'story' | 'cultural';
 export type TodoStatus = 'active' | 'parked';
 export type TodoLinkType = 'chatgpt' | 'claude' | 'document' | 'canva' | 'website' | 'email' | 'other';
@@ -275,11 +263,21 @@ export type BookRow = {
   updated_at: string;
 };
 
+export type BookItemSectionRow = {
+  id: string;
+  workspace_id: string;
+  key: string;
+  label: string;
+  order_index: number;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type BookLinkRow = {
   id: string;
   workspace_id: string;
   book_id: string;
-  item_key: BookItemKey;
+  section_id: string;
   label: string | null;
   url: string | null;
   file_path: string | null;

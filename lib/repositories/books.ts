@@ -1,6 +1,6 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
 import { normalizeImageForWeb } from '@/lib/normalizeImageForWeb';
-import type { BookRow, BookLinkRow, BookBoxItemRow, BookItemKey, BookBoxType } from '@/types/db';
+import type { BookRow, BookLinkRow, BookBoxItemRow, BookItemSectionRow, BookBoxType } from '@/types/db';
 
 const BOOK_COVER_BUCKET = 'book-covers';
 const BOOK_FILE_BUCKET = 'book-files';
@@ -69,6 +69,48 @@ export async function getBookCoverUrl(storagePath: string, expiresInSeconds = 36
   return data.signedUrl;
 }
 
+// --- The checklist itself (book_item_sections) — editable, not a fixed list ---
+
+export async function listBookItemSections(workspaceId: string): Promise<BookItemSectionRow[]> {
+  const supabase = requireSupabase();
+  const result = await supabase
+    .from('book_item_sections')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('order_index', { ascending: true });
+  return unwrap(result) as BookItemSectionRow[];
+}
+
+function slugifySectionKey(label: string): string {
+  const base = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  // A short random suffix keeps the key unique even if two sections share a
+  // label — the key is only ever used internally, never shown in the UI.
+  return `${base || 'section'}_${Date.now().toString(36).slice(-4)}`;
+}
+
+/** Adds a new checklist section (e.g. "Story map") — appears on every book from now on, no code change needed. */
+export async function addBookItemSection(workspaceId: string, label: string, createdBy: string): Promise<BookItemSectionRow> {
+  const supabase = requireSupabase();
+  const existing = await listBookItemSections(workspaceId);
+  const order_index = existing.length > 0 ? Math.max(...existing.map(s => s.order_index)) + 1 : 0;
+  const result = await supabase
+    .from('book_item_sections')
+    .insert({ workspace_id: workspaceId, key: slugifySectionKey(label), label: label.trim(), order_index, created_by: createdBy })
+    .select('*')
+    .single();
+  return unwrap(result) as BookItemSectionRow;
+}
+
+/** Removes a checklist section from every book — also removes any links already added under it (cascades). */
+export async function deleteBookItemSection(id: string): Promise<void> {
+  const supabase = requireSupabase();
+  unwrap(await supabase.from('book_item_sections').delete().eq('id', id));
+}
+
 // Best-effort thumbnail for a pasted link — reads the source page's own
 // og:image, so a failure here (unreachable link, no meta tag) should never
 // block adding the link itself.
@@ -83,11 +125,11 @@ async function fetchLinkPreviewImage(url: string): Promise<string | null> {
   }
 }
 
-/** Adds a link (usually Canva) to one of a book's 8 fixed item sections — a section can hold several. */
+/** Adds a link (usually Canva) to one of a book's checklist sections — a section can hold several. */
 export async function addBookLink(input: {
   workspace_id: string;
   book_id: string;
-  item_key: BookItemKey;
+  section_id: string;
   url: string;
   label?: string;
   created_by: string;
@@ -100,20 +142,20 @@ export async function addBookLink(input: {
 
 /** Attaches a photo instead of a link to one of a book's item sections. */
 export async function addBookLinkPhoto(
-  input: { workspace_id: string; book_id: string; item_key: BookItemKey; label?: string; created_by: string },
+  input: { workspace_id: string; book_id: string; section_id: string; label?: string; created_by: string },
   file: { uri: string; name: string; mimeType: string }
 ): Promise<BookLinkRow> {
   const supabase = requireSupabase();
   const normalized = await normalizeImageForWeb(file.uri, file.mimeType);
   const ext = normalized.mimeType === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() ?? 'jpg');
-  const path = `${input.book_id}/${input.item_key}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${input.book_id}/${input.section_id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const response = await fetch(normalized.uri);
   const blob = await response.blob();
   const { error: uploadError } = await supabase.storage.from(BOOK_FILE_BUCKET).upload(path, blob, { contentType: normalized.mimeType });
   if (uploadError) throw new Error(uploadError.message);
   const result = await supabase
     .from('book_links')
-    .insert({ workspace_id: input.workspace_id, book_id: input.book_id, item_key: input.item_key, label: input.label, file_path: path })
+    .insert({ workspace_id: input.workspace_id, book_id: input.book_id, section_id: input.section_id, label: input.label, file_path: path })
     .select('*')
     .single();
   return unwrap(result) as BookLinkRow;
@@ -126,14 +168,14 @@ export async function deleteBookLink(id: string): Promise<void> {
 
 /** Attaches an arbitrary document (PDF, etc.) instead of a link — e.g. an ISBN certificate. Only image files get the HEIC/web-decode fix; everything else uploads as-is. */
 export async function addBookLinkFile(
-  input: { workspace_id: string; book_id: string; item_key: BookItemKey; label?: string; created_by: string },
+  input: { workspace_id: string; book_id: string; section_id: string; label?: string; created_by: string },
   file: { uri: string; name: string; mimeType: string }
 ): Promise<BookLinkRow> {
   const supabase = requireSupabase();
   const isImage = file.mimeType.startsWith('image/');
   const normalized = isImage ? await normalizeImageForWeb(file.uri, file.mimeType) : { uri: file.uri, mimeType: file.mimeType };
   const ext = isImage && normalized.mimeType === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() ?? 'bin');
-  const path = `${input.book_id}/${input.item_key}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${input.book_id}/${input.section_id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const response = await fetch(normalized.uri);
   const blob = await response.blob();
   const { error: uploadError } = await supabase.storage.from(BOOK_FILE_BUCKET).upload(path, blob, { contentType: normalized.mimeType });
@@ -143,7 +185,7 @@ export async function addBookLinkFile(
     .insert({
       workspace_id: input.workspace_id,
       book_id: input.book_id,
-      item_key: input.item_key,
+      section_id: input.section_id,
       label: input.label ?? file.name,
       file_path: path
     })

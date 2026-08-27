@@ -955,11 +955,25 @@ create table if not exists books (
   updated_at timestamptz not null default now()
 );
 
+-- The checklist itself is editable — a section can be added from the FS2
+-- screen (see "+ Add a section") without a code change, instead of the
+-- fixed enum this replaces. book_links below points at a section by id.
+create table if not exists book_item_sections (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  key text not null,
+  label text not null,
+  order_index int not null default 0,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  unique (workspace_id, key)
+);
+
 create table if not exists book_links (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid references workspaces(id) on delete cascade not null,
   book_id uuid references books(id) on delete cascade not null,
-  item_key book_item_key not null,
+  section_id uuid references book_item_sections(id) on delete cascade not null,
   label text,
   url text,
   file_path text,
@@ -984,15 +998,65 @@ create table if not exists book_box_items (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_book_links_book on book_links(book_id, item_key);
+-- Existing databases created book_links with an `item_key book_item_key`
+-- column instead of `section_id` — this seeds the original 11 checklist
+-- sections (plus the newly requested Story map) for every workspace, then
+-- backfills section_id from the old item_key before dropping it. A no-op,
+-- start to finish, on a fresh install (which already has section_id and
+-- never had item_key).
+insert into book_item_sections (workspace_id, key, label, order_index)
+select w.id, s.key, s.label, s.order_index
+from workspaces w
+cross join (values
+  ('book', 'Book', 0),
+  ('isbn', 'ISBN', 1),
+  ('story_read_english', 'Story read in English', 2),
+  ('story_read_arabic', 'Story read in Arabic', 3),
+  ('story_map', 'Story map', 4),
+  ('teacher_toolkit', 'Teacher toolkit', 5),
+  ('activity_cards', 'Activity cards', 6),
+  ('cultural_game', 'Cultural game', 7),
+  ('sentence_strips', 'Sentence strips', 8),
+  ('flash_cards', 'Flash cards', 9),
+  ('activity_sheets', 'Activity sheets', 10),
+  ('cultural_box', 'Cultural box', 11)
+) as s(key, label, order_index)
+on conflict (workspace_id, key) do nothing;
+
+alter table book_links add column if not exists section_id uuid references book_item_sections(id) on delete cascade;
+
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'book_links' and column_name = 'item_key') then
+    update book_links bl
+    set section_id = bis.id
+    from book_item_sections bis
+    where bis.workspace_id = bl.workspace_id
+      and bis.key = bl.item_key::text
+      and bl.section_id is null;
+
+    alter table book_links drop column item_key;
+  end if;
+end $$;
+
+alter table book_links alter column section_id set not null;
+
+create index if not exists idx_book_item_sections_workspace on book_item_sections(workspace_id, order_index);
+create index if not exists idx_book_links_book on book_links(book_id, section_id);
 create index if not exists idx_book_box_items_book on book_box_items(book_id, box_type);
 
 alter table books enable row level security;
+alter table book_item_sections enable row level security;
 alter table book_links enable row level security;
 alter table book_box_items enable row level security;
 
 drop policy if exists "members manage books" on books;
 create policy "members manage books" on books
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "members manage book item sections" on book_item_sections;
+create policy "members manage book item sections" on book_item_sections
 for all using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 

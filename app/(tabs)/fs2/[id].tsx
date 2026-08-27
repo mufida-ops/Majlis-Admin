@@ -19,6 +19,9 @@ import {
   getBook,
   setBookCoverImage,
   removeBookCoverImage,
+  listBookItemSections,
+  addBookItemSection,
+  deleteBookItemSection,
   addBookLink,
   addBookLinkPhoto,
   addBookLinkFile,
@@ -27,21 +30,7 @@ import {
   addBookBoxItem,
   deleteBookBoxItem
 } from '@/lib/repositories/books';
-import type { BookItemKey, BookBoxType, BookLinkRow, BookBoxItemRow } from '@/types/db';
-
-const ITEM_SECTIONS: { key: BookItemKey; label: string }[] = [
-  { key: 'book', label: 'Book' },
-  { key: 'isbn', label: 'ISBN' },
-  { key: 'story_read_english', label: 'Story read in English' },
-  { key: 'story_read_arabic', label: 'Story read in Arabic' },
-  { key: 'teacher_toolkit', label: 'Teacher toolkit' },
-  { key: 'activity_cards', label: 'Activity cards' },
-  { key: 'cultural_game', label: 'Cultural game' },
-  { key: 'sentence_strips', label: 'Sentence strips' },
-  { key: 'flash_cards', label: 'Flash cards' },
-  { key: 'activity_sheets', label: 'Activity sheets' },
-  { key: 'cultural_box', label: 'Cultural box' }
-];
+import type { BookItemSectionRow, BookBoxType, BookLinkRow, BookBoxItemRow } from '@/types/db';
 
 const BOX_SECTIONS: { key: BookBoxType; label: string; withPrice: boolean }[] = [
   { key: 'story', label: 'Story box items', withPrice: true },
@@ -56,6 +45,10 @@ export default function BookDetailScreen() {
   const { session } = useAuth();
   const { workspaceId } = useWorkspace();
   const { data: book, loading, error, refresh, setData } = useAsync(() => getBook(id), [id]);
+  const { data: sections, loading: sectionsLoading, setData: setSections } = useAsync(
+    () => (workspaceId ? listBookItemSections(workspaceId) : Promise.resolve([])),
+    [workspaceId]
+  );
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -71,9 +64,13 @@ export default function BookDetailScreen() {
   const [addingDocument, setAddingDocument] = useState<Record<string, boolean>>({});
   const [boxDrafts, setBoxDrafts] = useState<Record<BookBoxType, BoxDraft>>({ story: emptyBoxDraft, cultural: emptyBoxDraft });
   const [addingBoxItem, setAddingBoxItem] = useState<Record<string, boolean>>({});
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [addingSection, setAddingSection] = useState(false);
 
-  if (loading) return <LoadingState label="Loading book…" />;
+  if (loading || sectionsLoading) return <LoadingState label="Loading book…" />;
   if (error || !book) return <ErrorState message={error ?? 'Book not found.'} onRetry={refresh} />;
+
+  const itemSections = sections ?? [];
 
   const pickCoverImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -113,24 +110,57 @@ export default function BookDetailScreen() {
     ]);
   };
 
-  const setLinkDraft = (key: BookItemKey, value: string) => setLinkDrafts(prev => ({ ...prev, [key]: value }));
-
-  const submitLink = async (key: BookItemKey) => {
-    const url = (linkDrafts[key] ?? '').trim();
-    if (!url || !workspaceId || !session) return;
-    setAddingLink(prev => ({ ...prev, [key]: true }));
+  const addSection = async () => {
+    if (!newSectionTitle.trim() || !workspaceId || !session) return;
+    setAddingSection(true);
     try {
-      const link = await addBookLink({ workspace_id: workspaceId, book_id: book.id, item_key: key, url, created_by: session.user.id });
-      setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
-      setLinkDraft(key, '');
+      const section = await addBookItemSection(workspaceId, newSectionTitle.trim(), session.user.id);
+      setSections(prev => [...(prev ?? []), section]);
+      setNewSectionTitle('');
     } catch (err) {
-      showAlert('Could not add that link', err instanceof Error ? err.message : 'Try again.');
+      showAlert('Could not add that section', err instanceof Error ? err.message : 'Try again.');
     } finally {
-      setAddingLink(prev => ({ ...prev, [key]: false }));
+      setAddingSection(false);
     }
   };
 
-  const pickLinkPhoto = async (key: BookItemKey) => {
+  const removeSection = (section: BookItemSectionRow) => {
+    showAlert(`Remove "${section.label}"?`, "This removes it from every book, along with any links already added under it. This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setSections(prev => (prev ?? []).filter(s => s.id !== section.id));
+          setData(prev => (prev ? { ...prev, book_links: prev.book_links.filter(l => l.section_id !== section.id) } : prev));
+          try {
+            await deleteBookItemSection(section.id);
+          } catch {
+            refresh();
+          }
+        }
+      }
+    ]);
+  };
+
+  const setLinkDraft = (sectionId: string, value: string) => setLinkDrafts(prev => ({ ...prev, [sectionId]: value }));
+
+  const submitLink = async (sectionId: string) => {
+    const url = (linkDrafts[sectionId] ?? '').trim();
+    if (!url || !workspaceId || !session) return;
+    setAddingLink(prev => ({ ...prev, [sectionId]: true }));
+    try {
+      const link = await addBookLink({ workspace_id: workspaceId, book_id: book.id, section_id: sectionId, url, created_by: session.user.id });
+      setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
+      setLinkDraft(sectionId, '');
+    } catch (err) {
+      showAlert('Could not add that link', err instanceof Error ? err.message : 'Try again.');
+    } finally {
+      setAddingLink(prev => ({ ...prev, [sectionId]: false }));
+    }
+  };
+
+  const pickLinkPhoto = async (sectionId: string) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       showAlert('Photo access needed', 'Allow photo access in your phone settings to attach a photo.');
@@ -139,35 +169,35 @@ export default function BookDetailScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (result.canceled || !workspaceId || !session) return;
     const asset = result.assets[0];
-    setAddingPhoto(prev => ({ ...prev, [key]: true }));
+    setAddingPhoto(prev => ({ ...prev, [sectionId]: true }));
     try {
       const link = await addBookLinkPhoto(
-        { workspace_id: workspaceId, book_id: book.id, item_key: key, created_by: session.user.id },
+        { workspace_id: workspaceId, book_id: book.id, section_id: sectionId, created_by: session.user.id },
         { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType ?? 'image/jpeg' }
       );
       setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
     } catch (err) {
       showAlert('Could not attach that photo', err instanceof Error ? err.message : 'Try again.');
     } finally {
-      setAddingPhoto(prev => ({ ...prev, [key]: false }));
+      setAddingPhoto(prev => ({ ...prev, [sectionId]: false }));
     }
   };
 
-  const pickLinkDocument = async (key: BookItemKey) => {
+  const pickLinkDocument = async (sectionId: string) => {
     const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
     if (result.canceled || !workspaceId || !session) return;
     const asset = result.assets[0];
-    setAddingDocument(prev => ({ ...prev, [key]: true }));
+    setAddingDocument(prev => ({ ...prev, [sectionId]: true }));
     try {
       const link = await addBookLinkFile(
-        { workspace_id: workspaceId, book_id: book.id, item_key: key, created_by: session.user.id },
+        { workspace_id: workspaceId, book_id: book.id, section_id: sectionId, created_by: session.user.id },
         { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
       );
       setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
     } catch (err) {
       showAlert('Could not attach that file', err instanceof Error ? err.message : 'Try again.');
     } finally {
-      setAddingDocument(prev => ({ ...prev, [key]: false }));
+      setAddingDocument(prev => ({ ...prev, [sectionId]: false }));
     }
   };
 
@@ -295,11 +325,16 @@ export default function BookDetailScreen() {
         ) : null}
       </Pressable>
 
-      {ITEM_SECTIONS.map(section => {
-        const links = book.book_links.filter(l => l.item_key === section.key);
+      {itemSections.map(section => {
+        const links = book.book_links.filter(l => l.section_id === section.id);
         return (
-          <Card key={section.key}>
-            <Text style={styles.sectionTitle}>{section.label}</Text>
+          <Card key={section.id}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { flex: 1 }]}>{section.label}</Text>
+              <Pressable hitSlop={10} onPress={() => removeSection(section)}>
+                <Ionicons name="trash-outline" size={16} color={theme.colors.muted} />
+              </Pressable>
+            </View>
             {links.length === 0 ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
             {links.map(link => (
               <View key={link.id} style={styles.linkRow}>
@@ -330,8 +365,8 @@ export default function BookDetailScreen() {
             ))}
             <View style={styles.addLinkRow}>
               <TextInput
-                value={linkDrafts[section.key] ?? ''}
-                onChangeText={v => setLinkDraft(section.key, v)}
+                value={linkDrafts[section.id] ?? ''}
+                onChangeText={v => setLinkDraft(section.id, v)}
                 placeholder="Paste a Canva link…"
                 placeholderTextColor={theme.colors.muted}
                 style={[styles.input, { flex: 1 }]}
@@ -340,20 +375,20 @@ export default function BookDetailScreen() {
               />
               <Pressable
                 style={styles.smallButton}
-                onPress={() => submitLink(section.key)}
-                disabled={!!addingLink[section.key] || !(linkDrafts[section.key] ?? '').trim()}
+                onPress={() => submitLink(section.id)}
+                disabled={!!addingLink[section.id] || !(linkDrafts[section.id] ?? '').trim()}
               >
-                <Text style={styles.smallButtonText}>{addingLink[section.key] ? '…' : 'Add'}</Text>
+                <Text style={styles.smallButtonText}>{addingLink[section.id] ? '…' : 'Add'}</Text>
               </Pressable>
-              <Pressable style={styles.photoButton} onPress={() => pickLinkPhoto(section.key)} disabled={!!addingPhoto[section.key]}>
-                {addingPhoto[section.key] ? (
+              <Pressable style={styles.photoButton} onPress={() => pickLinkPhoto(section.id)} disabled={!!addingPhoto[section.id]}>
+                {addingPhoto[section.id] ? (
                   <ActivityIndicator size="small" color={theme.colors.navy} />
                 ) : (
                   <Ionicons name="image-outline" size={20} color={theme.colors.navy} />
                 )}
               </Pressable>
-              <Pressable style={styles.photoButton} onPress={() => pickLinkDocument(section.key)} disabled={!!addingDocument[section.key]}>
-                {addingDocument[section.key] ? (
+              <Pressable style={styles.photoButton} onPress={() => pickLinkDocument(section.id)} disabled={!!addingDocument[section.id]}>
+                {addingDocument[section.id] ? (
                   <ActivityIndicator size="small" color={theme.colors.navy} />
                 ) : (
                   <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
@@ -363,6 +398,23 @@ export default function BookDetailScreen() {
           </Card>
         );
       })}
+
+      <Card>
+        <Text style={styles.sectionTitle}>Add a section</Text>
+        <Text style={styles.meta}>Adds a new checklist item to every book, not just this one.</Text>
+        <View style={styles.addLinkRow}>
+          <TextInput
+            value={newSectionTitle}
+            onChangeText={setNewSectionTitle}
+            placeholder="e.g. Story map"
+            placeholderTextColor={theme.colors.muted}
+            style={[styles.input, { flex: 1 }]}
+          />
+          <Pressable style={styles.smallButton} onPress={addSection} disabled={addingSection || !newSectionTitle.trim()}>
+            <Text style={styles.smallButtonText}>{addingSection ? '…' : 'Add'}</Text>
+          </Pressable>
+        </View>
+      </Card>
 
       {BOX_SECTIONS.map(section => {
         const items = book.book_box_items.filter(i => i.box_type === section.key);
@@ -441,6 +493,7 @@ const styles = StyleSheet.create({
   },
   coverPlaceholderText: { color: theme.colors.muted, fontSize: 13, fontWeight: '600', textAlign: 'center', paddingHorizontal: 20 },
   coverRemove: { position: 'absolute', top: 8, right: 8 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },
   linkRow: {
