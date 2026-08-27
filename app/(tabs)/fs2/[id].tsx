@@ -325,10 +325,11 @@ export default function BookDetailScreen() {
         ) : null}
       </Pressable>
 
-      {itemSections.map(section => {
+      <Card style={styles.checklistCard}>
+        {itemSections.map((section, index) => {
         const links = book.book_links.filter(l => l.section_id === section.id);
         return (
-          <Card key={section.id}>
+          <View key={section.id} style={[styles.sectionBlock, index > 0 && styles.sectionBlockDivider]}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { flex: 1 }]}>{section.label}</Text>
               <Pressable hitSlop={10} onPress={() => removeSection(section)}>
@@ -395,9 +396,10 @@ export default function BookDetailScreen() {
                 )}
               </Pressable>
             </View>
-          </Card>
+          </View>
         );
-      })}
+        })}
+      </Card>
 
       <Card>
         <Text style={styles.sectionTitle}>Add a section</Text>
@@ -493,6 +495,9 @@ const styles = StyleSheet.create({
   },
   coverPlaceholderText: { color: theme.colors.muted, fontSize: 13, fontWeight: '600', textAlign: 'center', paddingHorizontal: 20 },
   coverRemove: { position: 'absolute', top: 8, right: 8 },
+  checklistCard: { padding: 0, overflow: 'hidden' },
+  sectionBlock: { padding: 16 },
+  sectionBlockDivider: { borderTopWidth: 1, borderTopColor: theme.colors.border },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },
