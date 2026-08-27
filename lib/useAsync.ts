@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { friendlyErrorMessage } from '@/lib/errors';
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null);
@@ -15,7 +16,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
         if (!cancelled) setData(result);
       })
       .catch(err => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Something went wrong.');
+        if (!cancelled) setError(friendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

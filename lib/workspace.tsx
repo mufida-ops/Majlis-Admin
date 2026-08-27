@@ -1,6 +1,7 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { friendlyErrorMessage } from '@/lib/errors';
 import type { WorkspaceMember } from '@/types/db';
 
 type WorkspaceContextValue = {
@@ -50,17 +51,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       setMembers((rows ?? []) as WorkspaceMember[]);
     } catch (err) {
-      // Supabase errors (PostgrestError, AuthError, FunctionsHttpError) are
-      // plain objects with a `.message`, not `instanceof Error` — checking
-      // that first silently swallowed the real reason and always showed the
-      // generic fallback below.
-      const message =
-        err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string'
-          ? (err as { message: string }).message
-          : err instanceof Error
-            ? err.message
-            : 'Failed to load workspace.';
-      setError(message);
+      setError(friendlyErrorMessage(err, 'Failed to load workspace.'));
     } finally {
       setLoading(false);
     }
