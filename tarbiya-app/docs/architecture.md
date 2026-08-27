@@ -218,3 +218,109 @@ reviewer) found and fixed:
 - `lib/ai-router.ts`'s JSON extraction used `lastIndexOf('}')`, which could
   grab past the real end of the JSON object if the model's response had any
   trailing text containing a `}`. Replaced with a proper brace-depth scan.
+
+## 9. Planned: richer content types, a per-strand presentation style system, and enforced child-friendly language (not yet built)
+
+Prompted by comparing tarbiya's output against several real teachers' own
+Islamic Education decks and a real rubric/unit-plan document (Grade 1-5,
+UAE MOE curriculum) shared during a design discussion. Two conclusions
+came out of that comparison, plus one architectural reframe. None of this
+is built yet -- it's recorded here so it isn't lost before implementation.
+
+### 9.1 What the real examples revealed tarbiya's content model is missing
+
+- **Vocabulary step** -- shipped already (`lib/schemas.ts` `vocabularySchema`,
+  `buildVocabularyRequest`, `/api/generate/vocabulary`, Step 3 in
+  `LessonWorkspace`, a slide per word in the pptx export, a citation
+  slide/section using `lesson.layer1` which existed but was never shown to
+  students). Every real example had an explicit vocabulary slide (icon/word +
+  one-line definition, sometimes just proper nouns like angel names) --
+  tarbiya had no equivalent step at all before this.
+- **Success Criteria as a repeated student-facing checkpoint, not a
+  teacher-only artifact** -- real decks show the same 4-part Success
+  Criteria slide (matching tarbiya's own 4D dimensions almost exactly:
+  Understanding / Application / Use of Islamic texts / Connection to real
+  life) two to three times across one lesson (start, middle, end), in plain
+  language with numbered icons (01-04). The current pptx export
+  (`lib/export/lesson-plan-pptx.ts`) collapses Learning Intentions to a
+  single plain sentence and drops the 4-part breakdown as "teacher-only
+  jargon" -- that assumption turned out wrong for this specific piece;
+  real classes do see it, repeatedly, just phrased simply. Reinstating it
+  as a recurring simplified checkpoint slide (not raw dimension keys, not
+  percentages) is a planned fix, distinct from the Post-Assessment insight
+  slide (which correctly stays percentage/analytics-free for students).
+- **Group Activity Worksheet** -- a new content type. Real lessons project a
+  fill-in table for small-group work (e.g. "Angel's name / What do they
+  do?", "Similarities and differences") that students complete live in
+  class. Needs: a new schema (task instruction + column headers + row
+  count), a grounding-engine prompt, a session field, and a pptx slide kind
+  that renders an empty table for projection. Tarbiya has nothing like this.
+- **Rubric-based Project Task** -- a new, different assessment type from the
+  existing Yes/No quiz. Real practice uses a 4-level rubric --
+  **Approaching (1) -> Developing (2) -> Achieving (3) -> Mastering (4)** --
+  each level with its own "I can..." descriptor, paired with an open-ended
+  performance-task prompt (e.g. "create a timeline of Prophet Muhammad using
+  crafts/keynote/video and teach your family"). This is for creative/project
+  work, not comprehension checking -- it would sit alongside
+  `quizSchema`/`insightSchema`, not replace them, since binary pre/post
+  comprehension checks and open-ended project grading answer different
+  questions.
+- **UAE MOE curriculum strands** -- confirmed via the framework itself
+  (not assumed): six strands, not seven -- **Divine Revelation, Creed,
+  Islamic Values and Morals, Islamic Rulings and Purposes (Fiqh), Biography
+  of the Prophet (Seerah), Islamic Identity**. Corroborated by the Surah
+  al-Humazah source material's own first line ("Pivot 1: Divine
+  Revelation"). `LessonContent` (`content/lessons/types.ts`) currently has
+  no strand field -- only grade/volume/unit -- and would need one for 9.2
+  below.
+
+### 9.2 Presentation design: structure vs. style as two separate layers
+
+Explicit design principle from this discussion: **the structure stays
+fixed; only the style varies, and the variety should be meaningful, not
+random.** Concretely, two layers:
+
+- **Content structure (fixed)**: the ordered list of slide *kinds* a lesson
+  produces (title, citation, big-idea, vocabulary-card, group-activity-table,
+  success-criteria-checkpoint, rubric-level, closing) and what data goes on
+  each. This is what `lib/export/lesson-plan-pptx.ts` currently hardcodes
+  directly into slide-drawing calls.
+- **Style (varies)**: a small set of theme modules, one per UAE MOE strand
+  (six, per 9.1), each implementing the *same* rendering interface for every
+  slide kind (`renderTitle`, `renderBigIdea`, `renderVocabCard`,
+  `renderGroupActivity`, `renderRubricLevel`, `renderClosing`, ...) with
+  different palettes/fonts/motifs per strand (e.g. Seerah -> warm
+  storytelling/timeline treatment; Divine Revelation -> calligraphic/
+  geometric, serene; Fiqh -> clean/practical). A lesson's strand tag picks
+  its theme. Adding a theme later is additive -- one new file, nothing else
+  changes -- because every theme must cover every slide kind.
+- **The planned refactor**: split today's one big `buildLessonPlanPptx`
+  function into (a) a content-plan builder that turns a `LessonSession` into
+  an ordered list of `{kind, data}` slide specs, independent of any theme,
+  and (b) a theme module that knows how to draw each `kind`. This is a
+  reshaping of existing logic, not new generation capability.
+- **Section labels are a style-layer concern, not structure.** The eyebrow
+  captions on today's slides ("Let's imagine...", "New word", "Think about
+  this") signal which slide-kind something is, but that signal doesn't have
+  to be on-screen text -- a theme could use an icon, a color-coded corner,
+  or nothing at all instead. Whether/how a slide-kind is labeled is a
+  per-theme choice, same as color and font.
+
+### 9.3 Enforcing child-friendly language, not just requesting it
+
+Every generation prompt already asks for "Grade 3" / "age-appropriate"
+language, but nothing currently verifies the result -- a response could be
+schema-valid and still be a 30-word compound sentence no 8-year-old would
+parse. `lib/ai-router.ts`'s `runGrounded()` already has the right pattern
+for a different problem: it validates against a zod schema and
+automatically retries once with a corrective instruction on failure. Planned
+extension: after schema validation succeeds, run a cheap readability check
+(e.g. average words-per-sentence / word length, not a heavy NLP dependency)
+against a Grade-3 threshold on the relevant text fields, and if it fails,
+issue the same kind of corrective retry already built for shape failures
+("too complex for an 8-year-old -- shorter sentences, simpler words,
+rewrite it"). This makes child-friendliness an enforced, checked property
+of generation output, consistent with how the religious-content safety
+constraint and JSON-shape correctness are already enforced rather than
+merely requested.
+
