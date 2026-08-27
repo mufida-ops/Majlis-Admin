@@ -130,13 +130,16 @@ export function LinkPicker({
         </View>
       ) : null}
       {target === 'calendar' || target === 'discussion' ? (
-        <View style={styles.chipRow}>
-          {(['Both', 'Mufida', 'Victoria'] as OwnerType[]).map(o => (
-            <Pressable key={o} style={[styles.chip, owner === o && styles.chipActive]} onPress={() => setOwner(o)}>
-              <Text style={[styles.chipText, owner === o && styles.chipTextActive]}>{o}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <>
+          <Text style={styles.fieldLabel}>{target === 'calendar' ? "Who's this for?" : 'Who needs to weigh in?'}</Text>
+          <View style={styles.chipRow}>
+            {(['Both', 'Mufida', 'Victoria'] as OwnerType[]).map(o => (
+              <Pressable key={o} style={[styles.chip, owner === o && styles.chipActive]} onPress={() => setOwner(o)}>
+                <Text style={[styles.chipText, owner === o && styles.chipTextActive]}>{o}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
       ) : null}
       {localError || error ? <Text style={styles.error}>{localError || error}</Text> : null}
       <View style={styles.buttons}>
@@ -154,6 +157,7 @@ export function LinkPicker({
 const styles = StyleSheet.create({
   wrap: { marginTop: 10, padding: 14, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceMuted },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fieldLabel: { color: theme.colors.text, fontSize: 13, fontWeight: '600', marginTop: 10, marginBottom: 4 },
   chip: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
   chipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
   chipText: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },

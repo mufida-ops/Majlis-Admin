@@ -169,6 +169,7 @@ export default function DecisionsScreen() {
             placeholderTextColor={theme.colors.muted}
             style={styles.input}
           />
+          <Text style={styles.fieldLabel}>Who needs to weigh in on this?</Text>
           <View style={styles.ownerPicker}>
             {OWNERS.map(o => (
               <Pressable key={o} onPress={() => setOwner(o)}>
@@ -215,7 +216,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     backgroundColor: theme.colors.background
   },
-  ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  fieldLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 12 },
+  ownerPicker: { flexDirection: 'row', gap: 8, marginTop: 8 },
   ownerChip: {
     borderWidth: 1,
     borderColor: theme.colors.border,
