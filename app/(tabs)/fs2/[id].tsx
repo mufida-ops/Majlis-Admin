@@ -66,6 +66,9 @@ export default function BookDetailScreen() {
   const [addingBoxItem, setAddingBoxItem] = useState<Record<string, boolean>>({});
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [addingSection, setAddingSection] = useState(false);
+  const [expandedAdd, setExpandedAdd] = useState<Record<string, boolean>>({});
+
+  const toggleExpandedAdd = (sectionId: string) => setExpandedAdd(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
 
   if (loading || sectionsLoading) return <LoadingState label="Loading book…" />;
   if (error || !book) return <ErrorState message={error ?? 'Book not found.'} onRetry={refresh} />;
@@ -153,6 +156,7 @@ export default function BookDetailScreen() {
       const link = await addBookLink({ workspace_id: workspaceId, book_id: book.id, section_id: sectionId, url, created_by: session.user.id });
       setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
       setLinkDraft(sectionId, '');
+      setExpandedAdd(prev => ({ ...prev, [sectionId]: false }));
     } catch (err) {
       showAlert('Could not add that link', err instanceof Error ? err.message : 'Try again.');
     } finally {
@@ -176,6 +180,7 @@ export default function BookDetailScreen() {
         { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType ?? 'image/jpeg' }
       );
       setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
+      setExpandedAdd(prev => ({ ...prev, [sectionId]: false }));
     } catch (err) {
       showAlert('Could not attach that photo', err instanceof Error ? err.message : 'Try again.');
     } finally {
@@ -194,6 +199,7 @@ export default function BookDetailScreen() {
         { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
       );
       setData(prev => (prev ? { ...prev, book_links: [...prev.book_links, link] } : prev));
+      setExpandedAdd(prev => ({ ...prev, [sectionId]: false }));
     } catch (err) {
       showAlert('Could not attach that file', err instanceof Error ? err.message : 'Try again.');
     } finally {
@@ -332,11 +338,18 @@ export default function BookDetailScreen() {
           <View key={section.id} style={[styles.sectionBlock, index > 0 && styles.sectionBlockDivider]}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { flex: 1 }]}>{section.label}</Text>
-              <Pressable hitSlop={10} onPress={() => removeSection(section)}>
+              <Pressable hitSlop={10} onPress={() => toggleExpandedAdd(section.id)}>
+                <Ionicons
+                  name={expandedAdd[section.id] ? 'remove-circle-outline' : 'add-circle-outline'}
+                  size={20}
+                  color={theme.colors.navy}
+                />
+              </Pressable>
+              <Pressable hitSlop={10} onPress={() => removeSection(section)} style={{ marginLeft: 14 }}>
                 <Ionicons name="trash-outline" size={16} color={theme.colors.muted} />
               </Pressable>
             </View>
-            {links.length === 0 ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
+            {links.length === 0 && !expandedAdd[section.id] ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
             {links.map(link => (
               <View key={link.id} style={styles.linkRow}>
                 {link.file_path && link.label ? (
@@ -364,38 +377,40 @@ export default function BookDetailScreen() {
                 </Pressable>
               </View>
             ))}
-            <View style={styles.addLinkRow}>
-              <TextInput
-                value={linkDrafts[section.id] ?? ''}
-                onChangeText={v => setLinkDraft(section.id, v)}
-                placeholder="Paste a Canva link…"
-                placeholderTextColor={theme.colors.muted}
-                style={[styles.input, { flex: 1 }]}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-              <Pressable
-                style={styles.smallButton}
-                onPress={() => submitLink(section.id)}
-                disabled={!!addingLink[section.id] || !(linkDrafts[section.id] ?? '').trim()}
-              >
-                <Text style={styles.smallButtonText}>{addingLink[section.id] ? '…' : 'Add'}</Text>
-              </Pressable>
-              <Pressable style={styles.photoButton} onPress={() => pickLinkPhoto(section.id)} disabled={!!addingPhoto[section.id]}>
-                {addingPhoto[section.id] ? (
-                  <ActivityIndicator size="small" color={theme.colors.navy} />
-                ) : (
-                  <Ionicons name="image-outline" size={20} color={theme.colors.navy} />
-                )}
-              </Pressable>
-              <Pressable style={styles.photoButton} onPress={() => pickLinkDocument(section.id)} disabled={!!addingDocument[section.id]}>
-                {addingDocument[section.id] ? (
-                  <ActivityIndicator size="small" color={theme.colors.navy} />
-                ) : (
-                  <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
-                )}
-              </Pressable>
-            </View>
+            {expandedAdd[section.id] ? (
+              <View style={styles.addLinkRow}>
+                <TextInput
+                  value={linkDrafts[section.id] ?? ''}
+                  onChangeText={v => setLinkDraft(section.id, v)}
+                  placeholder="Paste a Canva link…"
+                  placeholderTextColor={theme.colors.muted}
+                  style={[styles.input, { flex: 1 }]}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Pressable
+                  style={styles.smallButton}
+                  onPress={() => submitLink(section.id)}
+                  disabled={!!addingLink[section.id] || !(linkDrafts[section.id] ?? '').trim()}
+                >
+                  <Text style={styles.smallButtonText}>{addingLink[section.id] ? '…' : 'Add'}</Text>
+                </Pressable>
+                <Pressable style={styles.photoButton} onPress={() => pickLinkPhoto(section.id)} disabled={!!addingPhoto[section.id]}>
+                  {addingPhoto[section.id] ? (
+                    <ActivityIndicator size="small" color={theme.colors.navy} />
+                  ) : (
+                    <Ionicons name="image-outline" size={20} color={theme.colors.navy} />
+                  )}
+                </Pressable>
+                <Pressable style={styles.photoButton} onPress={() => pickLinkDocument(section.id)} disabled={!!addingDocument[section.id]}>
+                  {addingDocument[section.id] ? (
+                    <ActivityIndicator size="small" color={theme.colors.navy} />
+                  ) : (
+                    <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         );
         })}
