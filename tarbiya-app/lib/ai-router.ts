@@ -30,6 +30,8 @@ const TEXT_TASK_PROVIDER: Record<GenerationTask, TextProviderKey> = {
   consolidation: "anthropic",
   "growth-insight": "anthropic",
   vocabulary: "anthropic",
+  "group-activity": "anthropic",
+  "rubric-project": "anthropic",
 };
 
 function getTextAdapter(task: GenerationTask): TextGenerationAdapter {
@@ -97,10 +99,63 @@ export interface GroundedResult<T> {
 }
 
 /**
+ * Cheap, dependency-free readability check (docs/architecture.md sec. 9.3):
+ * every generation prompt already *asks* for "Grade 3" / "age-appropriate"
+ * language, but nothing verified the result -- a schema-valid response could
+ * still be a 30-word sentence no 8-year-old could parse. This estimates a
+ * Flesch-Kincaid grade level (syllables approximated by vowel-group
+ * counting, no NLP library needed) over the response's actual prose fields,
+ * and is used to trigger one corrective retry, same pattern as the
+ * JSON-shape check below.
+ */
+const GRADE3_READABILITY_CEILING = 4.5;
+
+function countSyllables(word: string): number {
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!w) return 0;
+  const groups = w.match(/[aeiouy]+/g);
+  let count = groups ? groups.length : 1;
+  if (w.endsWith("e") && count > 1) count -= 1;
+  return Math.max(count, 1);
+}
+
+function fleschKincaidGrade(text: string): number | null {
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const words = text.match(/[A-Za-z']+/g) ?? [];
+  if (sentences.length === 0 || words.length === 0) return null;
+  const syllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
+  return 0.39 * (words.length / sentences.length) + 11.8 * (syllables / words.length) - 15.59;
+}
+
+/** Collects prose (4+ word) string values from a generation result, skipping short labels/enum values like "Yes" or "creative". */
+function collectProseStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") {
+    if (value.trim().split(/\s+/).length >= 4) out.push(value);
+  } else if (Array.isArray(value)) {
+    value.forEach((v) => collectProseStrings(v, out));
+  } else if (value && typeof value === "object") {
+    Object.values(value).forEach((v) => collectProseStrings(v, out));
+  }
+  return out;
+}
+
+function isReadableForGrade3(data: unknown): boolean {
+  const prose = collectProseStrings(data).join(" ");
+  const grade = fleschKincaidGrade(prose);
+  return grade === null || grade <= GRADE3_READABILITY_CEILING;
+}
+
+/**
  * Runs a grounded prompt through the router, validates the JSON response
  * against the given schema, and retries once with a corrective instruction
  * if validation fails. Never invents a fallback result on failure -- the
  * caller sees a clear error instead of silently-wrong content.
+ *
+ * Also retries once (independently of the shape check) if the response
+ * parses fine but reads above a Grade 3 level -- unlike a shape failure,
+ * this never throws: a heuristic miss is a quality issue, not a broken
+ * response, so the original schema-valid result is kept if the retry
+ * doesn't clearly improve on it.
  */
 export async function runGrounded<S extends z.ZodTypeAny>(
   task: GenerationTask,
@@ -121,14 +176,25 @@ export async function runGrounded<S extends z.ZodTypeAny>(
   };
 
   let { raw, parsed } = await attempt(prompt.systemPrompt);
+  let shapeRetried = false;
 
   if (!parsed.success) {
     const correctivePrompt = `${prompt.systemPrompt}\n\nYour previous response did not match the required JSON shape or was not valid JSON. Respond again with ONLY the corrected JSON object.`;
     ({ raw, parsed } = await attempt(correctivePrompt));
+    shapeRetried = true;
   }
 
   if (!parsed.success) {
     throw new GenerationValidationError(task, raw, parsed.error.message);
+  }
+
+  if (!shapeRetried && !isReadableForGrade3(parsed.data)) {
+    const correctivePrompt = `${prompt.systemPrompt}\n\nYour previous response was too complex for an 8-year-old (Grade 3) reader. Rewrite it with shorter sentences (under 10 words where possible) and simpler, more common words. Respond again with ONLY the corrected JSON object.`;
+    const retry = await attempt(correctivePrompt);
+    if (retry.parsed.success) {
+      raw = retry.raw;
+      parsed = retry.parsed;
+    }
   }
 
   return { data: parsed.data, sourceTag: prompt.sourceTag, provider: adapter.name };
