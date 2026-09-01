@@ -127,15 +127,23 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
     children.push(notGenerated("6"));
   }
 
-  children.push(heading("7. Consolidation"));
-  if (session.consolidation) {
-    children.push(body(session.consolidation.summary));
-    children.push(body(session.consolidation.discussionPrompt));
+  children.push(heading("7. Group Activity"));
+  if (session.groupActivity) {
+    children.push(body(session.groupActivity.taskPrompt));
+    children.push(body(`Table: ${session.groupActivity.columnHeaders.join(" | ")} (${session.groupActivity.rowCount} rows, blank for students to fill in)`));
   } else {
     children.push(notGenerated("7"));
   }
 
-  children.push(heading("8. Post-Assessment Results"));
+  children.push(heading("8. Consolidation"));
+  if (session.consolidation) {
+    children.push(body(session.consolidation.summary));
+    children.push(body(session.consolidation.discussionPrompt));
+  } else {
+    children.push(notGenerated("8"));
+  }
+
+  children.push(heading("9. Post-Assessment Results"));
   if (session.insight) {
     children.push(body(`Before: ${session.insight.beforePct}% → After: ${session.insight.afterPct}%`));
     children.push(new Paragraph({ children: [new TextRun({ text: session.insight.narrative, italics: true })], spacing: { after: 120 } }));
@@ -144,7 +152,16 @@ export async function buildLessonPlanDocx(lesson: LessonContent, session: Lesson
       children.push(bullet(`${dimensionLabels[dim]}: ${d.beforePct}% → ${d.afterPct}%`));
     }
   } else {
-    children.push(notGenerated("8"));
+    children.push(notGenerated("9"));
+  }
+
+  if (session.rubricProject) {
+    children.push(heading("10. Rubric Project (optional)"));
+    children.push(body(session.rubricProject.taskPrompt));
+    for (const lvl of session.rubricProject.levels) {
+      children.push(new Paragraph({ text: lvl.level, heading: HeadingLevel.HEADING_3, spacing: { before: 120, after: 60 } }));
+      children.push(...lvl.descriptors.map((d) => bullet(d)));
+    }
   }
 
   const doc = new Document({ sections: [{ children }] });

@@ -43,7 +43,9 @@ export type GenerationTask =
   | "image-provocation"
   | "consolidation"
   | "growth-insight"
-  | "vocabulary";
+  | "vocabulary"
+  | "group-activity"
+  | "rubric-project";
 
 export interface GroundedPrompt {
   systemPrompt: string;
@@ -164,6 +166,32 @@ export function buildVocabularyRequest(lesson: LessonContent): GroundedPrompt {
       ],
     ),
     userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Pick 3-6 key vocabulary words from this lesson that a Grade 3 student needs to know to understand it (e.g. a term from the Qur'an/hadith content, or a concept word), each with one short, simple definition suitable for display on its own presentation slide.`,
+    sourceTag: baseSourceTag(lesson),
+  };
+}
+
+export function buildGroupActivityRequest(lesson: LessonContent): GroundedPrompt {
+  return {
+    systemPrompt: systemPromptFor(
+      "group-activity",
+      `${JSON_ONLY}\nShape: {"taskPrompt": string, "columnHeaders": string[] (1 to 3 items), "rowCount": number (3 to 8)}`,
+    ),
+    userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Design one small-group worksheet activity Grade 3 students fill in together in class, based on this lesson's approved content -- e.g. researching and listing examples, comparing two things, or naming items and their purpose. Give one short task instruction, and 1-3 column headers for a table the group will fill in by hand (the table itself is projected empty -- never pre-fill answers). Suggest how many rows (3-8) fit the task.`,
+    sourceTag: baseSourceTag(lesson),
+  };
+}
+
+export function buildRubricProjectRequest(lesson: LessonContent): GroundedPrompt {
+  return {
+    systemPrompt: systemPromptFor(
+      "rubric-project",
+      `${JSON_ONLY}\nShape: {"taskPrompt": string, "levels": [{"level": "approaching"|"developing"|"achieving"|"mastering", "descriptors": string[] (1 to 3 items)}]}`,
+      [
+        "Provide exactly one entry per level, in this order: approaching, developing, achieving, mastering.",
+        "Each descriptor must be phrased as a first-person 'I can...' statement a Grade 3 student could self-assess against, growing in depth/skill from approaching to mastering -- not just repeating the same statement with a different label.",
+      ],
+    ),
+    userPrompt: `${approvedContentBlock(lesson, false)}\n\nTask: Design one open-ended project/performance task for Grade 3 students based on this lesson's approved content (e.g. retelling a story creatively, making something to teach a family member, a presentation) as a single task prompt, plus a 4-level rubric (Approaching / Developing / Achieving / Mastering) describing what a student demonstrates at each level.`,
     sourceTag: baseSourceTag(lesson),
   };
 }

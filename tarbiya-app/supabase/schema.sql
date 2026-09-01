@@ -26,9 +26,11 @@ create table if not exists tarbiya.lesson_sessions (
   pre_assessment_results jsonb,
   learning_intentions jsonb,
   active_learning jsonb,
+  group_activity jsonb,
   consolidation jsonb,
   post_assessment_results jsonb,
   insight jsonb,
+  rubric_project jsonb,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -41,6 +43,8 @@ create index if not exists lesson_sessions_lesson_id_idx on tarbiya.lesson_sessi
 -- already-existing table, so this covers re-running the file against a live
 -- database that predates this column.
 alter table tarbiya.lesson_sessions add column if not exists vocabulary jsonb;
+alter table tarbiya.lesson_sessions add column if not exists group_activity jsonb;
+alter table tarbiya.lesson_sessions add column if not exists rubric_project jsonb;
 
 -- A human reviewer's edit to a lesson's Layer 2 grounding text, layered on
 -- top of the seed data in content/lessons/*.ts (see lib/lesson-content-store.ts).

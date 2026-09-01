@@ -69,6 +69,29 @@ export const vocabularySchema = z.object({
 });
 export type VocabularyResult = z.infer<typeof vocabularySchema>;
 
+export const groupActivitySchema = z.object({
+  taskPrompt: z.string().min(1),
+  columnHeaders: z.array(z.string().min(1)).min(1).max(3),
+  rowCount: z.number().int().min(3).max(8),
+});
+export type GroupActivityResult = z.infer<typeof groupActivitySchema>;
+
+export const rubricLevels = ["approaching", "developing", "achieving", "mastering"] as const;
+export type RubricLevel = (typeof rubricLevels)[number];
+
+export const rubricProjectSchema = z.object({
+  taskPrompt: z.string().min(1),
+  levels: z
+    .array(
+      z.object({
+        level: z.enum(rubricLevels),
+        descriptors: z.array(z.string().min(1)).min(1).max(3),
+      }),
+    )
+    .length(4),
+});
+export type RubricProjectResult = z.infer<typeof rubricProjectSchema>;
+
 export const insightSchema = z.object({
   narrative: z.string().min(1),
   strongestDimension: z.enum(fourDDimensions),

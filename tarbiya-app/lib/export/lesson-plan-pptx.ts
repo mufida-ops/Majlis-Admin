@@ -87,7 +87,7 @@ export async function buildLessonPlanPptx(lesson: LessonContent, session: Lesson
     });
   }
 
-  // 3. Pre-Assessment -- one question per slide, answer never shown: students
+  // 4. Pre-Assessment -- one question per slide, answer never shown: students
   // answer out loud, they don't read the answer off the screen.
   if (session.preAssessment) {
     session.preAssessment.questions.forEach((q, i) => {
@@ -97,23 +97,62 @@ export async function buildLessonPlanPptx(lesson: LessonContent, session: Lesson
     addBigIdeaSlide("Quick Questions", [NOT_READY]);
   }
 
-  // 4. Learning Intentions -- one plain "today we will..." line, not four
-  // paragraphs and a success-criteria checklist (that's for the teacher).
+  // 5. Learning Intentions -- one plain "today we will..." line, not the
+  // four full paragraphs (that stays teacher-only, in the Word lesson plan).
   addBigIdeaSlide("Today we will learn", [session.learningIntentions?.understanding ?? NOT_READY]);
 
-  // 5. Active Learning -- the activity's name and its one main instruction.
+  /** Success Criteria checkpoint -- shown more than once (real classroom
+   *  decks repeat this at the start, middle, and end of a lesson, not just
+   *  once). The successCriteria list is already plain "I can..." language,
+   *  not raw 4D dimension keys, so it's fine for students to read directly. */
+  const addSuccessCriteriaSlide = () => {
+    if (!session.learningIntentions) return;
+    const slide = pres.addSlide();
+    slide.background = { color: PAPER };
+    slide.addText("Success Criteria", {
+      x: 0.5, y: 0.4, w: 9, h: 0.5, fontSize: 15, color: GOLD, fontFace: "Arial", bold: true, align: "center", charSpacing: 2,
+    });
+    slide.addText(
+      session.learningIntentions.successCriteria.map((c) => ({ text: c, options: { breakLine: true, paraSpaceAfter: 14, bullet: true } })),
+      { x: 1, y: 1.2, w: 8, h: 4, fontSize: 20, color: TEXT_PRIMARY, fontFace: "Arial", valign: "middle" },
+    );
+  };
+  addSuccessCriteriaSlide();
+
+  // 6. Active Learning -- the activity's name and its one main instruction.
   addBigIdeaSlide("Let's do it!", [
     session.activeLearning?.title ?? NOT_READY,
     ...(session.activeLearning ? [session.activeLearning.instructions] : []),
   ]);
 
-  // 6. Consolidation -- already short; keep as-is, just bigger.
+  // 7. Group Activity -- a real empty table, projected for students to fill
+  // in together; never pre-filled.
+  if (session.groupActivity) {
+    const slide = pres.addSlide();
+    slide.background = { color: PAPER };
+    slide.addText(session.groupActivity.taskPrompt, {
+      x: 0.5, y: 0.35, w: 9, h: 0.9, fontSize: 20, bold: true, color: INK, fontFace: "Arial", align: "center", valign: "middle",
+    });
+    const headerRow = session.groupActivity.columnHeaders.map((h) => ({
+      text: h,
+      options: { bold: true, color: ON_INK, fill: { color: INK }, fontFace: "Arial", fontSize: 14 },
+    }));
+    const blankRows = Array.from({ length: session.groupActivity.rowCount }, () =>
+      session.groupActivity!.columnHeaders.map(() => ({ text: "", options: { fontSize: 12 } })),
+    );
+    slide.addTable([headerRow, ...blankRows], { x: 0.5, y: 1.4, w: 9, h: 3.8, border: { type: "solid", color: GOLD, pt: 1 }, autoPage: false });
+  }
+
+  // 8. Consolidation -- already short; keep as-is, just bigger.
   addBigIdeaSlide("What we learned", [
     session.consolidation?.summary ?? NOT_READY,
     ...(session.consolidation ? [session.consolidation.discussionPrompt] : []),
   ]);
 
-  // 7. Closing -- a warm plain-language note, no percentages or dimension
+  // Success Criteria checkpoint again, as a wrap-up reminder before closing.
+  addSuccessCriteriaSlide();
+
+  // 9. Closing -- a warm plain-language note, no percentages or dimension
   // jargon (those stay in the teacher's Word lesson plan).
   const closing = pres.addSlide();
   closing.background = { color: INK };
@@ -121,6 +160,21 @@ export async function buildLessonPlanPptx(lesson: LessonContent, session: Lesson
     x: 0.7, y: 1.8, w: 8.6, h: 2, fontSize: 26, color: ON_INK, fontFace: "Georgia", align: "center", valign: "middle",
   });
   closing.addText(`Source: ${lesson.layer3.sourceRef}`, { x: 0.5, y: 5.0, w: 9, h: 0.4, fontSize: 10, color: ON_INK_MUTED, fontFace: "Arial", align: "center" });
+
+  // 10. Rubric Project (optional) -- one slide per level, only if generated.
+  if (session.rubricProject) {
+    const intro = pres.addSlide();
+    intro.background = { color: PAPER };
+    intro.addText("Your project", {
+      x: 0.5, y: 0.4, w: 9, h: 0.5, fontSize: 15, color: GOLD, fontFace: "Arial", bold: true, align: "center", charSpacing: 2,
+    });
+    intro.addText(session.rubricProject.taskPrompt, {
+      x: 0.7, y: 1.2, w: 8.6, h: 3.8, fontSize: 22, color: TEXT_PRIMARY, fontFace: "Arial", align: "center", valign: "middle",
+    });
+    session.rubricProject.levels.forEach((lvl, i) => {
+      addBigIdeaSlide(`${i + 1}. ${lvl.level.charAt(0).toUpperCase()}${lvl.level.slice(1)}`, lvl.descriptors);
+    });
+  }
 
   const output = await pres.write({ outputType: "nodebuffer" });
   return output as Buffer;

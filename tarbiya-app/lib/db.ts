@@ -2,8 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import type {
   ActiveLearningResult,
   ConsolidationResult,
+  GroupActivityResult,
   LearningIntentionsResult,
   QuizResult,
+  RubricProjectResult,
   VocabularyResult,
 } from "@/lib/schemas";
 
@@ -38,9 +40,11 @@ export interface LessonSession {
   preAssessmentResults: AssessmentResults | null;
   learningIntentions: LearningIntentionsResult | null;
   activeLearning: ActiveLearningResult | null;
+  groupActivity: GroupActivityResult | null;
   consolidation: ConsolidationResult | null;
   postAssessmentResults: AssessmentResults | null;
   insight: GrowthInsight | null;
+  rubricProject: RubricProjectResult | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,9 +70,11 @@ function emptySession(id: string, lessonId: string): LessonSession {
     preAssessmentResults: null,
     learningIntentions: null,
     activeLearning: null,
+    groupActivity: null,
     consolidation: null,
     postAssessmentResults: null,
     insight: null,
+    rubricProject: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -153,9 +159,11 @@ function fromRow(row: any): LessonSession {
     preAssessmentResults: row.pre_assessment_results,
     learningIntentions: row.learning_intentions,
     activeLearning: row.active_learning,
+    groupActivity: row.group_activity,
     consolidation: row.consolidation,
     postAssessmentResults: row.post_assessment_results,
     insight: row.insight,
+    rubricProject: row.rubric_project,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -172,9 +180,11 @@ function toRow(patch: SessionPatch): Record<string, any> {
   if ("preAssessmentResults" in patch) row.pre_assessment_results = patch.preAssessmentResults;
   if ("learningIntentions" in patch) row.learning_intentions = patch.learningIntentions;
   if ("activeLearning" in patch) row.active_learning = patch.activeLearning;
+  if ("groupActivity" in patch) row.group_activity = patch.groupActivity;
   if ("consolidation" in patch) row.consolidation = patch.consolidation;
   if ("postAssessmentResults" in patch) row.post_assessment_results = patch.postAssessmentResults;
   if ("insight" in patch) row.insight = patch.insight;
+  if ("rubricProject" in patch) row.rubric_project = patch.rubricProject;
   return row;
 }
 

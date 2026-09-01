@@ -180,6 +180,16 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
     setMeta((m) => ({ ...m, activeLearning: { sourceTag: data.sourceTag, provider: data.provider } }));
   });
 
+  const generateGroupActivity = withLoading("groupActivity", async () => {
+    if (!session) return;
+    const data = await postJSON<{ groupActivity: LessonSession["groupActivity"]; sourceTag: SourceTagShape; provider: string }>(
+      "/api/generate/group-activity",
+      { sessionId: session.id },
+    );
+    setSession((s) => (s ? { ...s, groupActivity: data.groupActivity } : s));
+    setMeta((m) => ({ ...m, groupActivity: { sourceTag: data.sourceTag, provider: data.provider } }));
+  });
+
   const generateConsolidation = withLoading("consolidation", async () => {
     if (!session) return;
     const data = await postJSON<{ consolidation: LessonSession["consolidation"]; sourceTag: SourceTagShape; provider: string }>(
@@ -206,6 +216,16 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
     );
     setSession((s) => (s ? { ...s, insight: data.insight } : s));
     setMeta((m) => ({ ...m, insight: { sourceTag: data.sourceTag, provider: data.provider } }));
+  });
+
+  const generateRubricProject = withLoading("rubricProject", async () => {
+    if (!session) return;
+    const data = await postJSON<{ rubricProject: LessonSession["rubricProject"]; sourceTag: SourceTagShape; provider: string }>(
+      "/api/generate/rubric-project",
+      { sessionId: session.id },
+    );
+    setSession((s) => (s ? { ...s, rubricProject: data.rubricProject } : s));
+    setMeta((m) => ({ ...m, rubricProject: { sourceTag: data.sourceTag, provider: data.provider } }));
   });
 
   if (errors.init) {
@@ -453,7 +473,40 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={7} title="Consolidation">
+        <StepCard step={7} title="Group Activity">
+          <button style={btnStyle} onClick={generateGroupActivity} disabled={loading.groupActivity}>
+            {loading.groupActivity ? "Generating…" : "Generate group activity worksheet"}
+          </button>
+          {errors.groupActivity && <p style={errorStyle}>{errors.groupActivity}</p>}
+          {session.groupActivity && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 14, fontWeight: 600 }}>{session.groupActivity.taskPrompt}</p>
+              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }}>
+                <thead>
+                  <tr>
+                    {session.groupActivity.columnHeaders.map((h, i) => (
+                      <th key={i} style={{ textAlign: "left", fontFamily: fonts.ui, fontSize: 12.5, borderBottom: `2px solid ${colors.border}`, padding: "6px 8px" }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: session.groupActivity.rowCount }).map((_, r) => (
+                    <tr key={r}>
+                      {session.groupActivity!.columnHeaders.map((_, c) => (
+                        <td key={c} style={{ borderBottom: `1px solid ${colors.border}`, padding: "8px", height: 20 }} />
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {meta_.groupActivity && <SourceTag tag={meta_.groupActivity.sourceTag} provider={meta_.groupActivity.provider} />}
+            </div>
+          )}
+        </StepCard>
+
+        <StepCard step={8} title="Consolidation">
           <button style={btnStyle} onClick={generateConsolidation} disabled={loading.consolidation}>
             {loading.consolidation ? "Generating…" : "Generate consolidation"}
           </button>
@@ -467,10 +520,10 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
           )}
         </StepCard>
 
-        <StepCard step={8} title="Post-Assessment">
+        <StepCard step={9} title="Post-Assessment">
           {!session.preAssessment ? (
             <p style={{ fontStyle: "italic", color: colors.rust, fontFamily: fonts.ui, fontSize: 13.5 }}>
-              Generate the pre-assessment quiz in Step 3 first -- the same questions are reused here.
+              Generate the pre-assessment quiz in Step 4 first -- the same questions are reused here.
             </p>
           ) : (
             <div>
@@ -547,6 +600,37 @@ export function LessonWorkspace({ meta }: { meta: LessonMeta }) {
               {session.insight && meta_.insight && (
                 <SourceTag tag={meta_.insight.sourceTag} provider={meta_.insight.provider} />
               )}
+            </div>
+          )}
+        </StepCard>
+
+        <StepCard step={10} title="Rubric Project (optional)">
+          <p style={{ fontSize: 13, color: colors.textMuted, marginBottom: 10 }}>
+            An open-ended project task, graded on a 4-level rubric instead of the Yes/No quiz above -- for when a
+            creative or take-home task fits the lesson better than a comprehension check.
+          </p>
+          <button style={btnStyle} onClick={generateRubricProject} disabled={loading.rubricProject}>
+            {loading.rubricProject ? "Generating…" : "Generate rubric project"}
+          </button>
+          {errors.rubricProject && <p style={errorStyle}>{errors.rubricProject}</p>}
+          {session.rubricProject && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 14, fontWeight: 600 }}>{session.rubricProject.taskPrompt}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                {session.rubricProject.levels.map((lvl, i) => (
+                  <div key={i} style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 10 }}>
+                    <strong style={{ fontSize: 12.5, fontFamily: fonts.ui, textTransform: "capitalize", color: colors.goldText }}>
+                      {i + 1}. {lvl.level}
+                    </strong>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      {lvl.descriptors.map((d, j) => (
+                        <li key={j} style={{ fontSize: 13 }}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              {meta_.rubricProject && <SourceTag tag={meta_.rubricProject.sourceTag} provider={meta_.rubricProject.provider} />}
             </div>
           )}
         </StepCard>
