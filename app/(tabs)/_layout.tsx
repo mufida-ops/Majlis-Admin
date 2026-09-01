@@ -29,6 +29,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="drop" options={{ title: 'Give', tabBarIcon: ({color, size}) => <Ionicons name="add-circle-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="projects" options={{ title: 'Projects', tabBarIcon: ({color, size}) => <Ionicons name="layers-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="fs2" options={{ title: 'FS2', tabBarIcon: ({color, size}) => <Ionicons name="library-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="documents" options={{ title: 'Documents', tabBarIcon: ({color, size}) => <Ionicons name="folder-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="decisions" options={{ title: 'Discussions', tabBarIcon: ({color, size}) => <Ionicons name="checkmark-done-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="crm" options={{ title: 'CRM', tabBarIcon: ({color, size}) => <Ionicons name="people-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: ({color, size}) => <Ionicons name="calendar-outline" color={color} size={size} /> }} />

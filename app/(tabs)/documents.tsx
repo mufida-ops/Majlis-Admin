@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Stack, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Card';
+import { SectionTitle } from '@/components/SectionTitle';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { DocumentThumb } from '@/components/DocumentThumb';
 import { theme } from '@/constants/theme';
@@ -177,17 +178,7 @@ export default function DocumentsScreen() {
 
   return (
     <Screen>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'Documents',
-          headerStyle: { backgroundColor: theme.colors.background },
-          headerTintColor: theme.colors.navy
-        }}
-      />
-      <Text style={styles.sub}>
-        Anything important you want to keep safe and easy to find — IDs, certificates, contracts, insurance.
-      </Text>
+      <SectionTitle title="Documents" subtitle="IDs, certificates, contracts — kept safe and easy to find." />
 
       <Card>
         <Text style={styles.sectionTitle}>Add a document</Text>
@@ -305,7 +296,6 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  sub: { color: theme.colors.muted, fontSize: 14, lineHeight: 20 },
   sectionTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600', marginBottom: 10 },
   input: {
     padding: 12,
