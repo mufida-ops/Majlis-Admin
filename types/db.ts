@@ -252,6 +252,17 @@ export type AttachmentRow = {
   created_at: string;
 };
 
+export type DocumentRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  note: string | null;
+  url: string | null;
+  file_path: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type BookRow = {
   id: string;
   workspace_id: string;

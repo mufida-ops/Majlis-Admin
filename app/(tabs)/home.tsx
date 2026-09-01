@@ -368,6 +368,17 @@ export default function HomeScreen() {
         </Card>
       </Pressable>
 
+      <Pressable onPress={() => router.push('/documents')}>
+        <Card style={styles.documentsRow}>
+          <Ionicons name="folder-outline" size={22} color={theme.colors.navy} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.documentsTitle}>Important documents</Text>
+            <Text style={styles.meta}>IDs, certificates, contracts — kept safe and easy to find.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+        </Card>
+      </Pressable>
+
       <View style={{ gap: 10 }}>
         <SectionTitle title="Right now" subtitle="Only the things that genuinely need movement." />
         {loading ? (
@@ -597,6 +608,8 @@ const styles = StyleSheet.create({
   captureTitle: { color: theme.colors.surface, fontSize: 20, fontWeight: '600' },
   captureText: { color: theme.colors.background, marginTop: 5, lineHeight: 20 },
   capturePrompt: { color: theme.colors.surface, marginTop: 20, fontSize: 16 },
+  documentsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  documentsTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
   eyebrow: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   itemTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '600', marginTop: 5 },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },

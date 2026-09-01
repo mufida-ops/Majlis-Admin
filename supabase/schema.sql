@@ -1101,3 +1101,46 @@ create policy book_files_insert on storage.objects for insert to authenticated
 drop policy if exists book_files_delete on storage.objects;
 create policy book_files_delete on storage.objects for delete to authenticated
   using (bucket_id = 'book-files');
+
+-- ---------------------------------------------------------------------------
+-- Important documents: a standalone shared library, separate from any
+-- project/task. Each entry has a name, an optional note, and exactly one of
+-- a link or an uploaded file (photo/document).
+-- ---------------------------------------------------------------------------
+
+create table if not exists documents (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade not null,
+  name text not null,
+  note text,
+  url text,
+  file_path text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  check (url is not null or file_path is not null)
+);
+
+create index if not exists idx_documents_workspace on documents(workspace_id, created_at desc);
+
+alter table documents enable row level security;
+
+drop policy if exists "members manage documents" on documents;
+create policy "members manage documents" on documents
+for all using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+insert into storage.buckets (id, name, public)
+values ('documents', 'documents', false)
+on conflict (id) do nothing;
+
+drop policy if exists documents_select on storage.objects;
+create policy documents_select on storage.objects for select to authenticated
+  using (bucket_id = 'documents');
+
+drop policy if exists documents_insert on storage.objects;
+create policy documents_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'documents');
+
+drop policy if exists documents_delete on storage.objects;
+create policy documents_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'documents');
