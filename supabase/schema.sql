@@ -1104,8 +1104,10 @@ create policy book_files_delete on storage.objects for delete to authenticated
 
 -- ---------------------------------------------------------------------------
 -- Important documents: a standalone shared library, separate from any
--- project/task. Each entry has a name, an optional note, and exactly one of
--- a link or an uploaded file (photo/document).
+-- project/task. Each entry is just a name + an optional note — the actual
+-- links/photos/files hang off it in the `attachments` table (below), the
+-- same table already used for project and task attachments, so a document
+-- can hold any number of them.
 -- ---------------------------------------------------------------------------
 
 create table if not exists documents (
@@ -1113,11 +1115,8 @@ create table if not exists documents (
   workspace_id uuid references workspaces(id) on delete cascade not null,
   name text not null,
   note text,
-  url text,
-  file_path text,
   created_by uuid references auth.users(id),
-  created_at timestamptz not null default now(),
-  check (url is not null or file_path is not null)
+  created_at timestamptz not null default now()
 );
 
 create index if not exists idx_documents_workspace on documents(workspace_id, created_at desc);
@@ -1129,18 +1128,54 @@ create policy "members manage documents" on documents
 for all using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
-insert into storage.buckets (id, name, public)
-values ('documents', 'documents', false)
-on conflict (id) do nothing;
+-- ---------------------------------------------------------------------------
+-- Let attachments hang off a document too (a document can now hold any
+-- number of links/photos/files, not just one) — reusing the same table
+-- and storage bucket as project/task attachments rather than a new one.
+-- ---------------------------------------------------------------------------
 
-drop policy if exists documents_select on storage.objects;
-create policy documents_select on storage.objects for select to authenticated
-  using (bucket_id = 'documents');
+alter table attachments add column if not exists document_id uuid references documents(id) on delete cascade;
 
-drop policy if exists documents_insert on storage.objects;
-create policy documents_insert on storage.objects for insert to authenticated
-  with check (bucket_id = 'documents');
+create index if not exists idx_attachments_document on attachments(document_id);
 
-drop policy if exists documents_delete on storage.objects;
-create policy documents_delete on storage.objects for delete to authenticated
-  using (bucket_id = 'documents');
+-- The original attachments check only allowed project_id XOR task_id.
+-- Replace it with a three-way "exactly one of project/task/document" check,
+-- found dynamically since the original was unnamed and its auto-generated
+-- name can't be relied on.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select conname from pg_constraint
+    where conrelid = 'attachments'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%task_id%'
+  loop
+    execute format('alter table attachments drop constraint %I', r.conname);
+  end loop;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'attachments_scope_check') then
+    alter table attachments add constraint attachments_scope_check
+      check (num_nonnulls(project_id, task_id, document_id) = 1);
+  end if;
+end $$;
+
+-- One-time migration: documents used to carry a single url/file_path of
+-- their own (before they could hold several). Move any such row's
+-- attachment into the shared `attachments` table, then drop the columns —
+-- a no-op on a fresh install, which never had them.
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'documents' and column_name = 'url') then
+    insert into attachments (workspace_id, document_id, url, file_path, created_by, created_at)
+    select workspace_id, id, url, file_path, created_by, created_at
+    from documents
+    where url is not null or file_path is not null;
+
+    alter table documents drop column if exists url cascade;
+    alter table documents drop column if exists file_path cascade;
+  end if;
+end $$;

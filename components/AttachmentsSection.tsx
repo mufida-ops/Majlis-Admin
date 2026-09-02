@@ -31,7 +31,7 @@ export function AttachmentsSection({
   scope: AttachmentScope;
   title?: string;
 }) {
-  const scopeKey = 'project_id' in scope ? `p:${scope.project_id}` : `t:${scope.task_id}`;
+  const scopeKey = 'project_id' in scope ? `p:${scope.project_id}` : 'task_id' in scope ? `t:${scope.task_id}` : `d:${scope.document_id}`;
   const { data: attachments, loading, setData } = useAsync(() => listAttachments(scope), [scopeKey]);
 
   const [linkDraft, setLinkDraft] = useState('');

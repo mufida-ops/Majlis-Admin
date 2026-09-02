@@ -4,12 +4,12 @@ import type { AttachmentRow } from '@/types/db';
 
 const BUCKET = 'attachments';
 
-export type AttachmentScope = { project_id: string } | { task_id: string };
+export type AttachmentScope = { project_id: string } | { task_id: string } | { document_id: string };
 
 function scopeColumn(scope: AttachmentScope) {
-  return 'project_id' in scope
-    ? { column: 'project_id' as const, value: scope.project_id }
-    : { column: 'task_id' as const, value: scope.task_id };
+  if ('project_id' in scope) return { column: 'project_id' as const, value: scope.project_id };
+  if ('task_id' in scope) return { column: 'task_id' as const, value: scope.task_id };
+  return { column: 'document_id' as const, value: scope.document_id };
 }
 
 export async function listAttachments(scope: AttachmentScope): Promise<AttachmentRow[]> {
