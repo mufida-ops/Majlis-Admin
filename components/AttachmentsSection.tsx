@@ -13,11 +13,14 @@ import {
   addAttachmentLink,
   addAttachmentPhoto,
   addAttachmentFile,
+  updateAttachment,
   deleteAttachment,
   getAttachmentFileUrl,
   type AttachmentScope
 } from '@/lib/repositories/attachments';
 import type { AttachmentRow } from '@/types/db';
+
+const IMAGE_PATH_RE = /\.(jpe?g|png|gif|webp|heic)$/i;
 
 /** Links, photos, and documents attached to one project or one task — reused on both screens. */
 export function AttachmentsSection({
@@ -38,6 +41,11 @@ export function AttachmentsSection({
   const [addingLink, setAddingLink] = useState(false);
   const [addingPhoto, setAddingPhoto] = useState(false);
   const [addingDocument, setAddingDocument] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const submitLink = async () => {
     const url = linkDraft.trim();
@@ -97,6 +105,31 @@ export function AttachmentsSection({
     }
   };
 
+  const startEdit = (attachment: AttachmentRow) => {
+    setEditingId(attachment.id);
+    setEditLabel(attachment.label ?? '');
+    setEditUrl(attachment.url ?? '');
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (attachment: AttachmentRow) => {
+    if (attachment.url && !editUrl.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateAttachment(attachment.id, {
+        label: editLabel.trim() || null,
+        ...(attachment.url ? { url: editUrl.trim() } : {})
+      });
+      setData(prev => (prev ?? []).map(a => (a.id === attachment.id ? updated : a)));
+      setEditingId(null);
+    } catch (err) {
+      showAlert("Couldn't save that", err instanceof Error ? err.message : undefined);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const removeAttachment = (attachment: AttachmentRow) => {
     showAlert('Remove this?', undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -129,29 +162,63 @@ export function AttachmentsSection({
     <Card>
       <Text style={styles.sectionTitle}>{title}</Text>
       {!loading && (attachments ?? []).length === 0 ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
-      {(attachments ?? []).map(attachment => (
-        <View key={attachment.id} style={styles.linkRow}>
-          {attachment.file_path && attachment.label ? (
-            <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
-              <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
-              <Text style={styles.linkText} numberOfLines={1}>{attachment.label}</Text>
+      {(attachments ?? []).map(attachment =>
+        editingId === attachment.id ? (
+          <View key={attachment.id} style={[styles.linkRow, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+            <TextInput
+              value={editLabel}
+              onChangeText={setEditLabel}
+              placeholder="Name (optional)"
+              placeholderTextColor={theme.colors.muted}
+              style={styles.input}
+            />
+            {attachment.url ? (
+              <TextInput
+                value={editUrl}
+                onChangeText={setEditUrl}
+                placeholder="Link"
+                placeholderTextColor={theme.colors.muted}
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+            ) : null}
+            <View style={styles.editActions}>
+              <Pressable onPress={cancelEdit} hitSlop={10}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={() => saveEdit(attachment)} disabled={savingEdit} hitSlop={10}>
+                <Text style={styles.saveText}>{savingEdit ? 'Saving…' : 'Save'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View key={attachment.id} style={styles.linkRow}>
+            {attachment.file_path && IMAGE_PATH_RE.test(attachment.file_path) ? (
+              <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
+                <AttachmentThumb storagePath={attachment.file_path} />
+                <Text style={styles.linkText} numberOfLines={1}>{attachment.label || 'Photo'}</Text>
+              </Pressable>
+            ) : attachment.file_path ? (
+              <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
+                <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
+                <Text style={styles.linkText} numberOfLines={1}>{attachment.label || 'File'}</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.linkTapArea} onPress={() => openLink(attachment)}>
+                <Ionicons name="link-outline" size={18} color={theme.colors.navy} />
+                <Text style={styles.linkText} numberOfLines={1}>{attachment.label || attachment.url}</Text>
+              </Pressable>
+            )}
+            <Pressable hitSlop={10} onPress={() => startEdit(attachment)}>
+              <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
             </Pressable>
-          ) : attachment.file_path ? (
-            <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
-              <AttachmentThumb storagePath={attachment.file_path} />
-              <Text style={styles.linkText} numberOfLines={1}>Photo</Text>
+            <Pressable hitSlop={10} onPress={() => removeAttachment(attachment)}>
+              <Ionicons name="close-circle-outline" size={20} color={theme.colors.muted} />
             </Pressable>
-          ) : (
-            <Pressable style={styles.linkTapArea} onPress={() => openLink(attachment)}>
-              <Ionicons name="link-outline" size={18} color={theme.colors.navy} />
-              <Text style={styles.linkText} numberOfLines={1}>{attachment.url}</Text>
-            </Pressable>
-          )}
-          <Pressable hitSlop={10} onPress={() => removeAttachment(attachment)}>
-            <Ionicons name="close-circle-outline" size={20} color={theme.colors.muted} />
-          </Pressable>
-        </View>
-      ))}
+          </View>
+        )
+      )}
       <View style={styles.addLinkRow}>
         <TextInput
           value={linkDraft}
@@ -214,5 +281,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden'
-  }
+  },
+  editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  cancelText: { color: theme.colors.muted, fontWeight: '600' },
+  saveText: { color: theme.colors.navy, fontWeight: '600' }
 });

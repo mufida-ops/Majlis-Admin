@@ -73,6 +73,12 @@ export async function addAttachmentFile(
   return unwrap(result) as AttachmentRow;
 }
 
+export async function updateAttachment(id: string, patch: Partial<Pick<AttachmentRow, 'label' | 'url'>>): Promise<AttachmentRow> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('attachments').update(patch).eq('id', id).select('*').single();
+  return unwrap(result) as AttachmentRow;
+}
+
 export async function deleteAttachment(id: string): Promise<void> {
   const supabase = requireSupabase();
   unwrap(await supabase.from('attachments').delete().eq('id', id));
