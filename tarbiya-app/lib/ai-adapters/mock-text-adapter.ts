@@ -81,6 +81,29 @@ export class MockTextAdapter implements TextGenerationAdapter {
           strongestDimension: "depthOfUnderstanding",
           weakestDimension: "demonstrationOfPractice",
         });
+      case "vocabulary":
+        return JSON.stringify({
+          words: [
+            { term: "(mock) Key term", definition: `(mock) A simple word related to "${topic}" that a Grade 3 student should know.` },
+            { term: "(mock) Second term", definition: `(mock) Another simple word tied to "${topic}".` },
+          ],
+        });
+      case "group-activity":
+        return JSON.stringify({
+          taskPrompt: `(mock) In your group, list examples related to "${topic}".`,
+          columnHeaders: ["(mock) Example", "(mock) Why it matters"],
+          rowCount: 5,
+        });
+      case "rubric-project":
+        return JSON.stringify({
+          taskPrompt: `(mock) Create something at home that shows what you learned about "${topic}".`,
+          levels: [
+            { level: "approaching", descriptors: [`(mock) I can describe "${topic}" with help.`] },
+            { level: "developing", descriptors: [`(mock) I can describe "${topic}" on my own.`] },
+            { level: "achieving", descriptors: [`(mock) I can explain "${topic}" and give an example.`] },
+            { level: "mastering", descriptors: [`(mock) I can explain "${topic}", give an example, and teach someone else.`] },
+          ],
+        });
       default:
         throw new Error(`Mock adapter has no canned response for task: ${task}`);
     }
