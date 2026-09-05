@@ -51,14 +51,14 @@ class SupabaseOverrideStore implements OverrideStore {
   private client;
 
   constructor(url: string, serviceRoleKey: string) {
-    // Namespaced schema so this project's tables can share a Supabase
-    // instance with unrelated apps (see supabase/schema.sql).
-    this.client = createClient(url, serviceRoleKey, { db: { schema: "tarbiya" } });
+    // Uses the default "public" schema -- see the matching note in lib/db.ts
+    // for why the "tarbiya" schema attempt was abandoned.
+    this.client = createClient(url, serviceRoleKey);
   }
 
   async get(lessonId: string): Promise<LessonContentOverride | null> {
     const { data, error } = await this.client
-      .from("lesson_content_overrides")
+      .from("tarbiya_lesson_content_overrides")
       .select()
       .eq("lesson_id", lessonId)
       .maybeSingle();
@@ -67,7 +67,7 @@ class SupabaseOverrideStore implements OverrideStore {
   }
 
   async set(lessonId: string, override: LessonContentOverride): Promise<void> {
-    const { error } = await this.client.from("lesson_content_overrides").upsert({
+    const { error } = await this.client.from("tarbiya_lesson_content_overrides").upsert({
       lesson_id: lessonId,
       grounding: override.grounding,
       review_status: override.reviewStatus,
@@ -77,7 +77,7 @@ class SupabaseOverrideStore implements OverrideStore {
   }
 
   async getAll(): Promise<Record<string, LessonContentOverride>> {
-    const { data, error } = await this.client.from("lesson_content_overrides").select();
+    const { data, error } = await this.client.from("tarbiya_lesson_content_overrides").select();
     if (error) throw error;
     const result: Record<string, LessonContentOverride> = {};
     for (const row of data ?? []) {

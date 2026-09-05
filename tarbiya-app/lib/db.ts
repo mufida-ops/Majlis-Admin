@@ -113,14 +113,18 @@ class SupabaseSessionStore implements SessionStore {
   private client;
 
   constructor(url: string, serviceRoleKey: string) {
-    // Namespaced schema so this project's tables can share a Supabase
-    // instance with unrelated apps (see supabase/schema.sql).
-    this.client = createClient(url, serviceRoleKey, { db: { schema: "tarbiya" } });
+    // Uses the default "public" schema. A "tarbiya" schema was tried first
+    // to share this Supabase project with unrelated apps without table-name
+    // collisions, but Supabase's dashboard would not persist a custom
+    // schema in "Exposed schemas" for this project even after the schema,
+    // its tables, and the documented GRANTs all existed -- not worth
+    // fighting further given the actual collision risk is low.
+    this.client = createClient(url, serviceRoleKey);
   }
 
   async create(lessonId: string): Promise<LessonSession> {
     const { data, error } = await this.client
-      .from("lesson_sessions")
+      .from("tarbiya_lesson_sessions")
       .insert({ lesson_id: lessonId })
       .select()
       .single();
@@ -129,14 +133,14 @@ class SupabaseSessionStore implements SessionStore {
   }
 
   async get(id: string): Promise<LessonSession | null> {
-    const { data, error } = await this.client.from("lesson_sessions").select().eq("id", id).maybeSingle();
+    const { data, error } = await this.client.from("tarbiya_lesson_sessions").select().eq("id", id).maybeSingle();
     if (error) throw error;
     return data ? fromRow(data) : null;
   }
 
   async update(id: string, patch: SessionPatch): Promise<LessonSession> {
     const { data, error } = await this.client
-      .from("lesson_sessions")
+      .from("tarbiya_lesson_sessions")
       .update({ ...toRow(patch), updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()

@@ -10,11 +10,15 @@
 
 create extension if not exists "pgcrypto";
 
--- Namespaced under its own schema rather than "public" so this can share a
--- Supabase project with unrelated apps without any table-name collisions.
-create schema if not exists tarbiya;
+-- Lives in the default "public" schema, table names prefixed "tarbiya_"
+-- instead. A separate "tarbiya" schema was tried first to share this
+-- Supabase project with unrelated apps without any table-name collisions,
+-- but Supabase's dashboard would not persist a custom schema in "Exposed
+-- schemas" for this project even after the schema, its tables, and the
+-- documented GRANTs all existed -- a table-name prefix gets the same
+-- collision-avoidance without depending on that setting at all.
 
-create table if not exists tarbiya.lesson_sessions (
+create table if not exists public.tarbiya_lesson_sessions (
   id uuid primary key default gen_random_uuid(),
   lesson_id text not null,
   class_size integer,
@@ -36,21 +40,13 @@ create table if not exists tarbiya.lesson_sessions (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists lesson_sessions_lesson_id_idx on tarbiya.lesson_sessions (lesson_id);
-
--- Additive migration for a table created before the `vocabulary` column
--- existed -- `create table if not exists` above is a no-op against an
--- already-existing table, so this covers re-running the file against a live
--- database that predates this column.
-alter table tarbiya.lesson_sessions add column if not exists vocabulary jsonb;
-alter table tarbiya.lesson_sessions add column if not exists group_activity jsonb;
-alter table tarbiya.lesson_sessions add column if not exists rubric_project jsonb;
+create index if not exists tarbiya_lesson_sessions_lesson_id_idx on public.tarbiya_lesson_sessions (lesson_id);
 
 -- A human reviewer's edit to a lesson's Layer 2 grounding text, layered on
 -- top of the seed data in content/lessons/*.ts (see lib/lesson-content-store.ts).
 -- lesson_id is not a foreign key since the seed lessons aren't a DB table --
 -- they're the static content library checked into the repo.
-create table if not exists tarbiya.lesson_content_overrides (
+create table if not exists public.tarbiya_lesson_content_overrides (
   lesson_id text primary key,
   grounding text not null,
   review_status text not null check (review_status in ('draft', 'approved')),
