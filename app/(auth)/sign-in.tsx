@@ -9,8 +9,8 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export default function SignInScreen() {
-  const { session, signInWithPassword, signUpWithPassword } = useAuth();
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const { session, signInWithPassword, signUpWithPassword, sendPasswordReset } = useAuth();
+  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'forgot'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,6 +22,23 @@ export default function SignInScreen() {
   const submit = async () => {
     setError('');
     setInfo('');
+
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setError('Enter the email you sign in with.');
+        return;
+      }
+      setSubmitting(true);
+      const result = await sendPasswordReset(email.trim());
+      setSubmitting(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setInfo('Check your email for a link to set a new password.');
+      return;
+    }
+
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
@@ -48,8 +65,10 @@ export default function SignInScreen() {
       <View style={{ gap: 6 }}>
         <FloralFlourish width={110} height={72} style={styles.flourish} />
         <Text style={styles.eyebrow}>Majlis</Text>
-        <Text style={styles.title}>{mode === 'sign-in' ? 'Welcome back' : 'Create your account'}</Text>
-        <Text style={styles.sub}>A shared, quiet workspace for Mufida and Victoria.</Text>
+        <Text style={styles.title}>{mode === 'sign-in' ? 'Welcome back' : mode === 'sign-up' ? 'Create your account' : 'Reset your password'}</Text>
+        <Text style={styles.sub}>
+          {mode === 'forgot' ? "We'll email you a link to set a new password." : 'A shared, quiet workspace for Mufida and Victoria.'}
+        </Text>
       </View>
 
       <Card>
@@ -64,30 +83,47 @@ export default function SignInScreen() {
           placeholderTextColor={theme.colors.muted}
           style={styles.input}
         />
-        <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          placeholder="••••••••"
-          placeholderTextColor={theme.colors.muted}
-          style={styles.input}
-        />
+        {mode !== 'forgot' ? (
+          <>
+            <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="••••••••"
+              placeholderTextColor={theme.colors.muted}
+              style={styles.input}
+            />
+          </>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {info ? <Text style={styles.info}>{info}</Text> : null}
         <Pressable style={styles.primary} onPress={submit} disabled={submitting}>
-          <Text style={styles.primaryText}>{submitting ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}</Text>
+          <Text style={styles.primaryText}>
+            {submitting ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : mode === 'sign-up' ? 'Create account' : 'Send reset link'}
+          </Text>
         </Pressable>
+        {mode === 'sign-in' ? (
+          <Pressable
+            onPress={() => {
+              setMode('forgot');
+              setError('');
+              setInfo('');
+            }}
+          >
+            <Text style={styles.switchText}>Forgot your password?</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() => {
-            setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+            setMode(mode === 'sign-up' ? 'sign-in' : mode === 'forgot' ? 'sign-in' : 'sign-up');
             setError('');
             setInfo('');
           }}
         >
           <Text style={styles.switchText}>
-            {mode === 'sign-in' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+            {mode === 'sign-up' || mode === 'forgot' ? 'Already have an account? Sign in' : 'New here? Create an account'}
           </Text>
         </Pressable>
       </Card>
