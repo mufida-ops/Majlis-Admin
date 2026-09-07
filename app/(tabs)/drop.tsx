@@ -36,6 +36,7 @@ export default function DropScreen() {
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [attachingDropId, setAttachingDropId] = useState<string | null>(null);
+  const [justSavedDropId, setJustSavedDropId] = useState<string | null>(null);
 
   const {
     data: myDrops,
@@ -160,6 +161,7 @@ export default function DropScreen() {
         setFeedback(`Saved for ${partnerName}'s next catch-up.`);
       }
       setText('');
+      setJustSavedDropId(drop.id);
       refreshDrops();
 
       // This screen is purely conversation with your co-founder: this call
@@ -198,6 +200,19 @@ export default function DropScreen() {
           </Pressable>
         </View>
         {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+        {justSavedDropId && workspaceId && session ? (
+          <View style={{ marginTop: 14 }}>
+            <AttachmentsSection
+              workspaceId={workspaceId}
+              createdBy={session.user.id}
+              scope={{ drop_id: justSavedDropId }}
+              title="Add links, photos, or files to that note"
+            />
+            <Pressable onPress={() => setJustSavedDropId(null)} style={{ marginTop: 10 }}>
+              <Text style={styles.startNewText}>Start a new note →</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </Card>
       <Text style={styles.note}>
         Talk or type freely — tap the microphone on your keyboard to dictate. {partner?.display_name ?? 'Your co-founder'}{' '}
@@ -321,6 +336,7 @@ const styles = StyleSheet.create({
   secondary: { borderWidth: 1, borderColor: theme.colors.border, padding: 14, borderRadius: theme.radius.md, alignItems: 'center' },
   secondaryText: { color: theme.colors.text, fontWeight: '600' },
   feedback: { color: theme.colors.success, marginTop: 14 },
+  startNewText: { color: theme.colors.navy, fontWeight: '600', fontSize: 13 },
   note: { color: theme.colors.muted, lineHeight: 21 },
   aiLink: { backgroundColor: theme.colors.surfaceMuted, padding: 16, borderRadius: theme.radius.md },
   aiLinkTitle: { color: theme.colors.navy, fontSize: 16, fontWeight: '600' },
