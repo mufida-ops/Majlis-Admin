@@ -198,11 +198,30 @@ export function AttachmentsSection({
     }
   };
 
+  const photoAttachments = (attachments ?? []).filter(a => a.file_path && IMAGE_PATH_RE.test(a.file_path));
+  const otherAttachments = (attachments ?? []).filter(a => !(a.file_path && IMAGE_PATH_RE.test(a.file_path)));
+
   return (
     <Card>
       <Text style={styles.sectionTitle}>{title}</Text>
       {!loading && (attachments ?? []).length === 0 ? <Text style={styles.meta}>Nothing added yet.</Text> : null}
-      {(attachments ?? []).map(attachment =>
+
+      {photoAttachments.length > 0 ? (
+        <View style={styles.photoGrid}>
+          {photoAttachments.map(attachment => (
+            <View key={attachment.id} style={styles.photoGridItem}>
+              <Pressable onPress={() => openFile(attachment)}>
+                <AttachmentThumb storagePath={attachment.file_path!} size={72} />
+              </Pressable>
+              <Pressable style={styles.photoRemoveBadge} hitSlop={8} onPress={() => removeAttachment(attachment)}>
+                <Ionicons name="close" size={12} color="#fff" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {otherAttachments.map(attachment =>
         editingId === attachment.id ? (
           <View key={attachment.id} style={[styles.linkRow, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
             <TextInput
@@ -234,12 +253,7 @@ export function AttachmentsSection({
           </View>
         ) : (
           <View key={attachment.id} style={styles.linkRow}>
-            {attachment.file_path && IMAGE_PATH_RE.test(attachment.file_path) ? (
-              <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
-                <AttachmentThumb storagePath={attachment.file_path} />
-                <Text style={styles.linkText} numberOfLines={1}>{attachment.label || 'Photo'}</Text>
-              </Pressable>
-            ) : attachment.file_path ? (
+            {attachment.file_path ? (
               <Pressable style={styles.linkTapArea} onPress={() => openFile(attachment)}>
                 <Ionicons name="document-attach-outline" size={20} color={theme.colors.navy} />
                 <Text style={styles.linkText} numberOfLines={1}>{attachment.label || 'File'}</Text>
@@ -290,6 +304,19 @@ export function AttachmentsSection({
 const styles = StyleSheet.create({
   sectionTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
   meta: { color: theme.colors.muted, fontSize: 13, marginTop: 6 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  photoGridItem: { position: 'relative' },
+  photoRemoveBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.text,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
