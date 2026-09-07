@@ -221,6 +221,8 @@ create table if not exists threads (
   created_at timestamptz not null default now()
 );
 
+alter table threads add column if not exists drop_id uuid references drops(id) on delete cascade;
+
 create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid references workspaces(id) on delete cascade not null,

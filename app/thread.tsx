@@ -40,13 +40,14 @@ const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   Done: 'Done'
 };
 
-type ThreadKind = 'project' | 'task' | 'organisation' | 'decision';
+type ThreadKind = 'project' | 'task' | 'organisation' | 'decision' | 'drop';
 
-const anchorColumn: Record<ThreadKind, 'project_id' | 'task_id' | 'organisation_id' | 'decision_id'> = {
+const anchorColumn: Record<ThreadKind, 'project_id' | 'task_id' | 'organisation_id' | 'decision_id' | 'drop_id'> = {
   project: 'project_id',
   task: 'task_id',
   organisation: 'organisation_id',
-  decision: 'decision_id'
+  decision: 'decision_id',
+  drop: 'drop_id'
 };
 
 export default function ThreadScreen() {

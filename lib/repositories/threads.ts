@@ -9,7 +9,8 @@ type ThreadAnchor =
   | { project_id: string }
   | { task_id: string }
   | { organisation_id: string }
-  | { decision_id: string };
+  | { decision_id: string }
+  | { drop_id: string };
 
 export async function getOrCreateThread(workspaceId: string, anchor: ThreadAnchor): Promise<ThreadRow> {
   const supabase = requireSupabase();

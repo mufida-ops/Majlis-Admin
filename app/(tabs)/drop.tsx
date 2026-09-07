@@ -305,6 +305,14 @@ export default function DropScreen() {
                     <View style={styles.sentHeader}>
                       <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text.trim() || '(No note — see attachments)'}</Text>
                       <View style={styles.sentIcons}>
+                        <Pressable
+                          hitSlop={10}
+                          onPress={() =>
+                            router.push({ pathname: '/thread', params: { kind: 'drop', id: drop.id, title: 'Reply' } })
+                          }
+                        >
+                          <Ionicons name="chatbubble-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
                         <Pressable hitSlop={10} onPress={() => toggleAttach(drop.id)}>
                           <Ionicons name="attach-outline" size={18} color={theme.colors.muted} />
                         </Pressable>
