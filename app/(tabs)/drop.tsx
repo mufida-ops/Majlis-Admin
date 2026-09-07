@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '@/lib/alert';
 import { Screen } from '@/components/Screen';
@@ -26,7 +26,12 @@ import type { AttachmentScope } from '@/lib/repositories/attachments';
 
 export default function DropScreen() {
   const { session } = useAuth();
-  const { workspaceId, me, partner } = useWorkspace();
+  const { workspaceId, me, partner, refresh: refreshWorkspace } = useWorkspace();
+
+  // Refetch the partner's last_seen_at every time this screen is opened, so
+  // "Seen" status reflects whether they've opened the app since — this is
+  // the same timestamp Home bumps the moment someone loads their catch-up.
+  useFocusEffect(useCallback(() => { refreshWorkspace(); }, [refreshWorkspace]));
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState('');
   const [saving, setSaving] = useState(false);
@@ -317,8 +322,20 @@ export default function DropScreen() {
                     <Text style={styles.meta}>
                       {formatRelative(drop.created_at)}
                       {drop.urgent ? ' · Urgent' : ''}
-                      {drop.summary ? ` · ${partner?.display_name ?? 'They'} will see: "${drop.summary}"` : ' · Not processed yet'}
+                      {drop.summary ? ` · Ready for ${partner?.display_name ?? 'their'} catch-up: "${drop.summary}"` : ' · Not processed yet'}
                     </Text>
+                    <View style={styles.seenRow}>
+                      <Ionicons
+                        name={partner?.last_seen_at && new Date(partner.last_seen_at) > new Date(drop.created_at) ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={13}
+                        color={partner?.last_seen_at && new Date(partner.last_seen_at) > new Date(drop.created_at) ? theme.colors.success : theme.colors.muted}
+                      />
+                      <Text style={styles.seenText}>
+                        {partner?.last_seen_at && new Date(partner.last_seen_at) > new Date(drop.created_at)
+                          ? `Seen by ${partner.display_name}`
+                          : `Not seen by ${partner?.display_name ?? 'them'} yet`}
+                      </Text>
+                    </View>
                     {linkingDropId === drop.id ? (
                       <LinkPicker
                         targets={GIVE_LINK_TARGETS}
@@ -379,6 +396,8 @@ const styles = StyleSheet.create({
   sentHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   sentIcons: { flexDirection: 'row', gap: 14, paddingTop: 2 },
   meta: { color: theme.colors.muted, fontSize: 12, marginTop: 8 },
+  seenRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  seenText: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
   editInput: {
     minHeight: 100,
     padding: 12,
