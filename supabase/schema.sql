@@ -1179,3 +1179,16 @@ begin
     alter table documents drop column if exists file_path cascade;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Let attachments hang off a Give "drop" too, so a link/photo/file can be
+-- added to a sent drop the same way as a project, task, or document.
+-- ---------------------------------------------------------------------------
+
+alter table attachments add column if not exists drop_id uuid references drops(id) on delete cascade;
+
+create index if not exists idx_attachments_drop on attachments(drop_id);
+
+alter table attachments drop constraint if exists attachments_scope_check;
+alter table attachments add constraint attachments_scope_check
+  check (num_nonnulls(project_id, task_id, document_id, drop_id) = 1);

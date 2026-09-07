@@ -8,6 +8,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { Card } from '@/components/Card';
 import { LoadingState, EmptyState } from '@/components/AsyncState';
 import { PageBanner } from '@/components/PageBanner';
+import { AttachmentsSection } from '@/components/AttachmentsSection';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
@@ -34,6 +35,7 @@ export default function DropScreen() {
   const [linkingDropId, setLinkingDropId] = useState<string | null>(null);
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState('');
+  const [attachingDropId, setAttachingDropId] = useState<string | null>(null);
 
   const {
     data: myDrops,
@@ -109,6 +111,10 @@ export default function DropScreen() {
     } finally {
       setLinkSaving(false);
     }
+  };
+
+  const toggleAttach = (dropId: string) => {
+    setAttachingDropId(prev => (prev === dropId ? null : dropId));
   };
 
   const confirmDeleteDrop = (dropId: string) => {
@@ -245,6 +251,9 @@ export default function DropScreen() {
                     <View style={styles.sentHeader}>
                       <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text}</Text>
                       <View style={styles.sentIcons}>
+                        <Pressable hitSlop={10} onPress={() => toggleAttach(drop.id)}>
+                          <Ionicons name="attach-outline" size={18} color={theme.colors.muted} />
+                        </Pressable>
                         <Pressable hitSlop={10} onPress={() => startLink(drop.id)}>
                           <Ionicons name="link-outline" size={18} color={theme.colors.muted} />
                         </Pressable>
@@ -271,6 +280,16 @@ export default function DropScreen() {
                         onSave={saveLink}
                         onCancel={cancelLink}
                       />
+                    ) : null}
+                    {attachingDropId === drop.id && workspaceId && session ? (
+                      <View style={{ marginTop: 10 }}>
+                        <AttachmentsSection
+                          workspaceId={workspaceId}
+                          createdBy={session.user.id}
+                          scope={{ drop_id: drop.id }}
+                          title="Links & files"
+                        />
+                      </View>
                     ) : null}
                   </Card>
                 )

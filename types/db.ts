@@ -246,6 +246,7 @@ export type AttachmentRow = {
   project_id: string | null;
   task_id: string | null;
   document_id: string | null;
+  drop_id: string | null;
   label: string | null;
   url: string | null;
   file_path: string | null;
