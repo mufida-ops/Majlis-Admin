@@ -26,7 +26,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: ({color, size}) => <Ionicons name="home-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="drop" options={{ title: 'Give', tabBarIcon: ({color, size}) => <Ionicons name="add-circle-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="drop" options={{ title: 'Quick Note', tabBarIcon: ({color, size}) => <Ionicons name="add-circle-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="projects" options={{ title: 'Projects', tabBarIcon: ({color, size}) => <Ionicons name="layers-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="fs2" options={{ title: 'FS2', tabBarIcon: ({color, size}) => <Ionicons name="library-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="documents" options={{ title: 'Documents', tabBarIcon: ({color, size}) => <Ionicons name="folder-outline" color={color} size={size} /> }} />

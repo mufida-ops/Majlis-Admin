@@ -204,7 +204,7 @@ export default function DropScreen() {
 
   return (
     <Screen>
-      <SectionTitle title="Give" subtitle="Capture first. Organise later." />
+      <SectionTitle title="Quick Note" subtitle="Capture first. Organise later." />
       <Card>
         <Text style={styles.label}>What's on your mind?</Text>
         <TextInput

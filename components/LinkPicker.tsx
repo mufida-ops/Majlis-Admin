@@ -6,7 +6,7 @@ import { localDateKey } from '@/lib/format';
 import type { OwnerType } from '@/types/db';
 
 // Shared "link this to Calendar / CRM / Discussion (/ Task)" mini-form —
-// used both on Give (per drop-in) and Your AI Assistant (per message, and
+// used both on Quick Note (per drop-in) and Your AI Assistant (per message, and
 // to reclassify a wrong AI suggestion), so linking works the same way in
 // both places instead of two divergent implementations.
 export type LinkTarget = 'task' | 'calendar' | 'crm' | 'discussion';

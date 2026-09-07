@@ -34,7 +34,7 @@ function scopeKeyFor(scope: AttachmentScope): string {
  * drop — reused everywhere attachments show up.
  *
  * `scope` can be null when the thing being attached to doesn't exist yet
- * (e.g. a Give note that hasn't been saved — sometimes the attachment IS
+ * (e.g. a Quick Note that hasn't been saved — sometimes the attachment IS
  * the note, so waiting for a save first would block that). Pass
  * `onEnsureScope` to create it lazily the first time something is actually
  * added; every add action resolves the scope through that before uploading.

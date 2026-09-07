@@ -362,7 +362,7 @@ export default function HomeScreen() {
 
       <Pressable onPress={() => router.push('/(tabs)/drop')}>
         <Card style={styles.capture}>
-          <Text style={styles.captureTitle}>Give something in</Text>
+          <Text style={styles.captureTitle}>Add a quick note</Text>
           <Text style={styles.captureText}>Thought, task, discussion, follow-up — organise it later.</Text>
           <Text style={styles.capturePrompt}>What's on your mind?</Text>
         </Card>
@@ -377,7 +377,7 @@ export default function HomeScreen() {
         ) : focus.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Image source={require('@/assets/images/reading-together.jpg')} style={styles.emptyImage} resizeMode="cover" />
-            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Give a thought in, or see Catch-up below.</Text>
+            <Text style={[styles.meta, styles.emptyText]}>Nothing urgent right now. Add a quick note, or see Catch-up below.</Text>
           </Card>
         ) : (
           focus.map(item => (
