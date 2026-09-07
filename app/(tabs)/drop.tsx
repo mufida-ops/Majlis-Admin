@@ -317,7 +317,7 @@ export default function DropScreen() {
                     <Text style={styles.meta}>
                       {formatRelative(drop.created_at)}
                       {drop.urgent ? ' · Urgent' : ''}
-                      {drop.summary ? ` · ${partner?.display_name ?? 'They'} saw: "${drop.summary}"` : ' · Not processed yet'}
+                      {drop.summary ? ` · ${partner?.display_name ?? 'They'} will see: "${drop.summary}"` : ' · Not processed yet'}
                     </Text>
                     {linkingDropId === drop.id ? (
                       <LinkPicker
