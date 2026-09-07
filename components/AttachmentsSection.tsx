@@ -75,38 +75,52 @@ export function AttachmentsSection({
       showAlert('Photo access needed', 'Allow photo access in your phone settings to attach a photo.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (result.canceled) return;
-    const asset = result.assets[0];
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsMultipleSelection: true
+    });
+    if (result.canceled || result.assets.length === 0) return;
     setAddingPhoto(true);
     try {
-      const link = await addAttachmentPhoto(
-        scope,
-        { workspace_id: workspaceId, created_by: createdBy },
-        { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType ?? 'image/jpeg' }
+      const outcomes = await Promise.allSettled(
+        result.assets.map(asset =>
+          addAttachmentPhoto(
+            scope,
+            { workspace_id: workspaceId, created_by: createdBy },
+            { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType ?? 'image/jpeg' }
+          )
+        )
       );
-      setData(prev => [...(prev ?? []), link]);
-    } catch (err) {
-      showAlert('Could not attach that photo', err instanceof Error ? err.message : 'Try again.');
+      const uploaded = outcomes.filter((o): o is PromiseFulfilledResult<AttachmentRow> => o.status === 'fulfilled').map(o => o.value);
+      if (uploaded.length > 0) setData(prev => [...(prev ?? []), ...uploaded]);
+      if (uploaded.length < outcomes.length) {
+        showAlert("Some photos didn't attach", `${outcomes.length - uploaded.length} of ${outcomes.length} couldn't be added — try those again.`);
+      }
     } finally {
       setAddingPhoto(false);
     }
   };
 
   const pickDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
-    if (result.canceled) return;
-    const asset = result.assets[0];
+    const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
+    if (result.canceled || result.assets.length === 0) return;
     setAddingDocument(true);
     try {
-      const link = await addAttachmentFile(
-        scope,
-        { workspace_id: workspaceId, created_by: createdBy },
-        { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
+      const outcomes = await Promise.allSettled(
+        result.assets.map(asset =>
+          addAttachmentFile(
+            scope,
+            { workspace_id: workspaceId, created_by: createdBy },
+            { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
+          )
+        )
       );
-      setData(prev => [...(prev ?? []), link]);
-    } catch (err) {
-      showAlert('Could not attach that file', err instanceof Error ? err.message : 'Try again.');
+      const uploaded = outcomes.filter((o): o is PromiseFulfilledResult<AttachmentRow> => o.status === 'fulfilled').map(o => o.value);
+      if (uploaded.length > 0) setData(prev => [...(prev ?? []), ...uploaded]);
+      if (uploaded.length < outcomes.length) {
+        showAlert("Some files didn't attach", `${outcomes.length - uploaded.length} of ${outcomes.length} couldn't be added — try those again.`);
+      }
     } finally {
       setAddingDocument(false);
     }
