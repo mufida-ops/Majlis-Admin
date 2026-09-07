@@ -16,11 +16,11 @@ export async function sendChatMessage(
   workspaceId: string,
   userId: string,
   message: string
-): Promise<{ userMessage: AiChatMessageRow; assistantMessage: AiChatMessageRow; action: AiActionRow | null }> {
+): Promise<{ userMessage: AiChatMessageRow; assistantMessage: AiChatMessageRow; actions: AiActionRow[] }> {
   const supabase = requireSupabase();
   const { data, error } = await supabase.functions.invoke('ai-chat', {
     body: { workspace_id: workspaceId, user_id: userId, message }
   });
   if (error) throw new Error(error.message);
-  return data as { userMessage: AiChatMessageRow; assistantMessage: AiChatMessageRow; action: AiActionRow | null };
+  return data as { userMessage: AiChatMessageRow; assistantMessage: AiChatMessageRow; actions: AiActionRow[] };
 }

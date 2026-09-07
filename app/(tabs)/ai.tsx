@@ -79,9 +79,9 @@ export default function AiChatScreen() {
     setMessages(prev => [...(prev ?? []), optimisticUser]);
 
     try {
-      const { userMessage, assistantMessage, action } = await sendChatMessage(workspaceId, session.user.id, text);
+      const { userMessage, assistantMessage, actions } = await sendChatMessage(workspaceId, session.user.id, text);
       setMessages(prev => [...(prev ?? []).filter(m => m.id !== optimisticId), userMessage, assistantMessage]);
-      if (action) setProposedActions(prev => [...(prev ?? []), action]);
+      if (actions.length > 0) setProposedActions(prev => [...(prev ?? []), ...actions]);
     } catch (err) {
       setMessages(prev => (prev ?? []).filter(m => m.id !== optimisticId));
       setError(err instanceof Error ? err.message : 'Could not send that — try again.');
@@ -173,7 +173,7 @@ export default function AiChatScreen() {
     }
   };
 
-  const actionFor = (messageId: string) => (proposedActions ?? []).find(a => a.chat_message_id === messageId);
+  const actionsFor = (messageId: string) => (proposedActions ?? []).filter(a => a.chat_message_id === messageId);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -193,7 +193,7 @@ export default function AiChatScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {messages.map(message => {
-              const action = message.role === 'assistant' ? actionFor(message.id) : undefined;
+              const actionsForMessage = message.role === 'assistant' ? actionsFor(message.id) : [];
               return (
                 <View key={message.id}>
                   <View style={[styles.bubble, message.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
@@ -221,9 +221,10 @@ export default function AiChatScreen() {
                     )
                   ) : null}
 
-                  {action ? (
+                  {actionsForMessage.map(action =>
                     recategorizing?.actionId === action.id ? (
                       <LinkPicker
+                        key={action.id}
                         targets={AI_LINK_TARGETS}
                         initialTarget={recategorizing.target}
                         organisations={(orgsList ?? []).map(o => ({ id: o.id, name: o.name }))}
@@ -235,7 +236,7 @@ export default function AiChatScreen() {
                         onCancel={cancelRecategorize}
                       />
                     ) : (
-                      <View style={styles.actionCard}>
+                      <View key={action.id} style={styles.actionCard}>
                         <Text style={styles.suggestion}>{describeAiAction(action)}</Text>
                         <View style={styles.actionButtons}>
                           <Pressable style={styles.primary} onPress={() => accept(action.id)} disabled={busyActionId === action.id}>
@@ -255,7 +256,7 @@ export default function AiChatScreen() {
                         </View>
                       </View>
                     )
-                  ) : null}
+                  )}
                 </View>
               );
             })}

@@ -34,32 +34,35 @@ const ACTION_TYPES = [
 
 const RESPOND_TOOL = {
   name: 'respond',
-  description: "Reply to the founder's chat message, optionally proposing one structured follow-up action.",
+  description: "Reply to the founder's chat message, optionally proposing structured follow-up actions.",
   input_schema: {
     type: 'object',
     properties: {
       reply: {
         type: 'string',
         description:
-          "Your conversational reply, shown directly to the founder in the chat. Natural, warm, concise — a couple of sentences at most unless they asked something that needs more. If you're proposing an action below, say so in the reply (e.g. \"I'll add that to your calendar — take a look below.\")."
+          "Your conversational reply, shown directly to the founder in the chat. Natural, warm, concise — a couple of sentences at most unless they asked something that needs more. If you're proposing actions below, say so in the reply (e.g. \"I'll add those to your calendar — take a look below.\"), and make sure the count you mention matches how many you actually listed in actions — never claim you've added something that isn't in that list."
       },
-      action: {
-        type: ['object', 'null'],
+      actions: {
+        type: 'array',
         description:
-          'At most one structured action this specific message clearly calls for — omit (null) for plain conversation, a question, or anything not clearly actionable. Never propose more than one action per turn.',
-        properties: {
-          action_type: { type: 'string', enum: ACTION_TYPES },
-          confidence: { type: 'number', description: '0 to 1, how clearly the message supports this action' },
-          payload: {
-            type: 'object',
-            description:
-              'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if a specific time was mentioned), all_day? (true when no specific time was mentioned), description?, owner? (display name or "Both" — only if clearly stated, otherwise omit so it defaults to Both)}; create_organisation {name, stage? (one of Lead|Contacted|Meeting Booked|Proposal Sent|Negotiating|Won|Onboarding|Active Partner|Follow-up — default Lead unless clearly further along), note?, next_action?}; send_partner_message {message, urgent? (true only if this genuinely cannot wait — most late-night or "just thinking out loud" messages should be false, since false respects the co-founder\'s quiet hours and just waits for their next catch-up instead of interrupting them)} — use this when the founder wants something passed along to their co-founder rather than acted on in the workspace (e.g. "tell Victoria I\'m thinking about X", "let Mufida know Y", any message meant for the other person, especially late-night ones they don\'t want to send straight to WhatsApp). Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one; if a company/school/contact isn\'t already listed in organisations, propose create_organisation for it instead.'
-          }
-        },
-        required: ['action_type', 'payload']
+          "Zero or more structured actions this message clearly calls for — one entry per distinct task/decision/event/etc. (e.g. three separate to-dos mentioned in one message means three entries here, not one). Empty array for plain conversation, a question, or anything not clearly actionable.",
+        items: {
+          type: 'object',
+          properties: {
+            action_type: { type: 'string', enum: ACTION_TYPES },
+            confidence: { type: 'number', description: '0 to 1, how clearly the message supports this action' },
+            payload: {
+              type: 'object',
+              description:
+                'Fields depend on action_type: create_task {project_id, title, owner_user_id?, due_at?}; assign_task {task_id, owner_user_id}; update_task {task_id, status: Todo|Doing|Waiting|Done}; create_decision {title, rationale?, project_id?, owner: display name or "Both"}; resolve_decision {decision_id, status: Agreed|Discuss}; add_crm_note {organisation_id, note}; update_pipeline_stage {organisation_id, stage}; create_follow_up {organisation_id, next_action, next_action_at?}; mark_waiting_for {task_id}; create_event {title, start_date (YYYY-MM-DD — resolve words like "today"/"tomorrow"/"Friday" using today_date in the workspace context, never guess a date), start_time? (24h HH:MM, only if a specific time was mentioned), all_day? (true when no specific time was mentioned), description?, owner? (display name or "Both" — only if clearly stated, otherwise omit so it defaults to Both)}; create_organisation {name, stage? (one of Lead|Contacted|Meeting Booked|Proposal Sent|Negotiating|Won|Onboarding|Active Partner|Follow-up — default Lead unless clearly further along), note?, next_action?}; send_partner_message {message, urgent? (true only if this genuinely cannot wait — most late-night or "just thinking out loud" messages should be false, since false respects the co-founder\'s quiet hours and just waits for their next catch-up instead of interrupting them)} — use this when the founder wants something passed along to their co-founder rather than acted on in the workspace (e.g. "tell Victoria I\'m thinking about X", "let Mufida know Y", any message meant for the other person, especially late-night ones they don\'t want to send straight to WhatsApp). Only reference project_id/task_id/organisation_id/decision_id values given in the workspace context — never invent one; if a company/school/contact isn\'t already listed in organisations, propose create_organisation for it instead.'
+            }
+          },
+          required: ['action_type', 'payload']
+        }
       }
     },
-    required: ['reply']
+    required: ['reply', 'actions']
   }
 };
 
@@ -179,11 +182,14 @@ Deno.serve(async req => {
           `with..." questions from there rather than guessing or saying you don't know.\n` +
           `2. Give honest advice or thinking-partner input when they ask "should I do this or that" — reason it ` +
           `through with them like a sharp co-founder would, using the real context you have, not generic advice.\n` +
-          `3. When their message clearly calls for a concrete action (a task, decision, CRM update, calendar ` +
-          `event, or passing a message to their co-founder), propose it via the tool's optional "action" field so ` +
-          `it can be reviewed before anything is created or sent — never claim you've already done something.\n\n` +
-          `For plain conversation, a question, or advice, just reply and leave action out — don't force an action ` +
-          `where none was asked for.\n\n` +
+          `3. When their message clearly calls for one or more concrete actions (a task, decision, CRM update, ` +
+          `calendar event, or passing a message to their co-founder), propose each one via the tool's "actions" ` +
+          `array so they can all be reviewed before anything is created or sent — if they list several things at ` +
+          `once (e.g. three separate to-dos), propose all of them as separate entries in that same turn, not just ` +
+          `the first one. Never claim in your reply that you've added or created something unless it's actually ` +
+          `listed in actions.\n\n` +
+          `For plain conversation, a question, or advice, just reply and leave actions empty — don't force an ` +
+          `action where none was asked for.\n\n` +
           `Workspace context (only use these ids, never invent new ones; resolve relative dates like "today"/` +
           `"tomorrow" using today_date/tomorrow_date, both already in ${context.author_name}'s own timezone):\n` +
           JSON.stringify(context, null, 2),
@@ -201,8 +207,8 @@ Deno.serve(async req => {
     const completion = await anthropicResponse.json();
     const toolUse = completion.content?.find((block: { type: string }) => block.type === 'tool_use');
     const reply: string = toolUse?.input?.reply ?? "Sorry, I couldn't come up with a reply just then — try again?";
-    const proposedAction: { action_type: string; confidence?: number; payload: Record<string, unknown> } | null =
-      toolUse?.input?.action ?? null;
+    const proposedActions: Array<{ action_type: string; confidence?: number; payload: Record<string, unknown> }> =
+      toolUse?.input?.actions ?? [];
 
     // Same guardrail as parse-drop: never let a suggestion reference an id
     // that doesn't actually exist in the workspace, even if Claude proposed
@@ -221,12 +227,9 @@ Deno.serve(async req => {
         return value == null || typeof value !== 'string' || knownIds[field].has(value);
       });
 
-    const validAction =
-      proposedAction &&
-      (ACTION_TYPES as readonly string[]).includes(proposedAction.action_type) &&
-      hasOnlyKnownIds(proposedAction.payload ?? {})
-        ? proposedAction
-        : null;
+    const validActions = proposedActions.filter(
+      a => (ACTION_TYPES as readonly string[]).includes(a.action_type) && hasOnlyKnownIds(a.payload ?? {})
+    );
 
     const { data: assistantMessage, error: insertAssistantError } = await supabase
       .from('ai_chat_messages')
@@ -235,24 +238,25 @@ Deno.serve(async req => {
       .single();
     if (insertAssistantError) throw new Error(insertAssistantError.message);
 
-    let actionRow = null;
-    if (validAction) {
+    let actionRows: unknown[] = [];
+    if (validActions.length > 0) {
       const { data, error: insertActionError } = await supabase
         .from('ai_actions')
-        .insert({
-          workspace_id,
-          chat_message_id: assistantMessage.id,
-          action_type: validAction.action_type,
-          payload: validAction.payload ?? {},
-          confidence: typeof validAction.confidence === 'number' ? validAction.confidence : null
-        })
-        .select('*')
-        .single();
+        .insert(
+          validActions.map(a => ({
+            workspace_id,
+            chat_message_id: assistantMessage.id,
+            action_type: a.action_type,
+            payload: a.payload ?? {},
+            confidence: typeof a.confidence === 'number' ? a.confidence : null
+          }))
+        )
+        .select('*');
       if (insertActionError) throw new Error(insertActionError.message);
-      actionRow = data;
+      actionRows = data ?? [];
     }
 
-    return new Response(JSON.stringify({ userMessage, assistantMessage, action: actionRow }), {
+    return new Response(JSON.stringify({ userMessage, assistantMessage, actions: actionRows }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (err) {
