@@ -22,27 +22,40 @@ import type { AttachmentRow } from '@/types/db';
 
 const IMAGE_PATH_RE = /\.(jpe?g|png|gif|webp|heic)$/i;
 
-/** Links, photos, and documents attached to one project or one task — reused on both screens. */
+function scopeKeyFor(scope: AttachmentScope): string {
+  if ('project_id' in scope) return `p:${scope.project_id}`;
+  if ('task_id' in scope) return `t:${scope.task_id}`;
+  if ('document_id' in scope) return `d:${scope.document_id}`;
+  return `g:${scope.drop_id}`;
+}
+
+/**
+ * Links, photos, and documents attached to one project, task, document, or
+ * drop — reused everywhere attachments show up.
+ *
+ * `scope` can be null when the thing being attached to doesn't exist yet
+ * (e.g. a Give note that hasn't been saved — sometimes the attachment IS
+ * the note, so waiting for a save first would block that). Pass
+ * `onEnsureScope` to create it lazily the first time something is actually
+ * added; every add action resolves the scope through that before uploading.
+ */
 export function AttachmentsSection({
   workspaceId,
   createdBy,
   scope,
+  onEnsureScope,
   title = 'Links & files'
 }: {
   workspaceId: string;
   createdBy: string;
-  scope: AttachmentScope;
+  scope: AttachmentScope | null;
+  onEnsureScope?: () => Promise<AttachmentScope>;
   title?: string;
 }) {
-  const scopeKey =
-    'project_id' in scope
-      ? `p:${scope.project_id}`
-      : 'task_id' in scope
-        ? `t:${scope.task_id}`
-        : 'document_id' in scope
-          ? `d:${scope.document_id}`
-          : `g:${scope.drop_id}`;
-  const { data: attachments, loading, setData } = useAsync(() => listAttachments(scope), [scopeKey]);
+  const scopeKey = scope ? scopeKeyFor(scope) : null;
+  const { data: attachments, loading, setData } = useAsync(() => (scope ? listAttachments(scope) : Promise.resolve([])), [scopeKey]);
+
+  const resolveScope = async (): Promise<AttachmentScope | null> => scope ?? (onEnsureScope ? onEnsureScope() : null);
 
   const [linkDraft, setLinkDraft] = useState('');
   const [addingLink, setAddingLink] = useState(false);
@@ -59,7 +72,9 @@ export function AttachmentsSection({
     if (!url) return;
     setAddingLink(true);
     try {
-      const link = await addAttachmentLink(scope, { workspace_id: workspaceId, url, created_by: createdBy });
+      const activeScope = await resolveScope();
+      if (!activeScope) return;
+      const link = await addAttachmentLink(activeScope, { workspace_id: workspaceId, url, created_by: createdBy });
       setData(prev => [...(prev ?? []), link]);
       setLinkDraft('');
     } catch (err) {
@@ -83,10 +98,12 @@ export function AttachmentsSection({
     if (result.canceled || result.assets.length === 0) return;
     setAddingPhoto(true);
     try {
+      const activeScope = await resolveScope();
+      if (!activeScope) return;
       const outcomes = await Promise.allSettled(
         result.assets.map(asset =>
           addAttachmentPhoto(
-            scope,
+            activeScope,
             { workspace_id: workspaceId, created_by: createdBy },
             { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', mimeType: asset.mimeType ?? 'image/jpeg' }
           )
@@ -107,10 +124,12 @@ export function AttachmentsSection({
     if (result.canceled || result.assets.length === 0) return;
     setAddingDocument(true);
     try {
+      const activeScope = await resolveScope();
+      if (!activeScope) return;
       const outcomes = await Promise.allSettled(
         result.assets.map(asset =>
           addAttachmentFile(
-            scope,
+            activeScope,
             { workspace_id: workspaceId, created_by: createdBy },
             { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }
           )

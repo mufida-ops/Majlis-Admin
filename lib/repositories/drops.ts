@@ -35,6 +35,12 @@ export async function updateDropText(id: string, rawText: string) {
   return unwrap(result) as DropRow;
 }
 
+export async function updateDropUrgent(id: string, urgent: boolean) {
+  const supabase = requireSupabase();
+  const result = await supabase.from('drops').update({ urgent }).eq('id', id).select('*').single();
+  return unwrap(result) as DropRow;
+}
+
 export async function deleteDrop(id: string) {
   const supabase = requireSupabase();
   const result = await supabase.from('drops').delete().eq('id', id);

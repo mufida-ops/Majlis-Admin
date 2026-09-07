@@ -13,7 +13,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { createDrop, listDrops, updateDropText, deleteDrop } from '@/lib/repositories/drops';
+import { createDrop, listDrops, updateDropText, updateDropUrgent, deleteDrop } from '@/lib/repositories/drops';
 import { requestDropParse } from '@/lib/repositories/aiActions';
 import { isInQuietHours, formatQuietHoursRange } from '@/lib/quietHours';
 import { formatRelative } from '@/lib/format';
@@ -22,6 +22,7 @@ import { createDecision } from '@/lib/repositories/decisions';
 import { createEvent } from '@/lib/repositories/events';
 import { LinkPicker, GIVE_LINK_TARGETS, type LinkPickerResult } from '@/components/LinkPicker';
 import { ownerAccentColor } from '@/lib/ownerLabel';
+import type { AttachmentScope } from '@/lib/repositories/attachments';
 
 export default function DropScreen() {
   const { session } = useAuth();
@@ -36,7 +37,10 @@ export default function DropScreen() {
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [attachingDropId, setAttachingDropId] = useState<string | null>(null);
-  const [justSavedDropId, setJustSavedDropId] = useState<string | null>(null);
+  // The note currently being composed — created either by tapping Save, or
+  // lazily the first time something is attached before any text is saved
+  // (sometimes the attachment IS the note, so it shouldn't have to wait).
+  const [draftDropId, setDraftDropId] = useState<string | null>(null);
 
   const {
     data: myDrops,
@@ -132,9 +136,27 @@ export default function DropScreen() {
     ]);
   };
 
+  // Creates the drop the first time anything needs it to actually exist —
+  // either an explicit Save/Mark urgent, or attaching a file before any
+  // text has been saved. Returns the same draft on every later call.
+  const ensureDraftDrop = async (): Promise<AttachmentScope> => {
+    if (draftDropId) return { drop_id: draftDropId };
+    if (!session || !workspaceId) throw new Error('Still setting up your workspace — try again in a moment.');
+    const drop = await createDrop({ workspace_id: workspaceId, created_by: session.user.id, raw_text: text.trim(), urgent: false });
+    setDraftDropId(drop.id);
+    refreshDrops();
+    // Attaching something is already "sending" it, even if Save is never
+    // explicitly tapped afterward — get the catch-up summary going right
+    // away instead of leaving it stuck on "Not processed yet" forever.
+    requestDropParse(drop.id, false)
+      .then(() => refreshDrops())
+      .catch(() => {});
+    return { drop_id: drop.id };
+  };
+
   const save = async (urgent = false) => {
-    if (!text.trim()) {
-      setFeedback('Type or say something first.');
+    if (!text.trim() && !draftDropId) {
+      setFeedback('Type something, or attach a photo/link/file first.');
       return;
     }
     if (!session || !workspaceId) {
@@ -145,12 +167,14 @@ export default function DropScreen() {
     setSaving(true);
     setFeedback('');
     try {
-      const drop = await createDrop({
-        workspace_id: workspaceId,
-        created_by: session.user.id,
-        raw_text: text.trim(),
-        urgent
-      });
+      // A draft may already exist if something was attached before Save was
+      // tapped — finish that same drop instead of creating a duplicate.
+      const drop = draftDropId
+        ? await (async () => {
+            const updated = await updateDropText(draftDropId, text.trim());
+            return urgent ? updateDropUrgent(draftDropId, true) : updated;
+          })()
+        : await createDrop({ workspace_id: workspaceId, created_by: session.user.id, raw_text: text.trim(), urgent });
 
       const partnerName = partner?.display_name ?? 'your co-founder';
       if (urgent) {
@@ -161,7 +185,7 @@ export default function DropScreen() {
         setFeedback(`Saved for ${partnerName}'s next catch-up.`);
       }
       setText('');
-      setJustSavedDropId(drop.id);
+      setDraftDropId(drop.id);
       refreshDrops();
 
       // This screen is purely conversation with your co-founder: this call
@@ -200,17 +224,27 @@ export default function DropScreen() {
           </Pressable>
         </View>
         {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-        {justSavedDropId && workspaceId && session ? (
+        {workspaceId && session ? (
           <View style={{ marginTop: 14 }}>
             <AttachmentsSection
               workspaceId={workspaceId}
               createdBy={session.user.id}
-              scope={{ drop_id: justSavedDropId }}
-              title="Add links, photos, or files to that note"
+              scope={draftDropId ? { drop_id: draftDropId } : null}
+              onEnsureScope={ensureDraftDrop}
+              title="Links, photos, or files — even without any text"
             />
-            <Pressable onPress={() => setJustSavedDropId(null)} style={{ marginTop: 10 }}>
-              <Text style={styles.startNewText}>Start a new note →</Text>
-            </Pressable>
+            {draftDropId ? (
+              <Pressable
+                onPress={() => {
+                  setDraftDropId(null);
+                  setText('');
+                  setFeedback('');
+                }}
+                style={{ marginTop: 10 }}
+              >
+                <Text style={styles.startNewText}>Start a new note →</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </Card>
@@ -264,7 +298,7 @@ export default function DropScreen() {
                 ) : (
                   <Card key={drop.id} style={{ backgroundColor: ownerAccentColor(drop.created_by, me, partner) ?? theme.colors.surface }}>
                     <View style={styles.sentHeader}>
-                      <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text}</Text>
+                      <Text style={[styles.sentText, { flex: 1 }]}>{drop.raw_text.trim() || '(No note — see attachments)'}</Text>
                       <View style={styles.sentIcons}>
                         <Pressable hitSlop={10} onPress={() => toggleAttach(drop.id)}>
                           <Ionicons name="attach-outline" size={18} color={theme.colors.muted} />
