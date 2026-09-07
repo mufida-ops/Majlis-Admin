@@ -5,6 +5,7 @@ import * as decisions from '@/lib/repositories/decisions';
 import * as organisations from '@/lib/repositories/organisations';
 import * as events from '@/lib/repositories/events';
 import * as drops from '@/lib/repositories/drops';
+import * as todos from '@/lib/repositories/todos';
 
 export async function listProposedActions(workspaceId: string): Promise<AiActionRow[]> {
   const supabase = requireSupabase();
@@ -30,6 +31,12 @@ async function performAction(action: AiActionRow, actorUserId: string, workspace
   const p = action.payload as Record<string, any>;
   switch (action.action_type) {
     case 'create_task':
+      // No project named means it's a personal to-do, not a project task —
+      // project_tasks.project_id is not-null, so this can never be a
+      // "leave it blank" project task.
+      if (!p.project_id) {
+        return todos.createTodo(workspaceId, actorUserId, p.title);
+      }
       return projects.createTask({
         workspace_id: workspaceId,
         project_id: p.project_id,
