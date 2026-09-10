@@ -171,7 +171,7 @@ Deno.serve(async req => {
       },
       body: JSON.stringify({
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 8192,
         system:
           `You're ${context.author_name}'s AI Assistant inside Majlis, a shared founder workspace app. You're ` +
           `chatting one-on-one and privately with them — this conversation is not seen by their co-founder. Be ` +
@@ -185,9 +185,10 @@ Deno.serve(async req => {
           `3. When their message clearly calls for one or more concrete actions (a task, decision, CRM update, ` +
           `calendar event, or passing a message to their co-founder), propose each one via the tool's "actions" ` +
           `array so they can all be reviewed before anything is created or sent — if they list several things at ` +
-          `once (e.g. three separate to-dos), propose all of them as separate entries in that same turn, not just ` +
-          `the first one. Never claim in your reply that you've added or created something unless it's actually ` +
-          `listed in actions.\n\n` +
+          `once, propose EVERY one of them as its own entry in that same turn, no matter how many there are (ten, ` +
+          `twenty, thirty — all of them, never just the first several). Never claim in your reply that you've ` +
+          `added or created something unless it's actually listed in actions, and never say a specific count in ` +
+          `your reply unless that many entries are actually in the actions array.\n\n` +
           `For plain conversation, a question, or advice, just reply and leave actions empty — don't force an ` +
           `action where none was asked for.\n\n` +
           `Workspace context (only use these ids, never invent new ones; resolve relative dates like "today"/` +

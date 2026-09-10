@@ -138,7 +138,7 @@ Deno.serve(async req => {
       },
       body: JSON.stringify({
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 8192,
         tools: [PROPOSE_ACTIONS_TOOL],
         tool_choice: { type: 'tool', name: 'propose_actions' },
         messages: [
