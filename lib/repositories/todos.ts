@@ -1,6 +1,6 @@
 import { requireSupabase, unwrap } from '@/lib/repositories/helpers';
 import { localDateKey } from '@/lib/format';
-import type { TodoItemRow, TodoProgressUpdateRow, TodoLinkRow, TodoDailyCapacityRow, TodoLinkType } from '@/types/db';
+import type { TodoItemRow, TodoProgressUpdateRow, TodoLinkRow, TodoDailyCapacityRow, TodoLinkType, TodoQuadrant } from '@/types/db';
 
 export async function listTodos(workspaceId: string, userId: string): Promise<TodoItemRow[]> {
   const supabase = requireSupabase();
@@ -46,6 +46,12 @@ export async function setTodoDone(id: string, done: boolean): Promise<TodoItemRo
     .eq('id', id)
     .select('*')
     .single();
+  return unwrap(result) as TodoItemRow;
+}
+
+export async function setTodoQuadrant(id: string, quadrant: TodoQuadrant): Promise<TodoItemRow> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('todo_items').update({ quadrant }).eq('id', id).select('*').single();
   return unwrap(result) as TodoItemRow;
 }
 

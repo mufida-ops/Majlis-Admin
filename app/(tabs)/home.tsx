@@ -24,14 +24,16 @@ import {
   deleteTodo,
   resumeTodo,
   getTodayCapacity,
-  setTodayCapacity
+  setTodayCapacity,
+  setTodoQuadrant
 } from '@/lib/repositories/todos';
 import { listActivitySince } from '@/lib/repositories/activity';
 import { classifyActivity, type ActivityHref } from '@/lib/catchUp';
 import { isInQuietHours } from '@/lib/quietHours';
 import { formatShortDate, formatMinutes } from '@/lib/format';
 import { quoteOfTheDay } from '@/lib/quotes';
-import type { ActivityEventRow, DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow, TodoDailyCapacityRow } from '@/types/db';
+import { TODO_QUADRANTS, TODO_QUADRANT_LABEL } from '@/lib/todoQuadrant';
+import type { ActivityEventRow, DecisionRow, OrganisationRow, ProjectTaskRow, TodoItemRow, TodoDailyCapacityRow, TodoQuadrant } from '@/types/db';
 
 type FocusItem = {
   key: string;
@@ -225,6 +227,91 @@ export default function HomeScreen() {
   // no-op for Victoria rather than something that needs its own branch.
   const activeTodos = useMemo(() => (data?.todos ?? []).filter(t => !t.done && t.status !== 'parked'), [data]);
   const parkedTodos = useMemo(() => (data?.todos ?? []).filter(t => !t.done && t.status === 'parked'), [data]);
+  const todosByQuadrant = useMemo(() => {
+    const groups: Record<TodoQuadrant, TodoItemRow[]> = { urgent_important: [], urgent: [], important: [], neither: [] };
+    for (const item of activeTodos) {
+      (groups[item.quadrant] ?? groups.important).push(item);
+    }
+    return groups;
+  }, [activeTodos]);
+
+  const [movingTodoId, setMovingTodoId] = useState<string | null>(null);
+
+  const toggleMoveTodo = (id: string) => setMovingTodoId(prev => (prev === id ? null : id));
+
+  const moveTodo = async (item: TodoItemRow, quadrant: TodoQuadrant) => {
+    setData(prev => (prev ? { ...prev, todos: prev.todos.map(t => (t.id === item.id ? { ...t, quadrant } : t)) } : prev));
+    setMovingTodoId(null);
+    try {
+      await setTodoQuadrant(item.id, quadrant);
+    } catch {
+      refresh();
+    }
+  };
+
+  const renderTodoRow = (item: TodoItemRow, index: number) => (
+    <View key={item.id}>
+      <View style={[styles.checkRow, index > 0 && styles.checkRowDivider]}>
+        <Pressable onPress={() => toggleTodo(item)} hitSlop={10}>
+          <Ionicons name="ellipse-outline" size={22} color={theme.colors.muted} />
+        </Pressable>
+        {editingTodoId === item.id ? (
+          <>
+            <TextInput value={editTodoBody} onChangeText={setEditTodoBody} style={[styles.input, { flex: 1 }]} autoFocus />
+            <Pressable hitSlop={10} onPress={() => saveTodoEdit(item.id)} disabled={savingTodoEdit}>
+              <Text style={styles.saveText}>{savingTodoEdit ? '…' : 'Save'}</Text>
+            </Pressable>
+            <Pressable hitSlop={10} onPress={cancelEditTodo} disabled={savingTodoEdit}>
+              <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              style={{ flex: 1 }}
+              disabled={!me?.enhanced_todo_enabled}
+              onPress={() => router.push(`/todo-item?id=${item.id}` as never)}
+            >
+              <View style={styles.todoTitleRow}>
+                <Text style={styles.checkRowTitle}>{item.body}</Text>
+                {me?.enhanced_todo_enabled && item.progress_note ? (
+                  <Ionicons name="chatbubble-ellipses" size={13} color={theme.colors.gold} />
+                ) : null}
+              </View>
+              <Text style={styles.todoDate} numberOfLines={2}>
+                {me?.enhanced_todo_enabled && item.progress_note ? item.progress_note : `Added ${formatShortDate(item.created_at)}`}
+                {me?.enhanced_todo_enabled && item.estimated_minutes_remaining ? ` · ${formatMinutes(item.estimated_minutes_remaining)} left` : ''}
+              </Text>
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => toggleMoveTodo(item.id)}>
+              <Ionicons name="swap-vertical-outline" size={16} color={theme.colors.muted} />
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => startEditTodo(item)}>
+              <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
+            </Pressable>
+            <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
+              <Ionicons name="close" size={18} color={theme.colors.muted} />
+            </Pressable>
+          </>
+        )}
+      </View>
+      {movingTodoId === item.id ? (
+        <View style={styles.quadrantChipRow}>
+          {TODO_QUADRANTS.map(q => (
+            <Pressable
+              key={q}
+              style={[styles.quadrantChip, item.quadrant === q && styles.quadrantChipActive]}
+              onPress={() => moveTodo(item, q)}
+            >
+              <Text style={[styles.quadrantChipText, item.quadrant === q && styles.quadrantChipTextActive]}>
+                {TODO_QUADRANT_LABEL[q]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
   const workloadMinutes = useMemo(
     () => activeTodos.reduce((sum, t) => sum + (t.estimated_minutes_remaining ?? 0), 0),
     [activeTodos]
@@ -465,59 +552,17 @@ export default function HomeScreen() {
           {activeTodos.length === 0 ? (
             !loading && <Text style={styles.meta}>Nothing on your list.</Text>
           ) : (
-            <View style={{ gap: 2 }}>
-              {activeTodos.map((item, index) => (
-                <View key={item.id} style={[styles.checkRow, index > 0 && styles.checkRowDivider]}>
-                  <Pressable onPress={() => toggleTodo(item)} hitSlop={10}>
-                    <Ionicons name="ellipse-outline" size={22} color={theme.colors.muted} />
-                  </Pressable>
-                  {editingTodoId === item.id ? (
-                    <>
-                      <TextInput
-                        value={editTodoBody}
-                        onChangeText={setEditTodoBody}
-                        style={[styles.input, { flex: 1 }]}
-                        autoFocus
-                      />
-                      <Pressable hitSlop={10} onPress={() => saveTodoEdit(item.id)} disabled={savingTodoEdit}>
-                        <Text style={styles.saveText}>{savingTodoEdit ? '…' : 'Save'}</Text>
-                      </Pressable>
-                      <Pressable hitSlop={10} onPress={cancelEditTodo} disabled={savingTodoEdit}>
-                        <Ionicons name="close-outline" size={20} color={theme.colors.muted} />
-                      </Pressable>
-                    </>
-                  ) : (
-                    <>
-                      <Pressable
-                        style={{ flex: 1 }}
-                        disabled={!me?.enhanced_todo_enabled}
-                        onPress={() => router.push(`/todo-item?id=${item.id}` as never)}
-                      >
-                        <View style={styles.todoTitleRow}>
-                          <Text style={styles.checkRowTitle}>{item.body}</Text>
-                          {me?.enhanced_todo_enabled && item.progress_note ? (
-                            <Ionicons name="chatbubble-ellipses" size={13} color={theme.colors.gold} />
-                          ) : null}
-                        </View>
-                        <Text style={styles.todoDate} numberOfLines={2}>
-                          {me?.enhanced_todo_enabled && item.progress_note
-                            ? item.progress_note
-                            : `Added ${formatShortDate(item.created_at)}`}
-                          {me?.enhanced_todo_enabled && item.estimated_minutes_remaining
-                            ? ` · ${formatMinutes(item.estimated_minutes_remaining)} left`
-                            : ''}
-                        </Text>
-                      </Pressable>
-                      <Pressable hitSlop={10} onPress={() => startEditTodo(item)}>
-                        <Ionicons name="pencil-outline" size={16} color={theme.colors.muted} />
-                      </Pressable>
-                      <Pressable onPress={() => removeTodo(item)} hitSlop={10}>
-                        <Ionicons name="close" size={18} color={theme.colors.muted} />
-                      </Pressable>
-                    </>
-                  )}
-                </View>
-              ))}
+            <View style={{ gap: 16 }}>
+              {TODO_QUADRANTS.map(quadrant => {
+                const items = todosByQuadrant[quadrant];
+                if (items.length === 0) return null;
+                return (
+                  <View key={quadrant}>
+                    <Text style={styles.quadrantLabel}>{TODO_QUADRANT_LABEL[quadrant]}</Text>
+                    <View style={{ gap: 2 }}>{items.map((item, index) => renderTodoRow(item, index))}</View>
+                  </View>
+                );
+              })}
             </View>
           )}
           {me?.enhanced_todo_enabled && parkedTodos.length > 0 ? (
@@ -641,6 +686,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background
   },
   parkedLabel: { color: theme.colors.gold, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 10 },
+  quadrantLabel: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
+  quadrantChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8, paddingLeft: 32 },
+  quadrantChip: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
+  quadrantChipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  quadrantChipText: { color: theme.colors.muted, fontSize: 12, fontWeight: '600' },
+  quadrantChipTextActive: { color: '#fff' },
   resumeButton: {
     borderWidth: 1,
     borderColor: theme.colors.navy,

@@ -1194,3 +1194,13 @@ create index if not exists idx_attachments_drop on attachments(drop_id);
 alter table attachments drop constraint if exists attachments_scope_check;
 alter table attachments add constraint attachments_scope_check
   check (num_nonnulls(project_id, task_id, document_id, drop_id) = 1);
+
+-- ---------------------------------------------------------------------------
+-- Sort a to-do into the classic Urgent/Important matrix (four quadrants),
+-- so a long flat list can be triaged instead of just scrolled.
+-- ---------------------------------------------------------------------------
+
+alter table todo_items add column if not exists quadrant text not null default 'important'
+  check (quadrant in ('urgent_important', 'important', 'urgent', 'neither'));
+
+create index if not exists idx_todo_items_quadrant on todo_items(workspace_id, user_id, quadrant);

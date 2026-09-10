@@ -10,6 +10,7 @@ export type DecisionStatus = 'Waiting' | 'Agreed' | 'Discuss';
 export type AiActionStatus = 'Proposed' | 'Applied' | 'Dismissed';
 export type BookBoxType = 'story' | 'cultural';
 export type TodoStatus = 'active' | 'parked';
+export type TodoQuadrant = 'urgent_important' | 'important' | 'urgent' | 'neither';
 export type TodoLinkType = 'chatgpt' | 'claude' | 'document' | 'canva' | 'website' | 'email' | 'other';
 
 export type Workspace = {
@@ -209,6 +210,7 @@ export type TodoItemRow = {
   return_at: string | null;
   restart_point: string | null;
   why_it_matters: string | null;
+  quadrant: TodoQuadrant;
   created_at: string;
 };
 
