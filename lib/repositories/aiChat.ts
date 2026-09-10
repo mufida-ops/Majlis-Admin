@@ -12,6 +12,18 @@ export async function listChatMessages(workspaceId: string, userId: string): Pro
   return unwrap(result) as AiChatMessageRow[];
 }
 
+/**
+ * Wipes this member's entire AI chat history, starting the conversation
+ * fresh. Also removes any of their still-pending suggestions from that
+ * chat (ai_actions.chat_message_id cascades) — anything already Accepted
+ * is unaffected since accepting already applied it elsewhere.
+ */
+export async function clearChatHistory(workspaceId: string, userId: string): Promise<void> {
+  const supabase = requireSupabase();
+  const result = await supabase.from('ai_chat_messages').delete().eq('workspace_id', workspaceId).eq('user_id', userId);
+  unwrap(result);
+}
+
 export async function sendChatMessage(
   workspaceId: string,
   userId: string,

@@ -7,10 +7,11 @@ import { PageBanner } from '@/components/PageBanner';
 import { LoadingState, ErrorState, EmptyState } from '@/components/AsyncState';
 import { LinkPicker, AI_LINK_TARGETS, GIVE_LINK_TARGETS, type LinkTarget, type LinkPickerResult } from '@/components/LinkPicker';
 import { theme } from '@/constants/theme';
+import { showAlert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { useWorkspace } from '@/lib/workspace';
 import { useAsync } from '@/lib/useAsync';
-import { listChatMessages, sendChatMessage } from '@/lib/repositories/aiChat';
+import { listChatMessages, sendChatMessage, clearChatHistory } from '@/lib/repositories/aiChat';
 import { listProposedActions, applyAiAction, dismissAiAction } from '@/lib/repositories/aiActions';
 import { listProjects, createTask } from '@/lib/repositories/projects';
 import { createDecision } from '@/lib/repositories/decisions';
@@ -38,6 +39,7 @@ export default function AiChatScreen() {
   const [linkingMessageId, setLinkingMessageId] = useState<string | null>(null);
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState('');
+  const [clearing, setClearing] = useState(false);
 
   const {
     data: messages,
@@ -89,6 +91,35 @@ export default function AiChatScreen() {
     } finally {
       setSending(false);
     }
+  };
+
+  const clearChat = () => {
+    if (!session || !workspaceId) return;
+    showAlert(
+      'Clear this chat?',
+      "This deletes your whole conversation history with the AI Assistant, along with any of its suggestions here you haven't accepted yet. Anything already accepted is unaffected. This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear chat',
+          style: 'destructive',
+          onPress: async () => {
+            setClearing(true);
+            setError('');
+            try {
+              await clearChatHistory(workspaceId, session.user.id);
+              setMessages([]);
+              const remaining = await listProposedActions(workspaceId);
+              setProposedActions(remaining);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Could not clear the chat.');
+            } finally {
+              setClearing(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const accept = async (actionId: string) => {
@@ -178,10 +209,19 @@ export default function AiChatScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen contentStyle={{ paddingBottom: 16 }}>
-        <SectionTitle
-          title="Your AI Assistant"
-          subtitle="Ask a question, think out loud, or have it add a task, discussion, CRM update, calendar event, or message to your co-founder."
-        />
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <SectionTitle
+              title="Your AI Assistant"
+              subtitle="Ask a question, think out loud, or have it add a task, discussion, CRM update, calendar event, or message to your co-founder."
+            />
+          </View>
+          {messages && messages.length > 0 ? (
+            <Pressable onPress={clearChat} disabled={clearing} hitSlop={8} style={styles.clearChatButton}>
+              <Text style={styles.clearChatText}>{clearing ? 'Clearing…' : 'Clear chat'}</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <PageBanner image={require('@/assets/images/sign-in-hero.jpg')} />
 
         {messagesLoading ? (
@@ -283,6 +323,9 @@ export default function AiChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  clearChatButton: { paddingVertical: 4, paddingHorizontal: 2 },
+  clearChatText: { color: theme.colors.danger, fontSize: 13, fontWeight: '600' },
   bubble: { maxWidth: '85%', padding: 14, borderRadius: theme.radius.md },
   bubbleUser: { alignSelf: 'flex-end', backgroundColor: theme.colors.navy },
   bubbleAssistant: { alignSelf: 'flex-start', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
